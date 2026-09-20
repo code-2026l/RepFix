@@ -209,3 +209,22 @@ The toxifier is a variance-shrinkage projection over three seeded random project
 constant attractor makes it a controlled stand-in for the real heads. All datasets are
 public (UCI-HAR, RadioML2016.10A, NASA PCoE and MATR battery archives, A-share daily
 bars, CelebA, NYUv2).
+
+## License and citation
+
+This repository is made available for **non-commercial academic research use
+only**. It is not open source: you may read, run and modify the code, and use the
+result files to reproduce the paper, but **redistribution, rehosting, republishing
+and commercial use are not permitted**. The full terms are in [`LICENSE`](LICENSE),
+which also names the third-party files that keep their own licenses:
+`repro/scripts/_ref_pcgrad.py` is BSD-3-Clause, and the LaTeX support files
+(`natbib.sty`, `fancyhdr.sty`, `iclr2027_conference.bst`) belong to their
+distributions.
+
+If you use this code, data or figures, please cite the accompanying paper:
+
+> Anonymous Authors. *Gradient Toxicity: When Auxiliary Heads Collapse the Shared
+> Encoder.* ICLR 2027 (under review).
+
+Machine-readable citation metadata is in [`CITATION.cff`](CITATION.cff); it will
+carry the full author list once the paper is published.
