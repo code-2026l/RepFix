@@ -133,17 +133,80 @@ RHO_MODES = ("stfrho", "stfrhorank")
 # populated from the CLI in main(); read by train_one (keeps every call site intact)
 STF_RHO_CFG = dict(kappa=4.0, ema=0.9, probe_every=10, rank_max=3,
                    smooth=False, trace=False, latch_quantile=1.0,
-                   cal_warm_epochs=2.0)
+                   cal_warm_epochs=2.0, basis="pca")
 
 
-def rho_probe(model, xb, yb, criterion, regress, R=3):
+def _toxic_basis(hc, ga, gp, R, basis):
+    """Return (U, lam): the depth-R basis that the calibrated rank rule deletes.
+
+    Mirrors `_toxic_basis` in code/battery_bmtl_v3.py; the two drivers must agree,
+    since the paper's Algorithm is one procedure instantiated twice.
+
+    basis='pca' : top-R principal directions of the centered representation.
+        This is the paper's surrogate.  Theorem minimalrank is stated for the
+        toxic operator T, and the two spans coincide only when the auxiliary
+        Hessian is diagonal in the representation's principal basis -- true for
+        the variance-shrinkage toxifier, not guaranteed for a production head.
+        Reproduced byte-for-byte as released (same two calls in the same order)
+        so every shipped stfcal / stfcalrank number reproduces exactly.
+
+    basis='aux' : top-R principal directions of the auxiliary gradient itself,
+        Sigma_a = E[g_a g_a^T].  The criterion
+        rho_res[r] = <||g_a - Pi_U g_a||> / <||g_p||> has a denominator that does
+        not depend on U, so the r-dim subspace that drives rho_res below
+        1/alpha at the SMALLEST r -- which is what minimal rank asks for -- is
+        the top-r eigenspace of Sigma_a.  No inverse of Sigma_p is taken, so the
+        estimate stays well conditioned.
+
+    basis='gen' : top-R generalized eigenvectors of (Sigma_a, Sigma_p), i.e. the
+        directions maximising the toxic-to-restoring energy ratio.  Diagnostic
+        only: with a small-sample Sigma_p the ratio is set by Sigma_p's smallest
+        eigenvalues, so lam is not on the scale of the amplitude ratio rho.
+    """
+    if basis in ('aux', 'gen'):
+        dev = "cuda" if torch.cuda.is_available() else "cpu"
+        with torch.autocast(device_type=dev, enabled=False):
+            n = max(int(ga.shape[0]), 1)
+            ga32 = ga.float(); gp32 = gp.float()
+            Sa = (ga32.t() @ ga32) / n
+            if basis == 'aux':
+                ev_a, U_a = torch.linalg.eigh(0.5 * (Sa + Sa.t()))
+                order = torch.argsort(ev_a, descending=True)
+                # Euclidean-orthonormal already; re-orthonormalise the retained
+                # span so (I - U U^T) really is a projector.
+                Qr, _ = torch.linalg.qr(U_a[:, order][:, :max(int(R), 1)])
+                return Qr.detach(), ev_a[order].detach()
+            Sp = (gp32.t() @ gp32) / n
+            Sp = Sp + 1e-6 * (Sp.diagonal().mean().clamp_min(1e-12)) * torch.eye(
+                Sp.shape[0], device=Sp.device)
+            ev_p, U_p = torch.linalg.eigh(Sp)
+            W = (U_p * ev_p.clamp_min(1e-12).rsqrt().unsqueeze(0)) @ U_p.t()
+            M = W.t() @ Sa @ W
+            M = 0.5 * (M + M.t())
+            ev_m, Q = torch.linalg.eigh(M)
+            order = torch.argsort(ev_m, descending=True)
+            Qr, _ = torch.linalg.qr((W @ Q[:, order])[:, :max(int(R), 1)])
+        return Qr.detach(), ev_m[order].detach()
+    d = hc.shape[1]
+    cov = (hc.t() @ hc) / max(hc.shape[0], 1) + 1e-6 * torch.eye(d, device=hc.device)
+    evals, evecs = torch.linalg.eigh(cov)
+    o = torch.argsort(evals, descending=True)
+    return evecs[:, o][:, :max(int(R), 1)], evals[o][:max(int(R), 1)]
+
+
+def rho_probe(model, xb, yb, criterion, regress, R=3, basis='pca'):
     """Order-parameter family on the UNFILTERED auxiliary branch.
 
       rho_u   : paper convention, <||P_c g_a||>/<||g_p||>, P_c the per-sample
                 batch-mean collapse direction u = hc/||hc||;
-      rho_res : residual pull after removing the top-r PCA directions of the
-                batch representation, r = 0..R  (rho_res[0] = full pull);
-      U       : orthonormal PCA basis, descending variance.
+      rho_res : residual pull after removing the top-r directions of the chosen
+                basis, r = 0..R  (rho_res[0] = full pull);
+      U       : orthonormal basis, descending in the basis' own criterion;
+      lam     : the spectrum behind U (variance for 'pca', Sigma_a eigenvalue
+                for 'aux', generalized eigenvalue for 'gen').
+
+    rho_u does not depend on `basis` -- the gate is therefore unaffected by the
+    choice of basis; only the subspace the rank rule deletes changes.
 
     Runs in fp32 outside autocast on a detached clone; gradients are taken with
     respect to h only, so no parameter gradients are created and the training
@@ -164,10 +227,7 @@ def rho_probe(model, xb, yb, criterion, regress, R=3):
         return None
     with torch.no_grad():
         hc = h.detach() - h.detach().mean(0, keepdim=True)
-        d = hc.shape[1]
-        cov = (hc.t() @ hc) / max(hc.shape[0], 1) + 1e-6 * torch.eye(d, device=hc.device)
-        evals, evecs = torch.linalg.eigh(cov)
-        U = evecs[:, torch.argsort(evals, descending=True)][:, :max(int(R), 1)]
+        U, lam = _toxic_basis(hc, ga, gp, R, basis)
         gp_n = gp.norm(dim=1) + 1e-8
         u = hc / hc.norm(dim=1, keepdim=True).clamp_min(1e-8)
         rho_u = float(((((ga * u).sum(-1, keepdim=True)) * u).norm(dim=1) / gp_n).mean().item())
@@ -175,7 +235,8 @@ def rho_probe(model, xb, yb, criterion, regress, R=3):
         for r in range(0, U.shape[1] + 1):
             ga_r = ga if r == 0 else ga - (ga @ U[:, :r]) @ U[:, :r].t()
             rho_res.append(float((ga_r.norm(dim=1) / gp_n).mean().item()))
-    return dict(rho_u=rho_u, rho_res=rho_res, U=U.detach())
+    return dict(rho_u=rho_u, rho_res=rho_res, U=U.detach(),
+                lam=lam.detach(), basis=basis)
 
 
 class RhoController:
@@ -283,13 +344,14 @@ class RhoController:
 #  completely untouched -- which is what distinguishes STF-cal from the blunt
 #  STF-0 erasure of benign auxiliary tasks.
 # =============================================================================
-CAL_MODES = ("stfcal", "stfcalrank")
+CAL_MODES = ("stfcal", "stfcalrank", "stfcalg", "stfcalgrank")
 
 
 class CalController:
-    def __init__(self, alpha, warm_steps, rank_max=3, ema=0.9):
+    def __init__(self, alpha, warm_steps, rank_max=3, ema=0.9, basis="pca"):
         self.alpha = float(alpha); self.warm_steps = int(warm_steps)
         self.rank_max = int(rank_max); self.ema = float(ema)
+        self.basis = str(basis)
         self.step = 0
         self.S_ema = None; self.S_star = None
         self.calibrated = False
@@ -695,7 +757,8 @@ def train_one(domain, mode, alpha, m, seed, epochs, lr, batch, rho_c, beta,
         cal = CalController(alpha,
                             warm_steps=int(STF_RHO_CFG["cal_warm_epochs"] * n_steps),
                             rank_max=STF_RHO_CFG["rank_max"],
-                            ema=STF_RHO_CFG["ema"])
+                            ema=STF_RHO_CFG["ema"],
+                            basis=STF_RHO_CFG["basis"])
     _probe_every = max(int(STF_RHO_CFG["probe_every"]), 1)
     step = 0
     for ep in range(epochs):
@@ -720,7 +783,8 @@ def train_one(domain, mode, alpha, m, seed, epochs, lr, batch, rho_c, beta,
                         if cal.step >= cal.warm_steps:
                             # one probe on the healthy model fixes gate AND rank
                             cal.calibrate(rho_probe(model, xb, yb, criterion, regress,
-                                                    R=STF_RHO_CFG["rank_max"]))
+                                                    R=STF_RHO_CFG["rank_max"],
+                                                    basis=STF_RHO_CFG["basis"]))
                         else:
                             with torch.no_grad():
                                 cal.observe_scatter(scatter_t(h.detach()))
@@ -1131,6 +1195,13 @@ def main():
                     help="steps between fp32 order-parameter probes (cost control)")
     ap.add_argument("--rho-rank-max", type=int, default=3,
                     help="max rank of the toxic subspace considered by stfrhorank")
+    ap.add_argument("--cal-basis", default="pca", choices=["pca", "aux", "gen"],
+                    help="basis the calibrated rank rule deletes: 'pca' = top "
+                         "principal directions of the centered representation "
+                         "(the released surrogate), 'aux' = top principal "
+                         "directions of the auxiliary gradient Sigma_a, 'gen' = "
+                         "generalized (Sigma_a, Sigma_p) directions (diagnostic). "
+                         "rho_u -- and hence the gate -- is identical in all three.")
     ap.add_argument("--rho-smooth", action="store_true",
                     help="smooth gate sigmoid(kappa*(alpha*rho_ref-1)) instead of bang-bang")
     ap.add_argument("--rho-trace", action="store_true",
@@ -1152,7 +1223,7 @@ def main():
     STF_RHO_CFG.update(kappa=a.stf_kappa, ema=a.rho_ema,
                        probe_every=a.rho_probe_every, rank_max=a.rho_rank_max,
                        smooth=a.rho_smooth, trace=a.rho_trace,
-                       cal_warm_epochs=a.cal_warm_epochs)
+                       cal_warm_epochs=a.cal_warm_epochs, basis=a.cal_basis)
     seeds = [int(x) for x in a.seeds.split(",")]
     if a.composition:
         alphas = [float(x) for x in a.alphas.split(",")]

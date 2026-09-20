@@ -232,7 +232,7 @@ MODES = ("joint", "stf0", "stfhard", "stfsoft", "stfcal", "stfcalrank")
 
 
 def train_once(domain, D, mode, alpha, m, seed, epochs, lr, batch, rho_c, beta,
-               base_scatter, base_rho, aux_kind, device, cal_warm=3):
+               base_scatter, base_rho, aux_kind, device, cal_warm=3, label_frac=1.0):
     cdm.set_seed(seed)
     torch.cuda.manual_seed(seed)
     cdm.enable_max_perf()
@@ -257,6 +257,30 @@ def train_once(domain, D, mode, alpha, m, seed, epochs, lr, batch, rho_c, beta,
         n_steps = max(1, math.ceil(Xtr.shape[0] / batch))
         cal = CalController(alpha, warm_steps=int(cal_warm * n_steps))
     n = Xtr.shape[0]
+    # --label-frac: semi-supervised regime.  A fixed random fraction of the
+    # training set carries a primary-task label; the auxiliary objective is
+    # supervised by the input itself (reconstruction), so it keeps using every
+    # sample.  This is the setting in which a benign auxiliary head can pay for
+    # itself, and therefore the setting that separates STF-cal -- which leaves a
+    # benign head alone when the gate stays closed -- from STF-0, which erases it
+    # unconditionally.  label_frac = 1.0 reproduces the released behaviour.
+    lab = torch.ones(n, dtype=torch.bool, device=device)
+    lab_idx = None
+    if label_frac < 1.0:
+        _g = torch.Generator().manual_seed(1234 + seed)
+        _n_lab = max(1, int(round(float(label_frac) * n)))
+        lab[:] = False
+        lab[torch.randperm(n, generator=_g)[: _n_lab]] = True
+        # Dedicated labelled probe set for the calibration read-out.  The order
+        # parameter is a mean of per-cell ratios over B cells whose centred
+        # representation spans d dimensions, so B must stay well above d: a
+        # 16-cell probe of a 64-d subspace is rank-deficient and reads a
+        # spuriously small rho.  Draw a fixed subset of the labelled pool
+        # (>= 2d cells) and probe on that, never on unlabelled cells.
+        _g2 = torch.Generator().manual_seed(4321 + seed)
+        lab_idx = torch.nonzero(lab, as_tuple=False).squeeze(1)
+        if lab_idx.numel() > 512:
+            lab_idx = lab_idx[torch.randperm(lab_idx.numel(), generator=_g2)[:512]]
     for ep in range(epochs):
         model.train()
         perm = torch.randperm(n, device=device)
@@ -269,9 +293,18 @@ def train_once(domain, D, mode, alpha, m, seed, epochs, lr, batch, rho_c, beta,
                 if cal is not None:
                     if not cal.calibrated:
                         if cal.step >= cal.warm_steps:
-                            # one probe on the healthy model fixes gate AND rank
-                            cal.calibrate(real_aux_probe(model, xb, yb, ab, aux_kind,
-                                                         D["aux_dim"], criterion, regress))
+                            # one probe on the healthy model fixes gate AND rank.
+                            # Under a label fraction the order parameter must be
+                            # read on labelled cells only, or the primary gradient
+                            # would be taken against labels the run never sees.
+                            if lab_idx is not None and lab_idx.numel() >= 2 * m:
+                                _pb = real_aux_probe(model, Xtr[lab_idx], ytr[lab_idx],
+                                                     atr[lab_idx], aux_kind, D["aux_dim"],
+                                                     criterion, regress)
+                            else:
+                                _pb = real_aux_probe(model, xb, yb, ab, aux_kind,
+                                                     D["aux_dim"], criterion, regress)
+                            cal.calibrate(_pb)
                         if not cal.calibrated:
                             with torch.no_grad():
                                 cal.observe_scatter(cdm.scatter_t(h.detach()))
@@ -281,7 +314,17 @@ def train_once(domain, D, mode, alpha, m, seed, epochs, lr, batch, rho_c, beta,
                     aux_in, _w, _r = cal.step_h(h, mode, warm=(not cal.calibrated))
                 else:
                     aux_in = cdm.stf_filter(h, mode, rc, beta)[0]
-                L_main = criterion(model.primary(h).squeeze(-1) if regress else model.primary(h), yb)
+                _pk = model.primary(h)
+                _pk = _pk.squeeze(-1) if regress else _pk
+                if label_frac < 1.0:
+                    # primary loss over the labelled cells of this batch only;
+                    # the auxiliary loss below still sees every cell
+                    _mk = lab[idx]
+                    _per = (nn.functional.mse_loss(_pk, yb, reduction="none") if regress
+                            else nn.functional.cross_entropy(_pk, yb, reduction="none"))
+                    L_main = _per[_mk].mean() if bool(_mk.any()) else _pk.sum() * 0.0
+                else:
+                    L_main = criterion(_pk, yb)
                 L_aux = _aux_loss(model, aux_in, ab, aux_kind)
                 (L_main + alpha * L_aux).backward()
             opt.step()
@@ -336,18 +379,30 @@ def train_once(domain, D, mode, alpha, m, seed, epochs, lr, batch, rho_c, beta,
     return row
 
 
-def run(domain, aux_kind, alpha, m, seeds, epochs, lr, batch, rho_c, beta, cal_warm=3):
+def run(domain, aux_kind, alpha, m, seeds, epochs, lr, batch, rho_c, beta, cal_warm=3,
+        label_frac=1.0, modes=None):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     D = load_real_aux(domain, aux_kind)
+    modes = tuple(modes) if modes else MODES
     rows = []
     for s in seeds:
-        # single-task health anchor (no aux head in the graph)
-        single = cdm.train_one(domain, "single", 0.0, m, s, epochs, lr, batch,
-                               rho_c, beta)
-        base_scatter, base_rho = single["scatter"], single["srho"]
-        for mode in MODES:
+        # single-task health anchor (no aux head in the graph).  Under a label
+        # fraction the anchor must be label-starved too, or it would set a
+        # ceiling the compared runs cannot reach; train_once at alpha = 0 is
+        # exactly a primary-only run and inherits the same mask.
+        if label_frac < 1.0:
+            anc = train_once(domain, D, "joint", 0.0, m, s, epochs, lr, batch,
+                             rho_c, beta, 0.0, None, aux_kind, device,
+                             cal_warm=cal_warm, label_frac=label_frac)
+            base_scatter, base_rho = anc["scatter"], anc["rho_mean"]
+        else:
+            single = cdm.train_one(domain, "single", 0.0, m, s, epochs, lr, batch,
+                                   rho_c, beta)
+            base_scatter, base_rho = single["scatter"], single["srho"]
+        for mode in modes:
             r = train_once(domain, D, mode, alpha, m, s, epochs, lr, batch, rho_c, beta,
-                           base_scatter, base_rho, aux_kind, device, cal_warm=cal_warm)
+                           base_scatter, base_rho, aux_kind, device, cal_warm=cal_warm,
+                           label_frac=label_frac)
             r["base_scatter"] = base_scatter; r["base_rho"] = base_rho
             rows.append(r)
             extra = (f" gate={r.get('gate', float('nan')):.0f}"
@@ -359,7 +414,7 @@ def run(domain, aux_kind, alpha, m, seeds, epochs, lr, batch, rho_c, beta, cal_w
                   f"collapse={r['collapse']} rho={r['rho_mean']:.4f}{extra}", flush=True)
     # aggregate
     agg = []
-    for mode in MODES:
+    for mode in modes:
         rs = [r for r in rows if r["mode"] == mode]
         if not rs:
             continue
@@ -393,15 +448,24 @@ def main():
     ap.add_argument("--rho-c", type=float, default=0.02)
     ap.add_argument("--beta", type=float, default=8.0)
     ap.add_argument("--cal-warm-epochs", type=int, default=3)
+    ap.add_argument("--label-frac", type=float, default=1.0,
+                    help="fraction of the training set carrying a primary-task "
+                         "label; the auxiliary objective still uses every sample "
+                         "(semi-supervised regime). 1.0 = released behaviour.")
+    ap.add_argument("--modes", default="",
+                    help="comma-separated subset of MODES; empty = all")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     seeds = [int(x) for x in a.seeds.split(",")]
+    modes = tuple(x for x in a.modes.split(",") if x) or None
     rows, agg = run(a.domain, a.aux, a.alpha, a.m, seeds, a.epochs, a.lr, a.batch,
-                    a.rho_c, a.beta, cal_warm=a.cal_warm_epochs)
+                    a.rho_c, a.beta, cal_warm=a.cal_warm_epochs,
+                    label_frac=a.label_frac, modes=modes)
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     with open(a.out, "w") as f:
         json.dump(dict(domain=a.domain, aux=a.aux, alpha=a.alpha, m=a.m,
                        kind="real_aux", cal_warm_epochs=a.cal_warm_epochs,
+                       label_frac=a.label_frac, modes=list(modes or MODES),
                        results=agg, raw=rows), f, indent=2)
     print("wrote", a.out)
 

@@ -85,6 +85,50 @@ Per-seed outputs land in `../results/R7/`.
 appendix (ρ = 0.74 ± 0.19, α_c = 1.45 ± 0.37); `--rho-def percell` switches to
 the per-cell mean-of-ratios variant. Both write `results/th_rho*.json`.
 
+## Cluster sweep launchers
+
+The `.sh` launchers that drove the multi-job sweeps are not versioned: each one
+embeds the deployment prefix of the machine it was submitted from, and shipping
+that prefix would leak the author's cluster layout. Their command lines are
+reproduced here instead. Every launcher is a plain queue over a driver that
+ships in `code/`, so each can be replayed from the repository root.
+
+| Launcher | Driver | Sweep | Output |
+|---|---|---|---|
+| `xdrcurve_sweep.sh` | `code/cross_domain_mtl.py` | UCI-HAR dose-to-rank curve: ten doses `0.003`--`100` × `--cal-basis {pca,aux}`, `--rho-rank-max 64`, five seeds, 60 epochs | `results/XDRCURVE/` |
+| `xdrank_sweep.sh` | `code/cross_domain_mtl.py` | Seven `(domain, alpha)` pairs at `--rho-rank-max {3,64}`, ten seeds (CelebA four) | `results/XDRANK/` |
+| `xdbasis_probe.sh` | `code/cross_domain_mtl.py` | Auxiliary-basis runs at `--rho-rank-max 64` on HAR, battery and CelebA, plus the one-cell port check | `results/XDBASIS/` |
+| `ll_sweep.sh` | `code/real_aux_mtl.py` | Semi-supervised label fraction: `--alpha {1,30}` × `--label-frac {0.02,0.05,0.2,1.0}`, ten seeds | `results/LOWLAB/` |
+| `syn8_sweep.sh` | `code/synth_beta_scan.py` | The seven-width synthetic rank-schedule family: `m ∈ {32,...,256}` × nine `beta`, 21-point `alpha` grid, ten seeds, 800 epochs | `repro/results/SYN8/` |
+| `sg_sweep.sh` | `code/battery_bmtl_v3.py` | The MATR flagship at a capped probe depth (`--cal-rank-max 3`) with the rank-rule arms | `results/SG/` |
+| `time_matrix.sh` | `repro/scripts/time_overhead.py` | Rotated wall-clock matrix with `--rotate --wait-idle` | `repro/results/TIME/` |
+
+The dose-to-rank curve and the rank-budget contrast in full:
+
+```bash
+# dose-to-rank curve, principal basis (the paper's surrogate) and aux basis
+for al in 0.003 0.01 0.03 0.1 0.3 1 3 10 30 100; do
+  for bs in pca aux; do
+    CUDA_VISIBLE_DEVICES= code/cross_domain_mtl.py --domain har \
+        --modes joint,stf0,stfcalrank --alphas "$al" --seeds 0,1,2,3,4 \
+        --m 64 --epochs 60 --cal-warm-epochs 4 \
+        --rho-rank-max 64 --cal-basis "$bs" \
+        --out "results/XDRCURVE/har_a${al}_${bs}.json"
+  done
+done
+
+# the same dose at two probe depths; only --rho-rank-max differs
+for r in 3 64; do
+  CUDA_VISIBLE_DEVICES= code/cross_domain_mtl.py --domain har \
+      --modes joint,stf0,stfcal,stfcalrank --alphas 100 \
+      --seeds 0,1,2,3,4,5,6,7,8,9 --m 64 --epochs 60 --cal-warm-epochs 4 \
+      --rho-rank-max "$r" --out "results/XDRANK/har_a100.0_r${r}.json"
+done
+```
+
+The `aux` runs of the first loop also carry the two `stfcalg` arms, which is why
+the shipped `XDRCURVE` files record a mode set one longer than the `pca` files.
+
 ## Reproduce
 
 Set `REPFIX_DATA_DIR` to your prepared A-share data (the `baseline_fold{N}.npz` fold

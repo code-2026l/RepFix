@@ -482,10 +482,79 @@ def _write_grads(model, grads):
 #  When the dose is sub-critical the auxiliary branch is left completely intact,
 #  which is what distinguishes STF-cal from the blunt STF-0 erasure.
 # =============================================================================
-def battery_rho_probe(model, xb, sb, rb, cnb, cens_aware, R=3):
+def _toxic_basis(hc, ga, gp, R, basis):
+    """Return (U, lam) -- the depth-R basis the rank rule deletes, and the
+    generalized spectrum behind it.
+
+    basis='pca' : the top-R principal directions of the centered representation.
+        This is the surrogate of the paper: Theorem~minimalrank is stated for the
+        toxic operator T, and the two coincide only when the auxiliary Hessian is
+        diagonal in the representation's principal basis (the variance-shrinkage
+        toxifier, whose contraction is isotropic on H_c).
+
+    basis='aux' : the top-R principal directions of the AUXILIARY GRADIENT itself,
+        i.e. of Sigma_a = E[g_a g_a^T].  The paper's residual criterion is
+        rho_res[r] = mean_i ||g_a^(i) - Pi_U g_a^(i)|| / ||g_p^(i)||, and its
+        denominator -- the FULL primary norm -- does not depend on the direction
+        being deleted.  The r-dim subspace that makes rho_res[r] fall fastest, and
+        therefore the one that satisfies the criterion at the smallest r (which is
+        what minimal rank asks for), is the top-r eigenspace of Sigma_a.  No inverse
+        of Sigma_p is taken, so the estimate stays well conditioned.
+
+    basis='gen' : the top-R generalized eigenvectors of (Sigma_a, Sigma_p).  These
+        maximise the toxic-to-restoring ENERGY ratio.  Diagnostic only: with a
+        small-sample Sigma_p the ratio is dominated by Sigma_p's smallest
+        eigenvalues, so lam is not on the same scale as the amplitude ratio rho of
+        Definition~toxicity.
+    """
+    dz = hc.shape[1]
+    if basis in ('aux', 'gen'):
+        # The probe is invoked from inside the training autocast region, where
+        # matmul silently runs in bf16; eigh has no bf16 kernel.  The pca branch
+        # below is left EXACTLY as released (its covariance picks up fp32 through
+        # the +1e-6*eye promotion), so existing stfcal runs stay bit-identical.
+        with torch.autocast('cuda', enabled=False):
+            n = max(int(ga.shape[0]), 1)
+            ga32 = ga.float(); gp32 = gp.float()
+            Sa = (ga32.t() @ ga32) / n
+            if basis == 'aux':
+                ev_a, U_a = torch.linalg.eigh(0.5 * (Sa + Sa.t()))
+                order = torch.argsort(ev_a, descending=True)
+                # Euclidean-orthonormal already, but re-orthonormalise the retained
+                # span so filter_z's (I - U U^T) really is a projector.
+                Qr, _ = torch.linalg.qr(U_a[:, order][:, :max(int(R), 1)])
+                return Qr.detach(), ev_a[order].detach()
+            Sp = (gp32.t() @ gp32) / n
+            Sp = Sp + 1e-6 * (Sp.diagonal().mean().clamp_min(1e-12)) * torch.eye(dz, device=hc.device)
+            ev_p, U_p = torch.linalg.eigh(Sp)
+            W = (U_p * ev_p.clamp_min(1e-12).rsqrt().unsqueeze(0)) @ U_p.t()
+            M = W.t() @ Sa @ W
+            M = 0.5 * (M + M.t())
+            ev_m, Q = torch.linalg.eigh(M)
+            order = torch.argsort(ev_m, descending=True)
+            V = W @ Q[:, order]
+            lam = ev_m[order]
+            # The generalized eigenvectors are Sigma_p-orthonormal, NOT Euclidean-
+            # orthonormal, while filter_z builds a Euclidean projector (I - U U^T).
+            # Re-orthonormalise the retained span so U^T U = I; the span -- and hence
+            # the projector -- is unchanged, and the COUNT of supercritical directions
+            # (cal_rank_gen) is basis-invariant.
+            Qr, _ = torch.linalg.qr(V[:, :max(int(R), 1)])
+        return Qr.detach(), lam.detach()
+    cov = (hc.t() @ hc) / max(hc.shape[0], 1) + 1e-6 * torch.eye(dz, device=hc.device)
+    evals, evecs = torch.linalg.eigh(cov)
+    U = evecs[:, torch.argsort(evals, descending=True)][:, :max(int(R), 1)]
+    return U, evals[torch.argsort(evals, descending=True)][:max(int(R), 1)]
+
+
+def battery_rho_probe(model, xb, sb, rb, cnb, cens_aware, R=3, basis='pca'):
     """Order-parameter family rho_u / rho_res[0..R] on the UNFILTERED auxiliary
     branch of the SOH/RUL encoder.  fp32 outside autocast; gradients are taken
-    with respect to the embedding only, so no parameter gradients are created."""
+    with respect to the embedding only, so no parameter gradients are created.
+
+    rho_u is the paper's rank-1 order parameter and is IDENTICAL for both bases --
+    the gate is therefore unaffected by the choice of basis.  Only the subspace the
+    rank rule deletes (and the residual family rho_res read on it) changes."""
     with torch.autocast('cuda', enabled=False), torch.enable_grad():
         z = model.embed(xb).detach().float().requires_grad_(True)
         soh = model.head_soh(z).squeeze(-1); rul = model.head_rul(z).squeeze(-1)
@@ -505,10 +574,7 @@ def battery_rho_probe(model, xb, sb, rb, cnb, cens_aware, R=3):
         return None
     with torch.no_grad():
         hc = z.detach() - z.detach().mean(0, keepdim=True)
-        dz = hc.shape[1]
-        cov = (hc.t() @ hc) / max(hc.shape[0], 1) + 1e-6 * torch.eye(dz, device=hc.device)
-        evals, evecs = torch.linalg.eigh(cov)
-        U = evecs[:, torch.argsort(evals, descending=True)][:, :max(int(R), 1)]
+        U, lam = _toxic_basis(hc, ga, gp, R, basis)
         gp_n = gp.norm(dim=1) + 1e-8
         u = hc / hc.norm(dim=1, keepdim=True).clamp_min(1e-8)
         rho_u = float(((((ga * u).sum(-1, keepdim=True)) * u).norm(dim=1) / gp_n).mean().item())
@@ -516,18 +582,21 @@ def battery_rho_probe(model, xb, sb, rb, cnb, cens_aware, R=3):
         for r in range(0, U.shape[1] + 1):
             ga_r = ga if r == 0 else ga - (ga @ U[:, :r]) @ U[:, :r].t()
             rho_res.append(float((ga_r.norm(dim=1) / gp_n).mean().item()))
-    return dict(rho_u=rho_u, rho_res=rho_res, U=U.detach())
+    return dict(rho_u=rho_u, rho_res=rho_res, U=U.detach(),
+                lam=lam.detach(), basis=basis)
 
 
 class BatteryCal:
-    def __init__(self, alpha_aux, warm_epochs, rank_max=3, ema=0.9):
+    def __init__(self, alpha_aux, warm_epochs, rank_max=3, ema=0.9, basis='pca'):
         self.alpha_aux = float(alpha_aux); self.warm_epochs = int(warm_epochs)
         self.rank_max = int(rank_max); self.ema = float(ema)
+        self.basis = str(basis)
         self.epoch = 1
         self.S_ema = None; self.S_star = None
         self.calibrated = False
         self.gate = 0.0; self.rank = 1
         self.rho_u = float("nan"); self.rho_res = []; self.U = None
+        self.lam = None
 
     def warm_phase(self):
         return self.epoch <= self.warm_epochs
@@ -544,6 +613,8 @@ class BatteryCal:
         self.rho_u = float(probe["rho_u"])
         self.rho_res = [float(x) for x in probe["rho_res"]]
         self.U = probe["U"].clone()
+        self.lam = None if probe.get("lam") is None else \
+            [float(x) for x in probe["lam"]]
         self.gate = 1.0 if self.alpha_aux * self.rho_u >= 1.0 else 0.0
         r_use = self.rank_max
         for r in range(0, min(len(self.rho_res) - 1, self.rank_max) + 1):
@@ -573,9 +644,17 @@ class BatteryCal:
         return z - ((hc @ U) @ U.t())
 
     def diag(self):
+        lam = self.lam or []
         return dict(
             cal_rho_u=self.rho_u, cal_margin=self.margin, cal_gate=self.gate,
-            cal_rank=self.rank,
+            cal_rank=self.rank, cal_basis=self.basis,
+            # The generalized spectrum and how many of its directions are
+            # supercritical.  cal_rank_gen is the rank the SAME criterion would
+            # pick with no probe-depth cap, so cal_rank < cal_rank_gen means the
+            # cap -- not the criterion -- decided the deletion.
+            cal_lam_top=lam[:12],
+            cal_rank_gen=int(sum(1 for x in lam if self.alpha_aux * x >= 1.0)),
+            cal_lam_max=(lam[0] if lam else float("nan")),
             cal_S_star=(self.S_star if self.S_star is not None else float("nan")),
             cal_scatter_ratio=((self.S_ema / self.S_star)
                                if (self.S_ema is not None and self.S_star)
@@ -585,7 +664,7 @@ class BatteryCal:
 def run(model, dl_tr, dl_te, opt, epochs, dev, alpha_aux, stf, wattr, wgt, scale,
         tox_var=False, single=False, cens_aware=True,
         agg='sum', ema=None, amp=True, stf_mode='off',
-        cal_warm_epochs=3, cal_rank_max=3, moo_state=None):
+        cal_warm_epochs=3, cal_rank_max=3, cal_basis='pca', moo_state=None):
     # AGG_SWITCH_V3 + AMP_BF16_V3 + STFCAL + P0-2 faithful MOO operators
     """single: 'soh'/'rul' -> train only that head (single-task ceiling, no aux).
     Returns best {soh_rmse_%, rul_mae_cycles} in physical units."""
@@ -598,8 +677,10 @@ def run(model, dl_tr, dl_te, opt, epochs, dev, alpha_aux, stf, wattr, wgt, scale
             "moo_state=None" % agg)
     best = {"soh": float("inf"), "rul": float("inf")}
     best_state = None
-    cal = (BatteryCal(alpha_aux, cal_warm_epochs, rank_max=cal_rank_max)
-           if stf_mode in ("cal", "calrank") and not single else None)
+    cal = (BatteryCal(alpha_aux, cal_warm_epochs, rank_max=cal_rank_max,
+                      basis=cal_basis)
+           if stf_mode in ("cal", "calrank", "calg", "calgrank") and not single
+           else None)
     for ep in range(1, epochs+1):
         if cal is not None:
             cal.epoch = ep
@@ -650,8 +731,13 @@ def run(model, dl_tr, dl_te, opt, epochs, dev, alpha_aux, stf, wattr, wgt, scale
                     else:
                         if not cal.calibrated:
                             cal.calibrate(battery_rho_probe(
-                                model, xb, sb, rb, cnb, cens_aware, R=cal_rank_max))
-                        aux_src = cal.filter_z(z, "cal" if stf_mode == "cal" else "calrank")
+                                model, xb, sb, rb, cnb, cens_aware,
+                                R=cal_rank_max, basis=cal.basis))
+                        # 'cal' is the rank-1 per-sample centered-direction filter
+                        # (it ignores U and rank entirely); every rank-aware mode --
+                        # calrank, calg, calgrank -- must take the subspace path.
+                        aux_src = cal.filter_z(
+                            z, "cal" if stf_mode == "cal" else "calrank")
                     l_ae = F.mse_loss(model.head_ae(aux_src), xb,
                                       reduction='none').mean(dim=(1, 2))
                     pi, mu, sig = model.head_mdn(aux_src)
@@ -979,14 +1065,26 @@ def main():
     print("  perf: batch=%d workers=%d pin=%s amp=%s cache=%s"
           % (a.batch, a.workers, a.pin_memory, a.amp, cacheable))
 
-    _ALL_CFG = {"joint": ("joint", False, 0, "off"),
-                "joint_w": ("joint_w", False, 1, "off"),
-                "stf0": ("stf0", True, 0, "off"),
-                "stf0_w": ("stf0_w", True, 1, "off"),
-                "stfcal": ("stfcal", False, 0, "cal"),
-                "stfcal_w": ("stfcal_w", False, 1, "cal"),
-                "stfcalrank": ("stfcalrank", False, 0, "calrank"),
-                "stfcalrank_w": ("stfcalrank_w", False, 1, "calrank")}
+    _ALL_CFG = {"joint": ("joint", False, 0, "off", "pca"),
+                "joint_w": ("joint_w", False, 1, "off", "pca"),
+                "stf0": ("stf0", True, 0, "off", "pca"),
+                "stf0_w": ("stf0_w", True, 1, "off", "pca"),
+                "stfcal": ("stfcal", False, 0, "cal", "pca"),
+                "stfcal_w": ("stfcal_w", False, 1, "cal", "pca"),
+                "stfcalrank": ("stfcalrank", False, 0, "calrank", "pca"),
+                "stfcalrank_w": ("stfcalrank_w", False, 1, "calrank", "pca"),
+                # STF-cal with the AUXILIARY-GRADIENT principal subspace (Sigma_a)
+                # instead of the representation-PCA surrogate.  Same criterion, same
+                # gate, same probe data -- only the subspace the rank rule deletes
+                # changes, and it is now the r-dim choice that minimises the paper's
+                # own residual rho_res[r].
+                "stfcalg": ("stfcalg", False, 0, "calg", "aux"),
+                "stfcalg_w": ("stfcalg_w", False, 1, "calg", "aux"),
+                "stfcalgrank": ("stfcalgrank", False, 0, "calgrank", "aux"),
+                "stfcalgrank_w": ("stfcalgrank_w", False, 1, "calgrank", "aux"),
+                # diagnostic only: the generalized (Sigma_a, Sigma_p) eigenvectors
+                "stfcalx": ("stfcalx", False, 0, "calg", "gen"),
+                "stfcalxrank": ("stfcalxrank", False, 0, "calgrank", "gen")}
     configs = [_ALL_CFG[c.strip()] for c in a.configs.split(",") if c.strip() in _ALL_CFG]
     seeds = [int(x) for x in a.seeds.split(",")]
     rows = []
@@ -1010,7 +1108,7 @@ def main():
             print(f"single[{tk}]", st_ceiling[tk])
     else:
         st_ceiling = {}
-    for cname, stf, wattr, stf_mode in configs:
+    for cname, stf, wattr, stf_mode, cal_basis in configs:
         per_seed = []
         for sd in seeds:
             set_seed(sd)
@@ -1028,7 +1126,7 @@ def main():
                     scale, tox_var=a.tox_var, cens_aware=a.cens_aware,
                     agg=a.agg, ema={}, amp=a.amp, stf_mode=stf_mode,
                     cal_warm_epochs=a.cal_warm_epochs, cal_rank_max=a.cal_rank_max,
-                    moo_state=moo_state)
+                    cal_basis=cal_basis, moo_state=moo_state)
             per_seed.append(dict(**b, seed=sd))
         rows.append(dict(config=cname,
                          rmse_soh=float(np.mean([r["soh"] for r in per_seed])),
