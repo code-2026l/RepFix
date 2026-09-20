@@ -323,7 +323,7 @@ def _across(rows, m, level=0.5):
     three grids start at different alphas, so that version read the domains at
     different depths: HAR (grid from 3e-4, rel_scatter 0.69-0.91 there) crossed
     0.34-0.45 while battery and RadioML crossed ~0.50, and HAR's exponent came
-    out at 0.30 instead of 0.67.
+    out at 0.30 instead of 0.66.
     """
     rs = sorted([r for r in rows if r["m"] == m
                  and r.get("rel_scatter_mean") is not None],
