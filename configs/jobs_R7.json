@@ -1,0 +1,152 @@
+{
+ "note": "R7: NYUv2 5th-domain dose confirmation (harness) + dense benchmark (nyu_bmtl). Calibration probes alpha=1e-9 (probe-only convention). Dose grid brackets predicted alpha_c ~ 0.31-0.5. Benchmark doses: proj alpha=1.0 (battery-flagship default, margin 2.5-3.9 per 10-seed probe), ae alpha=250 (margin 2.8-4.0).",
+ "jobs": [
+  {
+   "name": "R7_bmtl_singles",
+   "script": "repro/scripts/nyu_bmtl.py",
+   "args": ["--configs", "single", "--aux", "proj", "--alpha-aux", "1.0", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--epochs", "60", "--batch", "32", "--d", "128", "--cal-warm-epochs", "5", "--out", "results/R7/R7_bmtl_singles.json"],
+   "out": "results/R7/R7_bmtl_singles.json",
+   "log": "results/R7/R7_bmtl_singles.log"
+  },
+  {
+   "name": "R7_bmtl_joint3",
+   "script": "repro/scripts/nyu_bmtl.py",
+   "args": ["--configs", "joint3", "--aux", "proj", "--alpha-aux", "1.0", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--epochs", "60", "--batch", "32", "--d", "128", "--cal-warm-epochs", "5", "--out", "results/R7/R7_bmtl_joint3.json"],
+   "out": "results/R7/R7_bmtl_joint3.json",
+   "log": "results/R7/R7_bmtl_joint3.log"
+  },
+  {
+   "name": "R7_dose_nyu_a0.03",
+   "script": "code/cross_domain_mtl.py",
+   "args": ["--domain", "nyu", "--modes", "joint,stf0,stfcal", "--alphas", "0.03", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--m", "64", "--epochs", "100", "--batch", "128", "--cal-warm-epochs", "4", "--out", "results/R7/R7_dose_nyu_a0.03.json"],
+   "out": "results/R7/R7_dose_nyu_a0.03.json",
+   "log": "results/R7/R7_dose_nyu_a0.03.log"
+  },
+  {
+   "name": "R7_dose_nyu_a0.1",
+   "script": "code/cross_domain_mtl.py",
+   "args": ["--domain", "nyu", "--modes", "joint,stf0,stfcal", "--alphas", "0.1", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--m", "64", "--epochs", "100", "--batch", "128", "--cal-warm-epochs", "4", "--out", "results/R7/R7_dose_nyu_a0.1.json"],
+   "out": "results/R7/R7_dose_nyu_a0.1.json",
+   "log": "results/R7/R7_dose_nyu_a0.1.log"
+  },
+  {
+   "name": "R7_dose_nyu_a0.3",
+   "script": "code/cross_domain_mtl.py",
+   "args": ["--domain", "nyu", "--modes", "joint,stf0,stfcal", "--alphas", "0.3", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--m", "64", "--epochs", "100", "--batch", "128", "--cal-warm-epochs", "4", "--out", "results/R7/R7_dose_nyu_a0.3.json"],
+   "out": "results/R7/R7_dose_nyu_a0.3.json",
+   "log": "results/R7/R7_dose_nyu_a0.3.log"
+  },
+  {
+   "name": "R7_dose_nyu_a0.5",
+   "script": "code/cross_domain_mtl.py",
+   "args": ["--domain", "nyu", "--modes", "joint,stf0,stfcal", "--alphas", "0.5", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--m", "64", "--epochs", "100", "--batch", "128", "--cal-warm-epochs", "4", "--out", "results/R7/R7_dose_nyu_a0.5.json"],
+   "out": "results/R7/R7_dose_nyu_a0.5.json",
+   "log": "results/R7/R7_dose_nyu_a0.5.log"
+  },
+  {
+   "name": "R7_dose_nyu_a1",
+   "script": "code/cross_domain_mtl.py",
+   "args": ["--domain", "nyu", "--modes", "joint,stf0,stfcal", "--alphas", "1", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--m", "64", "--epochs", "100", "--batch", "128", "--cal-warm-epochs", "4", "--out", "results/R7/R7_dose_nyu_a1.json"],
+   "out": "results/R7/R7_dose_nyu_a1.json",
+   "log": "results/R7/R7_dose_nyu_a1.log"
+  },
+  {
+   "name": "R7_dose_nyu_a3",
+   "script": "code/cross_domain_mtl.py",
+   "args": ["--domain", "nyu", "--modes", "joint,stf0,stfcal", "--alphas", "3", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--m", "64", "--epochs", "100", "--batch", "128", "--cal-warm-epochs", "4", "--out", "results/R7/R7_dose_nyu_a3.json"],
+   "out": "results/R7/R7_dose_nyu_a3.json",
+   "log": "results/R7/R7_dose_nyu_a3.log"
+  },
+  {
+   "name": "R7_dose_nyu_a10",
+   "script": "code/cross_domain_mtl.py",
+   "args": ["--domain", "nyu", "--modes", "joint,stf0,stfcal", "--alphas", "10", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--m", "64", "--epochs", "100", "--batch", "128", "--cal-warm-epochs", "4", "--out", "results/R7/R7_dose_nyu_a10.json"],
+   "out": "results/R7/R7_dose_nyu_a10.json",
+   "log": "results/R7/R7_dose_nyu_a10.log"
+  },
+  {
+   "name": "R7_dose_nyu_a30",
+   "script": "code/cross_domain_mtl.py",
+   "args": ["--domain", "nyu", "--modes", "joint,stf0,stfcal", "--alphas", "30", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--m", "64", "--epochs", "100", "--batch", "128", "--cal-warm-epochs", "4", "--out", "results/R7/R7_dose_nyu_a30.json"],
+   "out": "results/R7/R7_dose_nyu_a30.json",
+   "log": "results/R7/R7_dose_nyu_a30.log"
+  },
+  {
+   "name": "R7_dose_nyu_a100",
+   "script": "code/cross_domain_mtl.py",
+   "args": ["--domain", "nyu", "--modes", "joint,stf0,stfcal", "--alphas", "100", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--m", "64", "--epochs", "100", "--batch", "128", "--cal-warm-epochs", "4", "--out", "results/R7/R7_dose_nyu_a100.json"],
+   "out": "results/R7/R7_dose_nyu_a100.json",
+   "log": "results/R7/R7_dose_nyu_a100.log"
+  },
+  {
+   "name": "R7_calib_nyu_m32",
+   "script": "code/cross_domain_mtl.py",
+   "args": ["--domain", "nyu", "--modes", "stfcal", "--alphas", "1e-09", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--m", "32", "--epochs", "100", "--batch", "128", "--cal-warm-epochs", "4", "--out", "results/R7/R7_calib_nyu_m32.json"],
+   "out": "results/R7/R7_calib_nyu_m32.json",
+   "log": "results/R7/R7_calib_nyu_m32.log"
+  },
+  {
+   "name": "R7_calib_nyu_m64",
+   "script": "code/cross_domain_mtl.py",
+   "args": ["--domain", "nyu", "--modes", "stfcal", "--alphas", "1e-09", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--m", "64", "--epochs", "100", "--batch", "128", "--cal-warm-epochs", "4", "--out", "results/R7/R7_calib_nyu_m64.json"],
+   "out": "results/R7/R7_calib_nyu_m64.json",
+   "log": "results/R7/R7_calib_nyu_m64.log"
+  },
+  {
+   "name": "R7_calib_nyu_m128",
+   "script": "code/cross_domain_mtl.py",
+   "args": ["--domain", "nyu", "--modes", "stfcal", "--alphas", "1e-09", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--m", "128", "--epochs", "100", "--batch", "128", "--cal-warm-epochs", "4", "--out", "results/R7/R7_calib_nyu_m128.json"],
+   "out": "results/R7/R7_calib_nyu_m128.json",
+   "log": "results/R7/R7_calib_nyu_m128.log"
+  },
+  {
+   "name": "R7_bmtl_aux_proj",
+   "script": "repro/scripts/nyu_bmtl.py",
+   "args": ["--configs", "joint3_aux", "--aux", "proj", "--alpha-aux", "1.0", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--epochs", "60", "--batch", "32", "--d", "128", "--cal-warm-epochs", "5", "--out", "results/R7/R7_bmtl_aux_proj.json"],
+   "out": "results/R7/R7_bmtl_aux_proj.json",
+   "log": "results/R7/R7_bmtl_aux_proj.log"
+  },
+  {
+   "name": "R7_bmtl_stf0_proj",
+   "script": "repro/scripts/nyu_bmtl.py",
+   "args": ["--configs", "joint3_aux_stf0", "--aux", "proj", "--alpha-aux", "1.0", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--epochs", "60", "--batch", "32", "--d", "128", "--cal-warm-epochs", "5", "--out", "results/R7/R7_bmtl_stf0_proj.json"],
+   "out": "results/R7/R7_bmtl_stf0_proj.json",
+   "log": "results/R7/R7_bmtl_stf0_proj.log"
+  },
+  {
+   "name": "R7_bmtl_stfcal_proj",
+   "script": "repro/scripts/nyu_bmtl.py",
+   "args": ["--configs", "joint3_aux_stfcal", "--aux", "proj", "--alpha-aux", "1.0", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--epochs", "60", "--batch", "32", "--d", "128", "--cal-warm-epochs", "5", "--out", "results/R7/R7_bmtl_stfcal_proj.json"],
+   "out": "results/R7/R7_bmtl_stfcal_proj.json",
+   "log": "results/R7/R7_bmtl_stfcal_proj.log"
+  },
+  {
+   "name": "R7_bmtl_stfcalrank_proj",
+   "script": "repro/scripts/nyu_bmtl.py",
+   "args": ["--configs", "joint3_aux_stfcalrank", "--aux", "proj", "--alpha-aux", "1.0", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--epochs", "60", "--batch", "32", "--d", "128", "--cal-warm-epochs", "5", "--out", "results/R7/R7_bmtl_stfcalrank_proj.json"],
+   "out": "results/R7/R7_bmtl_stfcalrank_proj.json",
+   "log": "results/R7/R7_bmtl_stfcalrank_proj.log"
+  },
+  {
+   "name": "R7_bmtl_aux_ae",
+   "script": "repro/scripts/nyu_bmtl.py",
+   "args": ["--configs", "joint3_aux", "--aux", "ae", "--alpha-aux", "250", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--epochs", "60", "--batch", "32", "--d", "128", "--cal-warm-epochs", "5", "--out", "results/R7/R7_bmtl_aux_ae.json"],
+   "out": "results/R7/R7_bmtl_aux_ae.json",
+   "log": "results/R7/R7_bmtl_aux_ae.log"
+  },
+  {
+   "name": "R7_bmtl_stf0_ae",
+   "script": "repro/scripts/nyu_bmtl.py",
+   "args": ["--configs", "joint3_aux_stf0", "--aux", "ae", "--alpha-aux", "250", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--epochs", "60", "--batch", "32", "--d", "128", "--cal-warm-epochs", "5", "--out", "results/R7/R7_bmtl_stf0_ae.json"],
+   "out": "results/R7/R7_bmtl_stf0_ae.json",
+   "log": "results/R7/R7_bmtl_stf0_ae.log"
+  },
+  {
+   "name": "R7_bmtl_stfcal_ae",
+   "script": "repro/scripts/nyu_bmtl.py",
+   "args": ["--configs", "joint3_aux_stfcal", "--aux", "ae", "--alpha-aux", "250", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--epochs", "60", "--batch", "32", "--d", "128", "--cal-warm-epochs", "5", "--out", "results/R7/R7_bmtl_stfcal_ae.json"],
+   "out": "results/R7/R7_bmtl_stfcal_ae.json",
+   "log": "results/R7/R7_bmtl_stfcal_ae.log"
+  }
+ ]
+}

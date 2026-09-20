@@ -1,0 +1,40 @@
+{
+  "note": "NYUCAP: the NYUv2 capacity exponent measured with the SAME estimator as the other real domains (the scatter half-height crossing of the joint curve), at the four widths the paper's capacity law uses. The published NYUv2 exponent (gamma=0.23, Appendix app:nyu) was read off the one-probe calibration instead (alpha_c = 1/rho_hat at three widths); these four sweeps let the two estimators be compared under one protocol. The alpha grid is the R7 dose grid (0.03,0.1,0.3,0.5,1,3,10,30,100) densified about the predicted alpha_c ~ 0.44-0.61 and extended down to 0.01 so the grid reaches the healthy branch. Protocol = the NYUv2 domain protocol of R7: harness MLP, batch 128, 100 epochs, seeds 0-9, cal-warm 4. The extra calibration job completes the one-probe series at m=256, which R7 stopped at m=128. Outcome: the two estimators do not agree. The crossing returns gamma = -0.77 (R2 = 0.992) over the four widths -- the opposite ordering -- because the NYUv2 joint scatter never reaches its single-task anchor on this grid (0.83 of it at m=32, 0.64 at m=256, the shortfall growing with width), so the half-height point (0.069 at m=64) does not track the collapse (complete at 0.5). The probe series extended to m=256 (rho_hat = 1.285 +- 0.048, alpha_c = 0.778) gives gamma = 0.273 (R2 = 0.978, 95% CI [+0.149, +0.398]) over four widths, and its alpha_c = 0.498 at m=64 does bracket the collapse. The m=64 sweep reproduces the R7 dose curve at m=64 to floating-point equality at all nine shared alphas, so the two runs are one protocol.",
+  "jobs": [
+    {
+      "name": "nyucap_nyu_m32",
+      "script": "code/cross_domain_mtl.py",
+      "args": ["--domain", "nyu", "--sweep-alpha", "--m", "32", "--alphas", "0.01,0.03,0.1,0.2,0.3,0.5,0.8,1.0,3.0,10.0,30.0,100.0", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--epochs", "100", "--batch", "128", "--cal-warm-epochs", "4", "--out", "results/NYUCAP/xcap_nyu_m32.json"],
+      "out": "results/NYUCAP/xcap_nyu_m32.json",
+      "log": "results/NYUCAP/xcap_nyu_m32.log"
+    },
+    {
+      "name": "nyucap_nyu_m64",
+      "script": "code/cross_domain_mtl.py",
+      "args": ["--domain", "nyu", "--sweep-alpha", "--m", "64", "--alphas", "0.01,0.03,0.1,0.2,0.3,0.5,0.8,1.0,3.0,10.0,30.0,100.0", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--epochs", "100", "--batch", "128", "--cal-warm-epochs", "4", "--out", "results/NYUCAP/xcap_nyu_m64.json"],
+      "out": "results/NYUCAP/xcap_nyu_m64.json",
+      "log": "results/NYUCAP/xcap_nyu_m64.log"
+    },
+    {
+      "name": "nyucap_nyu_m128",
+      "script": "code/cross_domain_mtl.py",
+      "args": ["--domain", "nyu", "--sweep-alpha", "--m", "128", "--alphas", "0.01,0.03,0.1,0.2,0.3,0.5,0.8,1.0,3.0,10.0,30.0,100.0", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--epochs", "100", "--batch", "128", "--cal-warm-epochs", "4", "--out", "results/NYUCAP/xcap_nyu_m128.json"],
+      "out": "results/NYUCAP/xcap_nyu_m128.json",
+      "log": "results/NYUCAP/xcap_nyu_m128.log"
+    },
+    {
+      "name": "nyucap_nyu_m256",
+      "script": "code/cross_domain_mtl.py",
+      "args": ["--domain", "nyu", "--sweep-alpha", "--m", "256", "--alphas", "0.01,0.03,0.1,0.2,0.3,0.5,0.8,1.0,3.0,10.0,30.0,100.0", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--epochs", "100", "--batch", "128", "--cal-warm-epochs", "4", "--out", "results/NYUCAP/xcap_nyu_m256.json"],
+      "out": "results/NYUCAP/xcap_nyu_m256.json",
+      "log": "results/NYUCAP/xcap_nyu_m256.log"
+    },
+    {
+      "name": "nyucap_calib_nyu_m256",
+      "script": "code/cross_domain_mtl.py",
+      "args": ["--domain", "nyu", "--modes", "stfcal", "--alphas", "1e-09", "--m", "256", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--epochs", "100", "--batch", "128", "--cal-warm-epochs", "4", "--out", "results/NYUCAP/calib_nyu_m256.json"],
+      "out": "results/NYUCAP/calib_nyu_m256.json",
+      "log": "results/NYUCAP/calib_nyu_m256.log"
+    }
+  ]
+}

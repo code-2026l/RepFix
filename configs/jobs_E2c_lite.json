@@ -1,0 +1,220 @@
+{
+ "note": "E2c/E2d lite (MLP jobs, runs now)",
+ "jobs": [
+  {
+   "name": "E2c_battery_cap",
+   "script": "code/cross_domain_mtl.py",
+   "args": [
+    "--domain",
+    "battery",
+    "--sweep-alpha",
+    "--alphas",
+    "1,3,10,30,100,300",
+    "--m-list",
+    "32,64,128,256",
+    "--seeds",
+    "0,1,2",
+    "--epochs",
+    "60",
+    "--out",
+    "results/E2c/E2c_battery_cap.json"
+   ],
+   "out": "results/E2c/E2c_battery_cap.json",
+   "log": "results/E2c/E2c_battery_cap.log"
+  },
+  {
+   "name": "E2c_radioml_cap_m32",
+   "script": "code/cross_domain_mtl.py",
+   "args": [
+    "--domain",
+    "radioml",
+    "--sweep-alpha",
+    "--alphas",
+    "1,3,10,30,100,300,1000",
+    "--m",
+    "32",
+    "--seeds",
+    "0,1,2",
+    "--epochs",
+    "25",
+    "--out",
+    "results/E2c/E2c_radioml_cap_m32.json"
+   ],
+   "out": "results/E2c/E2c_radioml_cap_m32.json",
+   "log": "results/E2c/E2c_radioml_cap_m32.log"
+  },
+  {
+   "name": "E2c_radioml_cap_m64",
+   "script": "code/cross_domain_mtl.py",
+   "args": [
+    "--domain",
+    "radioml",
+    "--sweep-alpha",
+    "--alphas",
+    "1,3,10,30,100,300,1000",
+    "--m",
+    "64",
+    "--seeds",
+    "0,1,2",
+    "--epochs",
+    "25",
+    "--out",
+    "results/E2c/E2c_radioml_cap_m64.json"
+   ],
+   "out": "results/E2c/E2c_radioml_cap_m64.json",
+   "log": "results/E2c/E2c_radioml_cap_m64.log"
+  },
+  {
+   "name": "E2c_radioml_cap_m128",
+   "script": "code/cross_domain_mtl.py",
+   "args": [
+    "--domain",
+    "radioml",
+    "--sweep-alpha",
+    "--alphas",
+    "1,3,10,30,100,300,1000",
+    "--m",
+    "128",
+    "--seeds",
+    "0,1,2",
+    "--epochs",
+    "25",
+    "--out",
+    "results/E2c/E2c_radioml_cap_m128.json"
+   ],
+   "out": "results/E2c/E2c_radioml_cap_m128.json",
+   "log": "results/E2c/E2c_radioml_cap_m128.log"
+  },
+  {
+   "name": "E2c_radioml_cap_m256",
+   "script": "code/cross_domain_mtl.py",
+   "args": [
+    "--domain",
+    "radioml",
+    "--sweep-alpha",
+    "--alphas",
+    "1,3,10,30,100,300,1000",
+    "--m",
+    "256",
+    "--seeds",
+    "0,1,2",
+    "--epochs",
+    "25",
+    "--out",
+    "results/E2c/E2c_radioml_cap_m256.json"
+   ],
+   "out": "results/E2c/E2c_radioml_cap_m256.json",
+   "log": "results/E2c/E2c_radioml_cap_m256.log"
+  },
+  {
+   "name": "E2c_radioml_conflict",
+   "script": "code/cross_domain_mtl.py",
+   "args": [
+    "--domain",
+    "radioml",
+    "--ablate-methods",
+    "pcgrad,famo,cagrad",
+    "--alphas",
+    "10000",
+    "--seeds",
+    "0,1,2,3,4",
+    "--m",
+    "64",
+    "--epochs",
+    "25",
+    "--out",
+    "results/E2c/E2c_radioml_conflict.json"
+   ],
+   "out": "results/E2c/E2c_radioml_conflict.json",
+   "log": "results/E2c/E2c_radioml_conflict.log"
+  },
+  {
+   "name": "E2d_har_recon",
+   "script": "code/real_aux_mtl.py",
+   "args": [
+    "--domain",
+    "har",
+    "--aux",
+    "recon",
+    "--alpha",
+    "0.1",
+    "--m",
+    "64",
+    "--seeds",
+    "0,1,2,3,4",
+    "--epochs",
+    "60",
+    "--out",
+    "results/E2d/E2d_har_recon.json"
+   ],
+   "out": "results/E2d/E2d_har_recon.json",
+   "log": "results/E2d/E2d_har_recon.log"
+  },
+  {
+   "name": "E2d_har_subj",
+   "script": "code/real_aux_mtl.py",
+   "args": [
+    "--domain",
+    "har",
+    "--aux",
+    "clf",
+    "--alpha",
+    "0.1",
+    "--m",
+    "64",
+    "--seeds",
+    "0,1,2,3,4",
+    "--epochs",
+    "60",
+    "--out",
+    "results/E2d/E2d_har_subj.json"
+   ],
+   "out": "results/E2d/E2d_har_subj.json",
+   "log": "results/E2d/E2d_har_subj.log"
+  },
+  {
+   "name": "E2d_rml_recon",
+   "script": "code/real_aux_mtl.py",
+   "args": [
+    "--domain",
+    "radioml",
+    "--aux",
+    "recon",
+    "--alpha",
+    "3000",
+    "--m",
+    "64",
+    "--seeds",
+    "0,1,2,3,4",
+    "--epochs",
+    "25",
+    "--out",
+    "results/E2d/E2d_rml_recon.json"
+   ],
+   "out": "results/E2d/E2d_rml_recon.json",
+   "log": "results/E2d/E2d_rml_recon.log"
+  },
+  {
+   "name": "E2d_rml_snr",
+   "script": "code/real_aux_mtl.py",
+   "args": [
+    "--domain",
+    "radioml",
+    "--aux",
+    "reg",
+    "--alpha",
+    "3000",
+    "--m",
+    "64",
+    "--seeds",
+    "0,1,2,3,4",
+    "--epochs",
+    "25",
+    "--out",
+    "results/E2d/E2d_rml_snr.json"
+   ],
+   "out": "results/E2d/E2d_rml_snr.json",
+   "log": "results/E2d/E2d_rml_snr.log"
+  }
+ ]
+}

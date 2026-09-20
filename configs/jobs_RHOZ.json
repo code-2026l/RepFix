@@ -1,0 +1,93 @@
+{
+ "note": "RHOZ: the alpha = 0 control for the collapse-dynamics traces. Same driver, seeds, epochs, widths and --rho-trace as jobs_RHO.json, but the auxiliary weight is zero, so the toxifier is inert and the encoder trains on the primary loss alone. If rho(t) still climbs to 1e4-1e5 here, the rise in the RHO traces is the primary gradient shrinking as the task is learned rather than the toxicity mechanism, and no collapse-dynamics claim may rest on it. If rho(t) stays near its initial value, the rise is toxicity-driven.",
+ "jobs": [
+  {
+   "name": "rhoz_har_m32",
+   "script": "code/cross_domain_mtl.py",
+   "args": [
+    "--domain",
+    "har",
+    "--sweep-alpha",
+    "--m",
+    "32",
+    "--alphas",
+    "0.0",
+    "--seeds",
+    "0,1,2,3,4",
+    "--epochs",
+    "60",
+    "--rho-trace",
+    "--out",
+    "results/RHO/xcap_har_zero_m32.json"
+   ],
+   "out": "results/RHO/xcap_har_zero_m32.json",
+   "log": "results/RHO/xcap_har_zero_m32.log"
+  },
+  {
+   "name": "rhoz_har_m64",
+   "script": "code/cross_domain_mtl.py",
+   "args": [
+    "--domain",
+    "har",
+    "--sweep-alpha",
+    "--m",
+    "64",
+    "--alphas",
+    "0.0",
+    "--seeds",
+    "0,1,2,3,4",
+    "--epochs",
+    "60",
+    "--rho-trace",
+    "--out",
+    "results/RHO/xcap_har_zero_m64.json"
+   ],
+   "out": "results/RHO/xcap_har_zero_m64.json",
+   "log": "results/RHO/xcap_har_zero_m64.log"
+  },
+  {
+   "name": "rhoz_har_m256",
+   "script": "code/cross_domain_mtl.py",
+   "args": [
+    "--domain",
+    "har",
+    "--sweep-alpha",
+    "--m",
+    "256",
+    "--alphas",
+    "0.0",
+    "--seeds",
+    "0,1,2,3,4",
+    "--epochs",
+    "60",
+    "--rho-trace",
+    "--out",
+    "results/RHO/xcap_har_zero_m256.json"
+   ],
+   "out": "results/RHO/xcap_har_zero_m256.json",
+   "log": "results/RHO/xcap_har_zero_m256.log"
+  },
+  {
+   "name": "rhoz_battery_m64",
+   "script": "code/cross_domain_mtl.py",
+   "args": [
+    "--domain",
+    "battery",
+    "--sweep-alpha",
+    "--m",
+    "64",
+    "--alphas",
+    "0.0",
+    "--seeds",
+    "0,1,2,3,4",
+    "--epochs",
+    "60",
+    "--rho-trace",
+    "--out",
+    "results/RHO/xcap_battery_zero_m64.json"
+   ],
+   "out": "results/RHO/xcap_battery_zero_m64.json",
+   "log": "results/RHO/xcap_battery_zero_m64.log"
+  }
+ ]
+}

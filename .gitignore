@@ -1,0 +1,67 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Large binary / regenerable data ---
+# Raw market and fold caches are not distributed (third-party licensing).
+# Prepare your own under data/ and set REPFIX_DATA_DIR accordingly.
+*.pkl
+*.npz
+*.h5
+*.npy
+# Trained model checkpoints are regenerable via train.py; not versioned.
+*.pth
+*.pt
+models/
+
+# --- LaTeX build artifacts ---
+*.log
+*.aux
+*.out
+*.toc
+*.lof
+*.lot
+*.bbl
+*.blg
+*.synctex.gz
+
+# --- Local editing backups ---
+# Timestamped snapshots kept on the authors' machines while revising; the
+# version history in this repository is the record of what changed.
+*.bak
+*.bak_*
+*.pre_*
+*.tex.bak*
+
+# --- Local-only submission material (never distributed) ---
+# The ICLR upload bundle names the authors and the venue, the _hpc/ tree holds
+# cluster job scratch, and the *_anonymous* preprints are submission scratch
+# from earlier venues.  None of it belongs in a double-blind repository, so the
+# patterns are listed rather than left to discipline.  The patterns deliberately
+# name no venue: a path that does would tell a reviewer which meetings this
+# manuscript has been through, which is exactly the inference the anonymisation
+# is supposed to prevent.
+paper/ICLR*/
+paper/_hpc/
+paper/pip_cache/
+paper/RepFix_MTL*
+paper/*_anonymous*
+paper/refs.bib
+_head.tex
+
+# --- OS / editors ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# --- Run logs shipped for review ---
+# The `*.log` rule above is for LaTeX build artifacts.  The job-queue ledgers
+# under logs/ are evidence about how the results were produced and are part of
+# the release; see logs/README.md for what they record and how they were
+# scrubbed of deployment paths.
+!logs/**

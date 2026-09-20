@@ -1,0 +1,26 @@
+{
+ "note": "E2e: STF x conflict-resolution composition (3x3: {joint,stfhard,stfsoft} x {joint,pcgrad,cagrad}), 5 seeds per domain. Tests the design rule '(i) filter toxicity, (ii) then resolve conflict'.",
+ "jobs": [
+  {
+   "name": "E2e_compose_har",
+   "script": "code/cross_domain_mtl.py",
+   "args": ["--domain", "har", "--composition", "--alphas", "0.1", "--seeds", "0,1,2,3,4", "--m", "128", "--epochs", "60", "--out", "results/E2e/E2e_compose_har.json"],
+   "out": "results/E2e/E2e_compose_har.json",
+   "log": "results/E2e/E2e_compose_har.log"
+  },
+  {
+   "name": "E2e_compose_battery",
+   "script": "code/cross_domain_mtl.py",
+   "args": ["--domain", "battery", "--composition", "--alphas", "3000", "--seeds", "0,1,2,3,4", "--m", "64", "--epochs", "60", "--out", "results/E2e/E2e_compose_battery.json"],
+   "out": "results/E2e/E2e_compose_battery.json",
+   "log": "results/E2e/E2e_compose_battery.log"
+  },
+  {
+   "name": "E2e_compose_radioml",
+   "script": "code/cross_domain_mtl.py",
+   "args": ["--domain", "radioml", "--composition", "--alphas", "3000", "--seeds", "0,1,2,3,4", "--m", "64", "--epochs", "25", "--out", "results/E2e/E2e_compose_radioml.json"],
+   "out": "results/E2e/E2e_compose_radioml.json",
+   "log": "results/E2e/E2e_compose_radioml.log"
+  }
+ ]
+}

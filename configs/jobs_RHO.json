@@ -1,0 +1,115 @@
+{
+ "note": "RHO: collapse dynamics. Same driver, seeds, epochs and alpha grid as BSCALE (a subset of its alphas, so the aggregate rows must reproduce the shipped BSCALE cells exactly), plus --rho-trace. In joint mode the controller is monitor_only, so training is unchanged and the trace is purely diagnostic: it records rho_u(t), rho_ref(t), the residual family and the gate every --rho-probe-every steps, and latch_step, the first step at which alpha*rho_ref crosses 1. This is the data behind the collapse-trajectory figure; BSCALE itself was run without the flag and therefore carries empty traces.",
+ "jobs": [
+  {
+   "name": "rho_har_m32",
+   "script": "code/cross_domain_mtl.py",
+   "args": [
+    "--domain",
+    "har",
+    "--sweep-alpha",
+    "--m",
+    "32",
+    "--alphas",
+    "0.0001,0.0003,0.001,0.003,0.01,0.03",
+    "--seeds",
+    "0,1,2,3,4",
+    "--epochs",
+    "60",
+    "--rho-trace",
+    "--out",
+    "results/RHO/xcap_har_trace_m32.json"
+   ],
+   "out": "results/RHO/xcap_har_trace_m32.json",
+   "log": "results/RHO/xcap_har_trace_m32.log"
+  },
+  {
+   "name": "rho_har_m64",
+   "script": "code/cross_domain_mtl.py",
+   "args": [
+    "--domain",
+    "har",
+    "--sweep-alpha",
+    "--m",
+    "64",
+    "--alphas",
+    "0.0001,0.0003,0.001,0.003,0.01,0.03",
+    "--seeds",
+    "0,1,2,3,4",
+    "--epochs",
+    "60",
+    "--rho-trace",
+    "--out",
+    "results/RHO/xcap_har_trace_m64.json"
+   ],
+   "out": "results/RHO/xcap_har_trace_m64.json",
+   "log": "results/RHO/xcap_har_trace_m64.log"
+  },
+  {
+   "name": "rho_har_m256",
+   "script": "code/cross_domain_mtl.py",
+   "args": [
+    "--domain",
+    "har",
+    "--sweep-alpha",
+    "--m",
+    "256",
+    "--alphas",
+    "0.0001,0.0003,0.001,0.003,0.01,0.03",
+    "--seeds",
+    "0,1,2,3,4",
+    "--epochs",
+    "60",
+    "--rho-trace",
+    "--out",
+    "results/RHO/xcap_har_trace_m256.json"
+   ],
+   "out": "results/RHO/xcap_har_trace_m256.json",
+   "log": "results/RHO/xcap_har_trace_m256.log"
+  },
+  {
+   "name": "rho_battery_m64",
+   "script": "code/cross_domain_mtl.py",
+   "args": [
+    "--domain",
+    "battery",
+    "--sweep-alpha",
+    "--m",
+    "64",
+    "--alphas",
+    "0.03,0.1,0.3,1.0,3.0",
+    "--seeds",
+    "0,1,2,3,4",
+    "--epochs",
+    "60",
+    "--rho-trace",
+    "--out",
+    "results/RHO/xcap_battery_trace_m64.json"
+   ],
+   "out": "results/RHO/xcap_battery_trace_m64.json",
+   "log": "results/RHO/xcap_battery_trace_m64.log"
+  },
+  {
+   "name": "rho_battery_m256",
+   "script": "code/cross_domain_mtl.py",
+   "args": [
+    "--domain",
+    "battery",
+    "--sweep-alpha",
+    "--m",
+    "256",
+    "--alphas",
+    "0.03,0.1,0.3,1.0,3.0",
+    "--seeds",
+    "0,1,2,3,4",
+    "--epochs",
+    "60",
+    "--rho-trace",
+    "--out",
+    "results/RHO/xcap_battery_trace_m256.json"
+   ],
+   "out": "results/RHO/xcap_battery_trace_m256.json",
+   "log": "results/RHO/xcap_battery_trace_m256.log"
+  }
+ ]
+}

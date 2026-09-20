@@ -1,0 +1,33 @@
+{
+  "note": "NYULO: does the NYUv2 relative-scatter curve return to its single-task anchor as the dose goes to zero? The four NYUCAP sweeps stop at alpha=0.01, where the joint scatter already sits at 0.83 (m=32) / 0.64 (m=256) of the per-seed single-task anchor, and that shortfall is what makes the scatter half-height crossing return the wrong sign (gamma=-0.77 against the probe's +0.27). Two readings are possible: the anchor is structurally unreachable in this domain, or the grid simply stopped too high. These sweeps extend the same protocol four decades down (alpha = 1e-6 .. 1e-3) so the plateau of the relative-scatter curve is measured rather than assumed. The alpha grid also repeats the NYUCAP points, which makes the overlapping cells a built-in protocol check: they must reproduce xcap_nyu_m*.json to floating-point equality. Protocol identical to NYUCAP (harness MLP, batch 128, 100 epochs, seeds 0-9, cal-warm 4); the single-task anchor is recomputed per seed inside the sweep, so rel_scatter is on the same scale as NYUCAP and R7.",
+  "jobs": [
+    {
+      "name": "nyulo_nyu_m32",
+      "script": "code/cross_domain_mtl.py",
+      "args": ["--domain", "nyu", "--sweep-alpha", "--m", "32", "--alphas", "1e-06,1e-05,0.0001,0.001,0.003,0.01,0.03,0.1,0.2,0.3,0.5,0.8,1.0,3.0,10.0,30.0,100.0", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--epochs", "100", "--batch", "128", "--cal-warm-epochs", "4", "--out", "results/NYULO/xcap_nyu_m32.json"],
+      "out": "results/NYULO/xcap_nyu_m32.json",
+      "log": "results/NYULO/xcap_nyu_m32.log"
+    },
+    {
+      "name": "nyulo_nyu_m64",
+      "script": "code/cross_domain_mtl.py",
+      "args": ["--domain", "nyu", "--sweep-alpha", "--m", "64", "--alphas", "1e-06,1e-05,0.0001,0.001,0.003,0.01,0.03,0.1,0.2,0.3,0.5,0.8,1.0,3.0,10.0,30.0,100.0", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--epochs", "100", "--batch", "128", "--cal-warm-epochs", "4", "--out", "results/NYULO/xcap_nyu_m64.json"],
+      "out": "results/NYULO/xcap_nyu_m64.json",
+      "log": "results/NYULO/xcap_nyu_m64.log"
+    },
+    {
+      "name": "nyulo_nyu_m128",
+      "script": "code/cross_domain_mtl.py",
+      "args": ["--domain", "nyu", "--sweep-alpha", "--m", "128", "--alphas", "1e-06,1e-05,0.0001,0.001,0.003,0.01,0.03,0.1,0.2,0.3,0.5,0.8,1.0,3.0,10.0,30.0,100.0", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--epochs", "100", "--batch", "128", "--cal-warm-epochs", "4", "--out", "results/NYULO/xcap_nyu_m128.json"],
+      "out": "results/NYULO/xcap_nyu_m128.json",
+      "log": "results/NYULO/xcap_nyu_m128.log"
+    },
+    {
+      "name": "nyulo_nyu_m256",
+      "script": "code/cross_domain_mtl.py",
+      "args": ["--domain", "nyu", "--sweep-alpha", "--m", "256", "--alphas", "1e-06,1e-05,0.0001,0.001,0.003,0.01,0.03,0.1,0.2,0.3,0.5,0.8,1.0,3.0,10.0,30.0,100.0", "--seeds", "0,1,2,3,4,5,6,7,8,9", "--epochs", "100", "--batch", "128", "--cal-warm-epochs", "4", "--out", "results/NYULO/xcap_nyu_m256.json"],
+      "out": "results/NYULO/xcap_nyu_m256.json",
+      "log": "results/NYULO/xcap_nyu_m256.log"
+    }
+  ]
+}

@@ -1,0 +1,1142 @@
+\documentclass{article}
+
+% ─── ICLR 2027 official style ───
+\usepackage{iclr2027_conference,times}
+
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{algorithmic}
+\usepackage{algorithm}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage{subcaption}
+\usepackage{amsthm}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{etoolbox}
+
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
+\newtheorem{lemma}{Lemma}
+\newtheorem{theorem}{Theorem}
+\newtheorem{corollary}{Corollary}
+
+% ─── Custom commands (mirroring the source build) ───
+\newcommand{\method}{STF}
+\newcommand{\ourmodel}{STF}
+\newcommand{\eg}{e.g.,\ }
+\newcommand{\ie}{i.e.,\ }
+\newcommand{\etc}{etc.\ }
+\newcommand{\STF}{\textsc{STF}}
+
+% ─── Typographic spacing ───
+% Figure 1 is authored at \columnwidth so that its 7 pt glyphs print at their
+% nominal size; the style-default float and caption skips are tightened here to
+% pay for that height and keep the main text inside the 9-page budget.
+\setlength{\textfloatsep}{7pt plus 2pt minus 2pt}
+\setlength{\floatsep}{7pt plus 2pt minus 2pt}
+\setlength{\intextsep}{7pt plus 2pt minus 2pt}
+\setlength{\abovecaptionskip}{4pt plus 1pt minus 1pt}
+\setlength{\belowcaptionskip}{2pt plus 1pt minus 1pt}
+% The conference style hard-codes \subsection's skips (no \beforesubsecskip
+% hook exists). Redefining it here with a slightly smaller pre-skip returns a
+% few points per heading; with the main-text subsections that funds the last
+% lines of the 9-page budget. The visual style (\normalsize\sc\raggedright)
+% is unchanged.
+\makeatletter
+\renewcommand{\subsection}{\@startsection{subsection}{2}{\z@}{-1.1ex plus
+-0.3ex minus -.2ex}{0.5ex plus .2ex}{\normalsize\sc\raggedright}}
+% \section carries far more skip than \subsection (style default -2.0ex /
+% 1.5ex) and the style hard-codes it with no hook, so the same override is
+% applied here: the pre-skip gives back a few points per heading, which funds
+% the last lines of the 9-page budget.  The visual spec (\large\sc\raggedright)
+% is reproduced verbatim.
+\renewcommand{\section}{\@startsection{section}{1}{\z@}{-1.4ex plus
+-0.4ex minus -.2ex}{1.0ex plus .2ex}{\large\sc\raggedright}}
+\makeatother
+% Displayed equations sit closer to their text: the 9 main-text displays each
+% give back ~10pt, which funds the last lines of the 9-page budget.
+\AtBeginDocument{%
+  \setlength{\abovedisplayskip}{2pt plus 1pt minus 1pt}%
+  \setlength{\belowdisplayskip}{2pt plus 1pt minus 1pt}%
+  \setlength{\abovedisplayshortskip}{0.5pt plus 0.5pt minus 0.5pt}%
+  \setlength{\belowdisplayshortskip}{1pt plus 0.5pt minus 0.5pt}}
+
+% The tightened skips leave little stretch on a page, and the style fixes
+% \parskip rigidly at 6pt, so \flushbottom can run out of glue on pages that
+% end inside a paragraph.  A small stretch on the paragraph gap lets those
+% pages fill without changing any nominal spacing.
+\setlength{\parskip}{6pt plus 1.5pt}
+
+\title{Gradient Toxicity: When Auxiliary Heads Collapse the Shared Encoder}
+
+\author{Anonymous authors\\Paper under double-blind review}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Multi-task learning blames the auxiliary task for gradient conflict. We show that the more dangerous failure needs no conflict at all: an auxiliary head with a constant attractor --- distribution matching, reconstruction, or view invariance --- drags the shared encoder into a degenerate fixed point of vanishing representation variance, however well it aligns with the primary task. The order parameter $\rho=\|\Pi_c g_a\|/\|g_p\|$ makes this sharp: we prove a saddle-node collapse at $\alpha\rho=1$ and the capacity law $\alpha_c(m)\propto m^\gamma$. The theory yields the spectral toxicity filter (\STF) family, with full \texttt{.detach()} as its blunt boundary case: every continuous sign-preserving gradient transformation provably fails to prevent the collapse, whereas \STF{} annihilates the toxic projection and leaves the auxiliary task learning. Its two knobs are derived, not tuned. One probe on a detached healthy anchor sets the gate and the deletion rank; the rank rule deletes the fewest directions whose removal restores safety; and the calibration error carries a finite-batch certificate whose sample size grows only logarithmically with confidence. On five domains (four time-series plus the dense-vision benchmark NYUv2), a single protocol with domain-independent metrics reproduces the law, and the protection transfers to a Transformer encoder. In a flagship battery-health application \STF{} matches both single-task ceilings on NASA and closes $75\%$ of the SOH gap on MATR, from $5.24$ to $1.68$ against a $0.51$ reference.
+\end{abstract}
+
+
+
+% ═══════════════════════════════════════════════════════════════════
+% 1. INTRODUCTION
+% ═══════════════════════════════════════════════════════════════════
+\section{Introduction}\label{sec:intro}
+
+Multi-task learning (MTL) rests on one working assumption: auxiliary tasks supply gradients that steer a shared encoder toward more generalizable representations. PCGrad~\citep{yu2020pcgrad}, FAMO~\citep{liu2023famo}, and CAGrad~\citep{liu2021cagrad} handle the case in which it fails through \emph{conflict} --- gradients pushing in different directions --- and all presuppose that each task contributes useful directional information.
+
+The assumption can also fail in a way that conflict resolution cannot detect: auxiliary gradients may all point in the \emph{same} direction, and that direction may lead to a degenerate fixed point. \texttt{.detach()} is the folk remedy, but it discards the auxiliary signal wholesale: the question is \emph{which} projection to remove, and stop-gradient removes all of them.
+
+We first met this failure in multi-task financial ranking, where a production model with a mixture-density network, an autoencoder, and a contrastive head froze at a near-constant prediction out of sample ($+0.0000$ rank-IC) that further training never recovered. The failure is not specific to finance. Every auxiliary head of this kind carries a \emph{constant attractor}: distributional, reconstruction, and view-matching objectives are all minimized at constant encoder outputs, so their gradients contract representation variance along the shared direction $u_c=h-\mathbb{E}_b[h]$, regardless of the primary task. We call this \emph{gradient toxicity}, and the resulting \emph{representational collapse}. It is categorically distinct from conflict, because toxic gradients from different heads are \emph{aligned} on a single variance-degenerating axis.
+
+We formalize toxicity as a phase transition, characterize how it depends on encoder capacity, and derive a principled repair, \emph{Spectral Toxicity Filtering} (\STF). \STF{} is not a tuned \texttt{.detach()}: what differs is \emph{what} it removes, not how much. \texttt{.detach()} is the saturated endpoint of the filter family (Corollary~\ref{cor:saturated}). The theory supplies the rest --- a critical ratio $\alpha_c=1/\rho$ and a proof that the \emph{least} intervention restoring safety is deletion of exactly the supercritical eigenspace (the fewest directions any orthogonal filter can delete; Theorem~\ref{thm:minimalrank}) --- and turns both into \textsc{stfcal}, which derives the gate and rank from a single probe on a detached healthy anchor, with no tuned threshold, no online feedback, and no forfeiture of the benign auxiliary signal. One unified protocol drives collapse in four time-series domains --- A-share ranking, where we first met it, human activity, radio-frequency modulation, and battery state-of-health prediction --- as well as on the dense-vision benchmark NYUv2, and \STF{} repairs all of them. The battery domain then becomes a flagship application: a production-style multi-task model jointly predicts state-of-health (SOH) and remaining useful life (RUL) over a temporal encoder, the auxiliary heads used in practice collapse SOH out of sample, the theory-consistent toxifier collapses the representation itself (scatter $0.340{\to}0.073$), and \STF{} repairs both tasks, with a multiplicative sample-reweighting gate for extreme-condition accuracy under non-stationary regimes.
+
+Our contributions are four. First, we identify gradient toxicity as a failure distinct from gradient conflict and trace it to auxiliary constant attractors (Definition~\ref{def:degmin}), from which the order parameter $\rho$ of \eqref{eq:order} and its measurable fingerprints follow (Definition~\ref{def:toxicity}). Second, we prove the saddle-node collapse transition at $r=\alpha\rho=1$ (Theorem~\ref{thm:transition}), irreversibility at the healthy fixed point (Lemma~\ref{lem:irreversible}), the capacity law $\alpha_c(m)\propto m^\gamma$ (Theorem~\ref{thm:capacity}), and its general spectral form, which fixes how degenerate heads compose (Theorem~\ref{thm:spectral}, Corollary~\ref{cor:additive}); we bound the finite-size rounding of the transition and give a high-probability calibration certificate with its sample-size prescription (Propositions~\ref{prop:finitebatch}, \ref{prop:lyapunov}, \ref{prop:calibration}, Corollary~\ref{cor:certificate}). We also prove that the fewest directions any orthogonal filter can delete to restore safety are exactly those of the supercritical eigenspace, making the calibrated rank rule optimal rather than heuristic (Theorem~\ref{thm:minimalrank}, Corollary~\ref{cor:saturated}). Third, we derive the \STF{} family --- \textsc{stf-0} as hard \texttt{.detach()}, \textsc{stf-hard} as thresholded spectral deletion, \textsc{stf-soft} as a differentiable gate --- and show that among continuous sign-preserving gradient transformations only annihilation of the toxic projection prevents collapse (Proposition~\ref{prop:minimality}, Corollary~\ref{cor:stf}). Fourth, under one protocol \STF{} prevents collapse in five domains spanning time series and dense vision, and a flagship battery application shows the diagnosis transferring to a safety-critical physical system.
+
+% ═══════════════════════════════════════════════════════════════════
+% 2. RELATED WORK
+% ═══════════════════════════════════════════════════════════════════
+\section{Related Work}\label{sec:related}
+
+Multi-task optimization~\citep{caruana1997multitask} has concentrated on \emph{negative transfer between tasks}. PCGrad projects conflicting gradients~\citep{yu2020pcgrad}, CAGrad optimizes a worst-case combination~\citep{liu2021cagrad}, Nash-MTL casts combination as a bargaining game~\citep{navon2022multi}, and FAMO balances losses via first-order per-task progress~\citep{liu2023famo}; multi-objective formulations target Pareto-stationary points~\citep{sener2018multi}; uncertainty weighting~\citep{kendall2018multi}, GradNorm~\citep{chen2018gradnorm}, IMTL~\citep{liu2021imtl}, and Aligned-MTL~\citep{senushkin2023aligned,wang2021gradient} reweight or rotate gradients; and task-grouping~\citep{standley2020tasks} and dense-prediction~\citep{vandenhende2021multi} studies map when co-training helps. All of these operate on \emph{directions or weights}, assuming the pathology is that tasks disagree. Our work studies the complementary regime, in which tasks \emph{agree} along a variance-degenerating axis, invisible to directional methods (Section~\ref{sec:conflict_ablations}).
+
+Representation collapse and its stop-gradient remedy form a second line of work. The \texttt{.detach()} trick appears across self-supervised learning (BYOL~\citep{grill2020bootstrap}, SimSiam~\citep{chen2021simsiam}, DINO~\citep{caron2021emerging}), where it prevents collapse, while non-contrastive objectives counteract the same failure by explicit variance/covariance regularization (Barlow Twins~\citep{zbontar2021barlow}, VICReg~\citep{bardes2022vicreg}, whitening~\citep{ermolov2021whitening}); related theory traces collapse to singular-value dynamics~\citep{jing2022understanding,dong2021attention}, and rank-based scores track it empirically~\citep{garrido2023rankme}. Auxiliary tasks are selected and weighted to \emph{improve} the shared representation~\citep{navon2021auxiliary,shin2024dgr}. We show instead that stop-gradient is the boundary case of a principled operator (\textsc{stf-0}) grounded in a phase-transition theory of gradient toxicity, that partial (soft) variants are admissible and beneficial, and that such auxiliary heads can instead \emph{destroy} the representation, with the collapse governed by the toxicity ratio $\rho$ rather than by spectral regularization of the primary objective.
+
+Our validation domains come from time-series sensing and energy. Human activity recognition (UCI-HAR~\citep{ucihar}), radio-frequency modulation identification (RadioML~\citep{radioml}), and battery state-of-health prediction (NASA PCoE~\citep{nasa_battery}) are canonical multi-task time-series problems where auxiliary tasks routinely augment the primary encoder~\citep{zhang2021survey}. Their scales, dimensionalities, and objectives differ, so we treat them as independent validation domains and evaluate on domain-independent quantities (Section~\ref{sec:unified_protocol}).
+
+Battery health is an active MTL application: data-driven models predict cycle life and SOH directly~\citep{severson2019data,attia2020closed,pradhan2022soh}, and adaptive loss weighting balances the two heads. Neither line of work treats the \emph{gradient structure} of the auxiliary heads, yet when a reconstruction or distributional head is attached to the shared encoder its constant attractor exerts the toxic gradient of Definition~\ref{def:toxicity}. Section~\ref{sec:battery} shows this silently degrades out-of-sample SOH and RUL on public NASA and MATR data, and that \STF, with a multiplicative reweighting gate for non-stationary regimes, repairs both.
+
+Table~\ref{tab:related} summarizes the positioning. No gradient-manipulation family provably prevents the collapse transition once $\alpha\rho>1$, because none removes the contracting projection. Stop-gradient and covariance regularization target collapse directly but are either blunt or scoped to the primary objective (Table~\ref{tab:reg}). \STF{} occupies the remaining cell: it acts on the toxic \emph{subspace}, making it effective, differentiable, and minimal at once.
+
+
+% ═══════════════════════════════════════════════════════════════════
+% 3. PROBLEM FORMULATION
+% ═══════════════════════════════════════════════════════════════════
+\section{Problem Formulation}\label{sec:formulation}
+
+We study multi-task representation learning with a shared encoder $E_\theta:\mathcal{X}\to\mathbb{R}^m$, a primary head $f_p$ with loss $L_p$, and $K$ auxiliary heads with losses $\{L_a^{(k)}\}$. The training objective is
+\begin{equation}
+\min_\theta\;\; \mathbb{E}_b\Big[\, L_p\big(f_p(E_\theta(x))\big) \;+\; \sum_{k=1}^{K}\alpha_k\, L_a^{(k)}\big(h_a^{(k)}(E_\theta(x))\big) \Big],
+\label{eq:mtl_obj}
+\end{equation}
+where $\alpha_k\ge0$ controls auxiliary strength, $h_a^{(k)}$ are auxiliary heads, and the batch expectation $\mathbb{E}_b$ is over training samples. Throughout, $h=E_\theta(x)$ denotes the shared representation and $g_p=\nabla_h L_p$, $g_a=\nabla_h L_a$ the primary and auxiliary gradients with respect to $h$.
+
+We assume the shared encoder is generic (an MLP in our protocol; the theory is architecture-agnostic) and make no assumption on how auxiliary tasks are chosen beyond the following structural property, which we show is the root cause:
+
+\begin{definition}[Degenerate minimizer]\label{def:degmin}
+$L_a$ has a \emph{degenerate minimizer at a constant encoder output} if there exists $c\in\mathbb{R}^m$ such that $L_a$ attains its minimum at the constant representation $h\equiv c$, i.e.\ $g_a(c)=0$. Distributional, reconstruction, and view-matching objectives all contain such configurations. A mixture-density network predicting the empirical label distribution and a contrastive head matching corrupted views attain their minima there, whereas a reconstruction head driven by varying inputs is \emph{stationary but not minimal} at constant outputs, the residual being the input variance --- a flat trap rather than a global optimum, and the case the real heads of Section~\ref{sec:real_aux} instantiate. The mechanism needs only that the batch-centered auxiliary gradient vanish with the representation spread; the constant configuration need not be globally optimal.
+\end{definition}
+
+\begin{definition}[Order parameter of gradient toxicity]\label{def:toxicity}
+Let $u_c = h-\mathbb{E}_b[h]$ be the batch-centered \emph{variance-contracting} direction and $\Pi_c: g \mapsto \frac{\langle g,u_c\rangle}{\|u_c\|^2}u_c$ its orthogonal projector. The scalar order parameter is
+\begin{equation}
+\rho \;\triangleq\; \frac{\|\Pi_c\, g_a\|}{\|g_p\|},
+\label{eq:order}
+\end{equation}
+the ratio of the toxic (variance-contracting) component of the auxiliary gradient to the primary gradient norm, with effective control ratio $r \triangleq \alpha\rho$ at auxiliary weight $\alpha$. Gradient toxicity is the regime $\alpha\rho\gtrsim1$, and it differs from conflict in that $\rho$ measures a \emph{projection} onto a shared axis, not an angle between antagonistic gradients.
+\end{definition}
+
+% ═══════════════════════════════════════════════════════════════════
+% 4. GRADIENT TOXICITY THEORY
+% ═══════════════════════════════════════════════════════════════════
+\section{Gradient Toxicity Theory}\label{sec:theory}
+
+\begin{theorem}[Collapse transition ($r_c=1$)]\label{thm:transition}
+Assume $L_a$ has a degenerate minimizer at a constant encoder output (Definition~\ref{def:degmin}). Write $\sigma_h=(\mathrm{Var}_b[h])^{1/2}$ for the encoder spread. In the continuous-time limit the \emph{parallel scatter} $\sigma_{h,\parallel}\triangleq\chi\sigma_h$, $\chi\in(0,1]$, obeys the linear contraction--restoration balance
+\begin{equation}
+\dot\sigma_{h,\parallel} \;=\; -\,c_1\,\alpha\,\kappa_c\,\sigma_{h,\parallel} \;+\; c_2\,b(\sigma_{h,\parallel}/\chi),
+\label{eq:flow}
+\end{equation}
+where $\kappa_c>0$ is the auxiliary curvature along the variance directions, $b$ is the primary restoration flux with $b(\sigma)=\lambda_1\sigma^2+o(\sigma^2)$ as $\sigma\to0$ and $b(\sigma)/\sigma\to0$ as $\sigma\to\infty$ (Appendix~\ref{app:proofs}), and $c_1,c_2>0$. Then the effective ratio $r=\alpha\rho$ governs a saddle-node transition~\citep{strogatz1994nonlinear} at $r=1$: for $r<1$ the scatter admits a positive lower bound and training is stable, while for $r>1$ it decays to zero and the encoder enters the collapse basin. The critical auxiliary weight is $\alpha_c=1/\rho$; the stable and unstable branches annihilate there, a discontinuous jump. Because the contraction is linear in $\sigma_{h,\parallel}$ while the primary flux is quadratic near the origin, the two regimes of Theorem~\ref{thm:capacity} follow from this one balance and differ only in how $\kappa_c$ scales with width.
+\end{theorem}
+
+\begin{proof}
+Deferred to Appendix~\ref{app:proofs}, which gives the five-step derivation (radial toxic gradient,
+modal flow, fixed points, saddle-node, discrete-time stability).
+\end{proof}
+
+Proposition~\ref{prop:gradient_vanishing} (Appendix~\ref{app:proofs}) shows why the basin is a trap: any loss that depends only on the \emph{ordering} or \emph{cross-sectional distribution} of the prediction has vanishing gradient at a constant output, leaving the objective locally flat, with no parameter change able to yield a learning signal.
+
+
+\begin{lemma}[Irreversibility at the healthy fixed point]\label{lem:irreversible}
+At a healthy optimum $\|g_p\|\to0$ while the batch-statistic auxiliary gradient retains $\|g_a\|=O(\sigma_h)\not\to0$, so $\rho=\|\Pi_c g_a\|/\|g_p\|\to\infty$ and $\alpha_c=1/\rho\to0$: \emph{any} $\alpha>0$ triggers collapse from the healthy optimum. The collapse is irreversible because the prediction-level trap of Proposition~\ref{prop:gradient_vanishing} leaves $g_p$ with no restoring force (Appendix~\ref{app:proofs}).
+\end{lemma}
+
+Proposition~\ref{prop:minimality} (Appendix~\ref{app:proofs}) closes the obvious escape route: every continuous, sign-preserving transform of the auxiliary gradient --- scaling, norm clipping, or the positive per-task reweightings of FAMO, GradNorm, and IMTL --- keeps each update inside the contracting half-space and so preserves the collapse trajectory. Only breaking sign preservation by \emph{annihilating} the toxic projection prevents it, which is what \STF{} does.
+
+
+\begin{corollary}[Necessity and sufficiency of spectral filtering]\label{cor:stf}
+Collapse is prevented \emph{if and only if} the effective ratio is driven below unity, which requires annihilating the toxic projection $\Pi_cg_a$. Because \STF{} acts on the toxic \emph{subspace} rather than scaling every gradient entry pointwise, it lies outside the class of Proposition~\ref{prop:minimality} and can prevent collapse without full detachment: \textsc{stf-soft} does so differentiably, retaining auxiliary regularization whenever $\alpha\rho$ is safely below $1$, with \textsc{stf-0} (full \texttt{.detach()}) as its boundary case.
+\end{corollary}
+
+\begin{theorem}[Capacity law]\label{thm:capacity}
+Under Theorem~\ref{thm:transition} with a fixed-rank toxic projection, the toxicity ratio dilutes with encoder width $m$ and the critical auxiliary weight obeys
+\begin{equation}
+\alpha_c(m)\;\propto\;m^{\gamma}, \qquad \gamma>0,
+\label{eq:capacity_law}
+\end{equation}
+where $\gamma=1$ in mean-field --- $\kappa_c$ is read off the toxic operator in \eqref{eq:spectral} and a width-independent toxic rank gives $\alpha_c\propto m$ --- while a toxic direction coherent with the dominant representation mode gives $\gamma>1$, the collective branch; a toxic subspace that grows with the width dilutes it (Proposition~\ref{prop:rank_dilution}). Larger encoders are proportionally harder to poison, and the design rule is $\alpha < c\, m^{\gamma}$.
+\end{theorem}
+
+Proposition~\ref{prop:rank_dilution} (Appendix~\ref{app:general}) refines \eqref{eq:capacity_law} through \eqref{eq:rank_dilution}: if the effective rank of the toxic projection grows with width as $m_\Pi\propto m^{\beta}$, the exponent rescales to $\gamma=\gamma_0(1-\beta)$, with $\gamma_0\ge1$ the undiluted value. A \emph{trained} head absorbs part of any added width into its toxic subspace and yields sub-mean-field exponents, whereas an untrained projection dilutes only as fast as its rank grows; we fit both regimes per domain in Section~\ref{sec:capacity_law}.
+
+
+Theorem~\ref{thm:transition} is the rank-one case of a spectral statement; the spectral form covers several degenerate heads attached at once, as in the discovery domain.
+
+\begin{theorem}[General spectral collapse criterion]\label{thm:spectral}
+For a constant-attractor auxiliary loss the auxiliary push is linear on the batch-centered subspace, $g_a=A_a\,\delta h+o(\|\delta h\|)$ with $A_a\succeq0$ and $A_a\mathbf 1=0$ ($\mathbf 1$ the all-ones feature direction; translation invariance), and the primary restoration is $g_p=-S_p\,\delta h+o(\|\delta h\|)$ with $S_p\succeq0$ near its healthy anchor. Let $\Sigma=\mathbb E_b[\delta h\,\delta h^{\!\top}]$ and $\varsigma_v^2=v^{\!\top}\Sigma v$. Every eigen-direction $v$ of $\Sigma$ evolves as
+\begin{equation}
+\dot\varsigma_v^2\;=\;-2\big(c_1\,\alpha\,\kappa_a(v)\;-\;c_2\,\lambda_p(v)\big)\,\varsigma_v^2\;+\;o(\varsigma_v^2),
+\label{eq:modal}
+\end{equation}
+where $\kappa_a(v)\triangleq\langle v,A_av\rangle\ge0$ contracts and $\lambda_p(v)$ restores the spread along $v$; \eqref{eq:modal} divided by $2\varsigma_v$ is the scatter form \eqref{eq:flow}. Hence the encoder collapses \emph{if and only if the spectral control ratio \eqref{eq:spectral} exceeds unity},
+\begin{equation}
+\alpha\,\rho_\star>1,\qquad
+\rho_\star\triangleq\lambda_{\max}\!\Big(R^{-1/2}\,\Pi_c A_a \Pi_c\,R^{-1/2}\Big),
+\label{eq:spectral}
+\end{equation}
+where $R=\Pi_cS_p\Pi_c$ is the restoration operator restricted to the batch-centered subspace. For a single toxic direction $T\triangleq\Pi_cA_a\Pi_c$ is rank one and $\rho_\star=\rho$, recovering $r_c=1$. The ratio is defined on $H_c\triangleq\mathrm{range}(T)$ rather than on an arbitrary subspace, with $R^{-1/2}$ taken on $H_c$ and the filters below acting on $H_c$ itself, because a filter that deletes a dimension outside $H_c$ cannot change any $\kappa_a(v)$ and leaves \eqref{eq:spectral} invariant. Necessity and the rank rule are therefore stated on the toxic spectrum.
+\end{theorem}
+
+Corollary~\ref{cor:additive} (Appendix~\ref{app:proofs}) fixes how degenerate heads compose: genuinely new toxic directions are mutually orthogonal and leave the threshold unchanged, whereas aligned heads add their ratios and divide $\alpha_c$ by their number, so three aligned heads are three times as toxic as one --- the $K{=}3$ production failure of Appendix~\ref{app:finance}.
+
+
+Two finite-size consequences of \eqref{eq:modal} (Appendix~\ref{app:general}) matter in practice. First, $\rho$ is estimated from a finite batch, so the realized control ratio $\hat r=\alpha\hat\rho$ fluctuates with standard deviation $\Delta\propto B^{-1/2}$, making the collapse probability a sigmoid in $\alpha$ of width $\propto B^{-1/2}$. Second, under stochastic-gradient noise the scatter settles at a floor that diverges as $\alpha\to\alpha_c^{-}$, so any threshold read off the scatter curve converges to $\alpha_c$ from \emph{below}, reconciling the half-height and flag-based transition locations of Section~\ref{sec:capacity_law}.
+
+A third consequence makes the operator's remaining freedom a matter of \emph{calibration} rather than tuning. Because $\rho$ is informative on the healthy branch even though it is not identifiable at initialization, one detached warm-up probe fixes both the gate and the minimal admissible rank (Section~\ref{sec:stfcal}): Proposition~\ref{prop:calibration} bounds the calibration error at that probe size, and Theorem~\ref{thm:minimalrank} shows the rank rule so obtained deletes less auxiliary energy than any other filter that restores safety.
+
+% ═══════════════════════════════════════════════════════════════════
+% 5. SPECTRAL TOXICITY FILTERING
+% ═══════════════════════════════════════════════════════════════════
+\section{Spectral Toxicity Filtering}\label{sec:stf}
+
+Theorem~\ref{thm:transition} and Corollary~\ref{cor:stf} characterize the collapse and identify the unique minimal repair: annihilate the toxic projection while leaving the informative auxiliary component intact. We instantiate it as the \emph{spectral toxicity filter}
+\begin{equation}
+F_\beta[g_a] \;=\; g_a \;-\; \Pi_c g_a \cdot w_\beta(\rho),\qquad
+w_\beta(\rho) = \mathrm{sig}\!\big(\beta(\alpha\rho-1)\big),
+\label{eq:stf}
+\end{equation}
+so that $w_\beta\to1$ in the toxic regime $\alpha\rho>1$, where the projection is deleted at criticality, and $w_\beta\to0$ in the healthy regime, where auxiliary regularization is retained; the shared update is $\theta\leftarrow\theta-\eta\,J_\theta^{\!\top}(g_p+\sum_k F_\beta[g_a^{(k)}])$ with $J_\theta=\partial h/\partial\theta$. Three instantiations form a spectrum: \textsc{stf-0}, with $w_\beta\equiv1$ and the projector widened to the identity so that $F_0[g_a]=0$, which is \texttt{.detach()} and the non-spectral boundary case; \textsc{stf-hard} ($\beta\to\infty$, deleting the toxic component only once the threshold is crossed); and \textsc{stf-soft} ($w_\beta\in(0,1)$, a differentiable gate interpolating smoothly across the critical point).
+
+The design space collapses to a single gate. Theorem~\ref{thm:filters} (Appendix~\ref{app:general}) characterizes every filter that preserves the batch-centered subspace: the transition is removed \emph{iff} it annihilates $\mathrm{range}(T)$, and $I-P_{\mathrm{range}(T)}$ is the unique distortion-minimizing safe filter, while an \emph{estimated} subspace keeps a finite threshold and its $\alpha_c/\epsilon$ ratio (Corollary~\ref{cor:estimation}). The attenuation operators $F_\lambda[g_a]=g_a-\lambda\,\Pi_cg_a$, $\lambda\in[0,1]$, have effective control ratio $(1-\lambda)\,\alpha\rho_\star$, so every $\lambda<1$ only rescales the saddle-node, $\alpha_c(\lambda)=\alpha_c(0)/(1-\lambda)\to\infty$ as $\lambda\to1$ (Proposition~\ref{prop:attenuation}): partial attenuation buys a constant factor, never safety. The least removal that prevents collapse at the operating point is the bang-bang step $\lambda^\star=\mathbf 1[\alpha\rho_\star\ge1]$, whose hard branch is \textsc{stf-hard} and whose smooth relaxation under estimation noise is the sigmoid $w_\beta$ of \eqref{eq:stf}. One threshold and one temperature therefore remain.
+
+\STF{} changes neither the architecture, the primary loss, nor the auxiliary design. Its per-step cost is one batch-centered direction estimate and one orthogonal projection, $O(B\,d)$, plus a scalar gate --- at most $26\%$ measured per-epoch overhead, against $2\times$ backward passes for gradient surgery. It is \emph{complementary} to conflict-resolution methods: filter toxicity first, then resolve conflict (Table~\ref{tab:compose}). For the regression (SOH/RUL) setting we pair \STF{} with prediction variance normalization and target $z$-scoring, which close the second-layer prediction trap of Proposition~\ref{prop:gradient_vanishing}.
+
+\subsection{Calibrated Spectral Filtering: \textsc{stfcal}}\label{sec:stfcal}
+
+Equation~\eqref{eq:stf} still leaves two choices to the user: the threshold, and how many toxic directions to delete. The theory fixes both once $\rho$ is known, but $\rho$ cannot be tracked online. The per-step \emph{probe} is uninformative at the start of training: the per-cell fluctuation of the projected auxiliary gradient scales as $B^{-1/2}d^{-1/2}$ while its mean is $O(1)$, so a single-batch probe reads $\hat\rho\approx0.01$ for \emph{every} $\alpha\in[0.03,100]$ at step $0$. That value is an artifact of the one-batch estimate; the domain's true initialization spectrum is $O(1)$ (Section~\ref{sec:diagnosis}). The probe is no better later: it \emph{rises} by orders of magnitude as training proceeds, and does so with the toxifier inert, so an online $\rho$-gate fires on runs that never collapse (Appendix~\ref{app:online}). The resolution is to calibrate once, on the healthy branch, where $\rho$ is informative.
+
+The calibration runs a short warm-up with the auxiliary branch detached, so the encoder trains on the primary loss alone and its scatter defines the healthy anchor $\mathcal S^\star$; one probe there yields $\hat\rho$ and the residual family $\hat\rho_{\mathrm{res}}[0..R]$ of Definition~\ref{def:toxicity}. Theorem~\ref{thm:transition} then fixes the gate and Theorem~\ref{thm:minimalrank} the rank in \eqref{eq:calrule},
+\begin{equation}
+\text{gate}=\mathbf 1[\alpha\hat\rho\ge1],\qquad
+r=\min\{r\le R:\alpha\hat\rho_{\mathrm{res}}[r]<1\},
+\label{eq:calrule}
+\end{equation}
+after which $F=I-P_{\hat S_r}$ --- the orthogonal projector onto the \emph{complement} of the $r$ leading principal directions of the centered representation, so that those directions are deleted --- is \emph{latched} for the remainder of training. The projector is latched rather than refit: Lemma~\ref{lem:irreversible} rules out recovery after collapse, the healthy latent basis is not stationary as the toxic subspace drifts with the encoder (Corollary~\ref{cor:estimation}), and refitting online against a collapsing representation is unreliable. We delete once and accept the residual leakage (Section~\ref{sec:negatives}). When $\alpha$ is sub-critical the gate stays closed and calibration is free; Algorithm~\ref{alg:stfcal} states the procedure.
+
+One probe suffices because the decision is exact in the population limit: $r$ is the minimal rank that makes the operating point safe and deletes less auxiliary energy than any other safe filter, while the gate is the same rule at $r=0$ (Theorem~\ref{thm:minimalrank}). At finite probe size, Proposition~\ref{prop:calibration} certifies it: gate and rank are correct with probability $1-\delta$ whenever the operating point lies further from the critical shell than the probe noise floor, with $B\gtrsim2\rho^2c_0^2\varepsilon^{-2}\ln(2/\delta)$ --- logarithmic in confidence and, at fixed \emph{relative} accuracy, independent of the toxicity scale.
+
+On UCI-HAR at $m=64$ a $4$-epoch detached warm-up followed by one probe gives $\hat\rho=110.2$ (mean over $10$ seeds; range $42$--$296$), hence a predicted $\alpha_c=9.1\times10^{-3}$, inside the measured interval $\alpha_c\in[0.001,0.01]$ (Section~\ref{sec:har}) --- the probe precedes any auxiliary gradient.
+Ten seeds per cell replicate the dose--response across five domains and two encoders: joint collapses $10/10$ at supercritical $\alpha$ while \textsc{stfcal} collapses $0/10$ with the gate open in every seed, and on battery it beats joint on SOH-RMSE ($0.298$ vs.\ $0.348$). The protection transfers to a Transformer encoder at RadioML $\alpha{=}3000$, where joint collapses $10/10$ to accuracy $0.156$ and \textsc{stfcal} holds $0/10$ at scatter $0.970$. CelebA~\citep{liu2015celeba} (Smiling head) is the most toxic configuration measured ($\hat\rho=1602$--$3585$): at $\alpha{=}100$ \textsc{stfcal} protects fully ($0/5$, scatter $0.934$) while joint collapses $5/5$ to scatter $0.003$. NYUv2 dense perception (Appendix~\ref{app:nyu}) adds the metric-silent regime: the calibrated $\alpha_c=0.50$ brackets the observed transition, and at $\alpha{=}0.5$ the gate opens in exactly the five seeds with $\hat\rho>1/\alpha$ (Figure~\ref{fig:unified}f), while for all $\alpha\ge1$ \textsc{stfcal} holds $0/10$ --- yet joint depth RMSE \emph{improves} under collapse ($1.33\to1.09$), so only $\rho$ reveals the failure. Per-domain scatter values are in Appendix~\ref{app:moved}.
+
+% ═══════════════════════════════════════════════════════════════════
+% 6. EXPERIMENTS
+% ═══════════════════════════════════════════════════════════════════
+\section{Experiments}\label{sec:experiments}
+
+\subsection{Unified Protocol}\label{sec:unified_protocol}
+
+All domains run the \emph{identical} protocol (Algorithm~\ref{alg:stf}), so cross-domain differences reflect the data, not the harness. The shared encoder is a 3-layer MLP of width $m$; the primary task is domain-specific (accuracy or RMSE); and the toxic auxiliary task is the \emph{variance-shrinkage toxifier} $L_{tox}=\mathrm{Var}_b[W_k h]$ over $K=3$ seeded random projections, which realizes the constant attractor of Definition~\ref{def:degmin}. Training uses Adam ($\mathrm{lr}=10^{-3}$, batch $256$) with bf16 autocast on an NVIDIA A100 80\,GB and $5$--$10$ seeds per cell, with the relative-collapse criterion $\mathcal{S}_h<0.3\,\mathcal{S}_{single}$ on the cross-sample scatter
+\begin{equation}
+\mathcal{S}_h \;=\; \mathbb{E}_{j}\big[\mathrm{std}_b( h^{(b)}_{j} - \mathbb{E}_b[h^{(b)}_{j}] )\big],
+\label{eq:cross_sample_scatter}
+\end{equation}
+anchored per seed to its own single-task ceiling. The toxifier holds the toxic subspace fixed across widths, which is what makes the capacity law measurable; Section~\ref{sec:bmtl} repeats the measurements with production heads. Domain-independent metrics are the \emph{collapse rate}, the \emph{recovery rate}, the order parameter $\rho$, and the relative scatter $\mathcal{S}_h/\mathcal{S}_{single}$; domain characteristics and sample counts are in Table~\ref{tab:domains} (Appendix~\ref{app:tables}). Over per-seed values ($n{=}10$ per domain), the \textsc{joint}-vs-\textsc{stfcal} scatter reduction is significant at $p<0.01$ in every domain (Wilcoxon; $d_z>20$) and battery SOH-RMSE improves by $0.050$ ($95\%$ CI $[0.033, 0.067]$, $d_z=1.8$); all five primary comparisons survive Holm correction.
+
+\subsection{Cross-domain validation}\label{sec:validation}
+
+Five domains instantiate the same mechanism under one protocol: A-share ranking (Appendix~\ref{app:finance})\label{sec:finance}; UCI-HAR\label{sec:har}; RadioML2016.10A\label{sec:radioml}; NASA/MATR battery state-of-health\label{sec:battery}; and NYUv2 dense perception\label{sec:nyu} (Appendix~\ref{app:nyu}), with CelebA as a sixth-instance toxicity check. In every domain \textsc{joint} training collapses the representation at supercritical $\alpha$, every \STF{} mode restores it (collapse rate $1.0\to0.0$), and the repair is complete where collapse is primary-metric-visible: RadioML accuracy returns from the chance level $0.091$ to $0.33$ and battery log-SOH RMSE from $0.611$ to $0.305$ (Figure~\ref{fig:battery_repair}; Table~\ref{tab:unified_repair}).
+
+The domains also differ in \emph{how visible} the collapse is to the primary metric. On RadioML and battery the metric itself collapses; on HAR the classifier still reaches $\approx0.95$ accuracy at relative scatter $0.05$; and on MATR a fully degenerate encoder (relative scatter $0.0052$) can score \emph{better} SOH-RMSE than detachment ($0.82$ vs.\ $1.51$), because a near-constant representation suffices for a target monotone in cycle index. A task metric can therefore reward the failure it is meant to detect --- the case for monitoring $\rho$ rather than the loss (Proposition~\ref{prop:gradient_vanishing}).
+
+\subsection{BatteryMTL: A Flagship Application for Joint SOH and RUL Prediction}\label{sec:bmtl}
+
+The battery domain is also the natural setting for a \emph{production-style} application: a multi-task model over a strong temporal encoder that jointly predicts state-of-health (SOH) and remaining useful life (RUL), with exactly the auxiliary heads such systems routinely attach --- the configuration the unified protocol diagnoses.
+
+A \textsc{TSMixer}~\citep{ekambaram2023tsmixer} block plus a gated state-space block~\citep{gu2022s4,gu2023mamba} map each cell's per-cycle window to $h\in\mathbb{R}^{d}$, which feeds a SOH head ($L_2$), a RUL head ($L_1$), and auxiliary reconstruction/distributional heads whose constant attractors are the toxic gradients of Definition~\ref{def:degmin} (Appendix~\ref{app:moved}).
+
+The RUL targets are right-censored. Because $59.2\%$ of MATR samples never reach end-of-life within their window, we supervise them with the Tobit-style form~\citep{tobin1958estimation}: an exact term for observed cells and a one-sided hinge for censored ones, with EOL detection restricted to the physically valid suffix, retaining all $185$ MATR cells (Appendix~\ref{app:moved}). Evaluation covers only the cells that reach EOL, since censored cells carry no observed target and scoring them would assume an unverifiable lifetime. The reported RUL-MAE is therefore computed on the $89$ uncensored MATR cells while SOH-RMSE covers all cells; since the two are not estimates over the same set, Table~\ref{tab:bmtl} separates them.
+
+Repairing the gradient flow recovers both tasks. Feeding the auxiliary gradients into the encoder (\textsc{joint}) collapses the representation and degrades SOH (Table~\ref{tab:bmtl}; Figure~\ref{fig:battery_repair}). \textsc{stf-0} (\texttt{.detach()}) restores them: on NASA it \emph{matches} both ceilings ($9.35$ vs.\ $9.17$ SOH; $18.0$ vs.\ $18.5$ RUL), and on MATR it cuts SOH-RMSE from $5.24$ to $1.68$ against the $0.51$ ceiling and RUL from $209$ to $575$ against $695$ --- $75\%$ of the joint-to-ceiling SOH gap. Unlike NASA, MATR retains a residual $3.3\times$ above the single-task reference, concentrated on SOH and only narrowed to $1.54$ by the tri-weight gate: the repair remains partial. The SOH repair holds in all ten seeds on both datasets (paired $p{=}8.4{\times}10^{-4}$ on NASA, $p{=}5.8{\times}10^{-9}$ on MATR). The theory-consistent toxifier collapses the representation (scatter $0.340{\to}0.073$ at $\alpha{=}100$) while SOH degrades only mildly ($9.17{\to}9.66$).
+
+A \emph{dataset-calibrated} tri-weight gate over C-rate, temperature, and degradation rate --- a soft AND with percentile thresholds, not fixed physical cuts --- leaves aggregate SOH unchanged while improving the hardest windows; the attribution is in Appendix~\ref{app:moved}.
+
+\begin{table}[t]
+\centering
+\caption{SOH RMSE\% and RUL MAE (cycles) for the flagship battery application, leave-cell-out; ceilings from four seeds, all other rows ten. \textsc{joint} training degrades SOH by $10.3\times$ on MATR ($0.51\to5.24$) and $1.2\times$ on NASA ($11.42$ vs.\ the $9.17$ ceiling); \textsc{stf-0} ($\texttt{.detach()}$) matches both NASA ceilings, and on MATR closes $75\%$ of the SOH gap ($5.24\to1.68$), leaving a residual $3.3\times$ above the ceiling and RUL within $17\%$ --- a repair, not ceiling parity --- while restoring the representation (MATR scatter $0.149\to0.175$); \textsc{stf-0w} adds the tri-weight gate ($1.54$).}
+\label{tab:bmtl}
+\small
+\resizebox{\columnwidth}{!}{\begin{tabular}{lccccc}
+\toprule
+ & \multicolumn{2}{c}{MATR} & \multicolumn{2}{c}{NASA} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Mode & SOH rms(\%) & RUL MAE (cyc) & SOH rms(\%) & RUL MAE (cyc) \\
+\midrule
+single-task ceiling & $0.51$ & $694.6$ & $9.17$ & $18.5$ \\
+\textsc{joint} (aux heads) & $5.24\pm0.54$ & $209.0\pm59.8$ & $11.42\pm0.85$ & $17.5\pm1.1$ \\
+\textsc{joint} (toxifier) & $1.23\pm0.44$ & $306.6\pm48.2$ & $9.66\pm0.44$ & $17.6\pm2.4$ \\
+\textsc{stf-0} & $1.68\pm0.41$ & $574.7\pm80.7$ & $9.35\pm0.55$ & $18.0\pm2.0$ \\
+\textsc{stf-0w} (tri-weight) & $1.54\pm0.44$ & $541.2\pm91.3$ & $9.40\pm0.62$ & $18.6\pm1.4$ \\
+\textsc{stfcal} ($\hat\rho{=}17.4/0.40$) & $1.77\pm0.47$ & $419.8\pm33.6$ & $11.40\pm0.78$ & $18.3\pm1.7$ \\
+\bottomrule
+\end{tabular}}
+\vspace{1pt}
+{\footnotesize All MATR rows: censoring-aware RUL supervision, all 185 cells retained; bf16 autocast training, fp32 evaluation.}
+\end{table}
+
+\subsection{Battery ablations}\label{sec:bmtl_ablation}
+
+Appendix~\ref{app:tables} isolates the three design choices behind the flagship numbers: the censoring-aware RUL supervision (Table~\ref{tab:cens_ablation}); the auxiliary-weight dose--response, where \textsc{joint} degrades monotonically in the dose ($1.36\to6.58$ SOH-RMSE\% at $d{=}128$) while \textsc{stf-0} is unchanged to the last digit at every dose; and the tri-weight gate, confirmed by a ten-seed NASA replication.
+
+
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/unified_all.pdf}
+\caption{Gradient toxicity and its repair behave uniformly across the five validation domains. (a) On the discovery domain, A-share rank-IC over the $100$ fold-cells of Table~\ref{tab:finance_repair} (dots, cells; whiskers, s.d.) separates the spectral gate from \texttt{.detach()}. (b) Relative scatter crosses a collapse threshold at some $\alpha_c$ in every domain. (c,d) STF drives the collapse rate to zero and recovers the primary metric. (e) Capacity law $\alpha_c\propto m^{\gamma}$, with OLS fits drawn only where the sweep brackets the transition against a healthy anchor. (f) Seed-level gate on NYUv2 at the calibrated dose ($\alpha{=}0.5$, $m{=}64$, ten seeds): relative scatter per seed against the one-probe $\hat\rho$ (seed-identical warm-up); \textsc{stfcal} (squares) survives exactly where $\hat\rho>1/\alpha$ (dashed), while \textsc{joint} (open circles, same seeds) collapses in all ten.}
+\label{fig:unified}
+\end{figure}
+
+\subsection{Conflict-Resolution Methods Cannot Prevent Collapse}\label{sec:conflict_ablations}
+
+Toxic auxiliary gradients are \emph{aligned} rather than opposing, so methods acting only on pairwise conflict cannot stop the encoder collapsing. A direct measurement on the four real heads confirms it: over ten seeds $|\cos(g_p,g_a)|\le0.06$ with a sign-balanced dot product, while on the SNR head --- the one that collapses --- $88\%$ of $\|g_a\|$ lies on the single collapse axis $u_c$ (benign heads: $1$--$14\%$). Replacing plain summation by the reference implementation of the whole family --- PCGrad, CAGrad, FAMO, MGDA, Aligned-MTL, IMTL-G, Nash-MTL, uncertainty weighting, GradNorm and IMTL-L --- at the same dose and seeds, each family with its published defaults (Tables~\ref{tab:conflict_num} and~\ref{tab:conflict}) leaves the verdict unchanged: every one of them retains a $1.0$ collapse rate in all three domains, and on HAR seven fall below the $0.945$ accuracy of plain summation, four of them to $0.18$--$0.42$. On the discovery domain no family separates from plain summation either: averaged over the six walk-forward folds the family means span $-0.022$ to $+0.032$ against $-0.004$ for plain summation, within each fold's spread.
+
+
+Composing a filter with a conflict operator at supercritical $\alpha$ (Table~\ref{tab:compose}) confirms the ordering: the two interventions complement each other, but only when \emph{sequenced}, filter first (Appendix~\ref{app:moved}).
+
+
+% ═══════════════════════════════════════════════════════════════════
+% 7. ANALYSIS
+% ═══════════════════════════════════════════════════════════════════
+\section{Analysis}\label{sec:analysis}
+
+\subsection{Capacity Law, Diagnostics, and Real Auxiliary Heads}\label{sec:capacity_law}\label{sec:diagnosis}\label{sec:real_aux}\label{sec:negatives}
+
+Theorem~\ref{thm:capacity} predicts $\alpha_c(m)\propto m^{\gamma}$. We locate $\alpha_c$ as the relative half-height crossing of the scatter curve (Figure~\ref{fig:unified}b) and fit $\log\alpha_c=\gamma\log m+c$ by OLS. A fixed-rank projection ($\beta=0$) gives the largest exponent, $\gamma_0=2.43$ ($R^2=0.90$), the collective branch; the synthetic testbed, whose toxic rank is a fixed fraction of the width, is the $\beta=1$ endpoint, $\gamma=0.01$. The real domains trace the $\beta$ axis through trained heads: HAR $\gamma_{\mathrm{HAR}}=0.67$, battery $\gamma_{\mathrm{bat}}=0.10$ ($\alpha_c\approx1$ throughout), and RadioML $\gamma_{\mathrm{RML}}=0.02$ ($R^2=0.00$; width-independent crossings). Relative to $\gamma_0$ these imply $\beta\approx0.73$, $\approx0.96$, and $\approx0.99$: a trained head absorbs nearly all added width into its toxic subspace. The exponents follow Proposition~\ref{prop:rank_dilution}, and the gap $\alpha_c^{\text{battery}}\gg\alpha_c^{\text{HAR}}$ traces to the primary gradient magnitude (Lemma~\ref{lem:irreversible}).
+
+The mechanism is read from the representation, not the metric: Figure~\ref{fig:unified}b shows primary metrics that are insensitive to collapse (HAR accuracy) or register it late (battery RMSE), whereas $\mathcal{S}_h$ and $\rho$ respond within one decade of $\alpha$. The measured initialization $\rho=0.74\pm0.19$ matches the observed onset at $\alpha_c=1.45\pm0.37$ (Appendix~\ref{app:finance}). \STF{} removes that encoder-level attractor, and the separate prediction-level trap of Proposition~\ref{prop:gradient_vanishing} is closed by the normalization of Appendix~\ref{app:general}.
+
+We repeat the comparison with four \emph{real} auxiliary objectives at $m=64$ and ten seeds (Table~\ref{tab:real_aux}): input-reconstruction and subject-identity heads on HAR, I/Q-reconstruction and SNR-regression heads on RadioML. The measured $\rho$ separates the two benign reconstruction heads from the subject probe and the SNR head by orders of magnitude (Appendix~\ref{app:moved}), and \textsc{stfcal} leaves the benign heads untouched, gate closed in every seed. The production heads are the harsher hazard: on MATR they drive SOH to $5.24$ where the toxifier reaches $1.23$ (Table~\ref{tab:bmtl}). On the SNR hazard no spectral variant restores the metric: joint and \textsc{stf-hard} collapse in $10/10$ seeds and \textsc{stf-soft} in $9/10$, and \textsc{stfcal} --- gate open in every seed --- still collapses $1/10$ at joint-level accuracy ($0.199$ vs.\ $0.307$). Only full deletion is safe. This is the saturation regime: at extreme toxicity the batch estimate of $u_c$ destabilizes as the representation collapses, and Corollary~\ref{cor:estimation} shows that an estimated subspace keeps only a finite threshold $\epsilon^{-1}\alpha_c$, so exact annihilation is the sole escape. The SNR head instantiates it at the marginal RadioML dose ($\alpha{=}1$), where the probe reads every seed as sub-critical while joint collapses in $8/10$. Capacity exponents rest on four widths per domain (three on NYUv2), accuracy on HAR is not a collapse witness, and the calibrated filter is validated per domain in Appendix~\ref{app:moved}.
+
+\begin{table}[t]
+\centering
+\caption{Real auxiliary heads ($m=64$, ten seeds): primary accuracy, collapse rate in parentheses. \textsc{stfcal} leaves the two benign reconstruction heads untouched, gate closed in every seed; the SNR head collapses every joint seed and no spectral variant restores it, so only \textsc{stf-0} is safe.}
+\label{tab:real_aux}
+\small
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+Auxiliary head & $\alpha$ & \textsc{joint} & \textsc{stf-0} & \textsc{stf-hard} & \textsc{stf-soft} & \textsc{stfcal} \\
+\midrule
+HAR input-reconstruction & $0.1$ & $.942$ ($0.0$) & $.943$ ($0.0$) & $.942$ ($0.0$) & $.942$ ($0.0$) & $.942$ ($0.0$) \\
+HAR subject-ID probe & $0.1$ & $.941$ ($0.0$) & $.943$ ($0.0$) & $.944$ ($0.0$) & $.943$ ($0.0$) & $.942$ ($0.0$) \\
+RadioML I/Q-reconstruction & $3000$ & $.343$ ($0.0$) & $.307$ ($0.0$) & $.329$ ($0.0$) & $.327$ ($0.0$) & $.315$ ($0.0$) \\
+RadioML SNR regression & $3000$ & $.205$ ($1.0$) & $\mathbf{.307}$ ($\mathbf{0.0}$) & $.208$ ($1.0$) & $.200$ ($0.9$) & $.199$ ($0.1$) \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+
+% ═══════════════════════════════════════════════════════════════════
+% 8. CONCLUSION
+% ═══════════════════════════════════════════════════════════════════
+\section{Conclusion}\label{sec:conclusion}
+
+Gradient toxicity is a general failure mode: auxiliary heads with constant attractors exert variance-contracting gradients that drive a shared encoder through a saddle-node collapse transition. We gave the order parameter $\rho$, the transition at $\alpha\rho=1$, irreversibility, and the capacity law $\alpha_c\propto m^{\gamma}$, from which the \STF{} family follows, with \texttt{.detach()} as its boundary case. Validation spans four time-series domains plus NYUv2 under one protocol, and a single probe fixes gate and rank. The design rule is to \emph{monitor the toxicity ratio, not just the task metric}: filter first, then resolve conflict.
+
+
+
+
+\section*{AI Use Statement}
+Generative AI tools assisted in preparing this work: large language models were used to help draft and
+edit prose, to assist in writing and debugging experiment and figure code, to help retrieve and format
+related literature, and to help formulate early proof sketches that the authors subsequently re-derived
+and checked in full. No experimental datum was generated by a model; all reported numbers come from the
+authors' runs; every mathematical claim, table entry, and figure was verified by the authors, who are
+solely responsible for this submission.
+
+\section*{Ethics Statement}
+All data used are public (UCI-HAR, RadioML2016.10A, the NASA PCoE and MATR battery archives, and public
+A-share market data); no human-subject data were collected and no IRB approval was required. Because the
+battery application is safety-relevant, we characterize the method's operating limits in
+Section~\ref{sec:negatives}. As a general gradient-processing operator the filter inherits the properties
+of the model it is applied to, and task-specific safety validation remains the practitioner's
+responsibility.
+
+\section*{Reproducibility Statement}
+All theoretical claims are proved under explicitly stated assumptions in
+Appendices~\ref{app:proofs}--\ref{app:general}. The unified protocol (architecture, optimizer,
+hyper-parameters, seed counts, collapse criterion, and the definition of every reported metric) is
+given in Section~\ref{sec:unified_protocol} and Appendix~\ref{app:tables}, with the fitting ranges and
+$R^2$ of the capacity-law fits. The anonymized repository containing the training and evaluation
+code, the per-table configuration files and seed lists, and the raw per-seed result files is
+available at \url{https://github.com/code-2026l/RepFix}. All datasets are public, and the battery
+preprocessing, including the censoring-aware RUL supervision, is described in
+Appendix~\ref{app:moved} and implemented in the released code.
+
+\bibliographystyle{iclr2027_conference}
+\bibliography{RepFix_ICLR2027}
+
+
+% ═══════════════════════════════════════════════════════════════════
+% APPENDICES
+% ═══════════════════════════════════════════════════════════════════
+\appendix
+Seven appendices follow: the discovery domain (Section~\ref{app:finance}), the proofs (Section~\ref{app:proofs}), the generalizations and finite-size theory (Section~\ref{app:general}), additional tables and the protocol (Section~\ref{app:tables}), the dense-perception benchmark (Section~\ref{app:nyu}), material moved from the main text (Section~\ref{app:moved}), and the anti-collapse regularizer sweep at matched doses (Section~\ref{app:reg}).
+\section{Origin of the Discovery: Multi-Task Financial Ranking}\label{app:finance}
+
+Multi-task equity selection was the setting in which the failure mode was first observed. A production model coupled a pairwise-rank primary head with auxiliary distributional (MDN~\citep{bishop1994mixture}), reconstruction (AE), and view-contrastive (SCARF-style~\citep{bahri2022scarf}) heads over a shared encoder of A-share factors. After deployment, without any change to the training objective, the model began to output a near-constant ranking; cross-sectional predicted spreads degraded by $\sim$93\% against its validation history, while each individual objective still reported low training loss. This is the signature of collapse onto the constant attractor of Proposition~\ref{prop:gradient_vanishing}, invisible to scalar objectives.
+
+Under the joint protocol (Section~\ref{sec:unified_protocol}) on daily A-share data (800 stocks, 2018.01--2026.06), the toxifier is a variance-shrinkage projection (Definition~\ref{def:degmin}) and the primary loss is pairwise rank, with ten walk-forward folds $\times$ ten seeds (100 fold-cells per mode) partitioning the timeline. Table~\ref{tab:finance_repair} gives OOS rank-IC per mode: joint reaches $+0.060$; hard \texttt{.detach()} (\textsc{stf-0}) \emph{loses} auxiliary signal ($+0.036$, $-39\%$; paired $p{=}5{\times}10^{-5}$ over the 100 fold-cells) because it deletes the useful component outright; and the spectral gates retain it (\textsc{stf-hard} $+0.063$, $+5\%$; \textsc{stf-soft} $+0.056$, $-7\%$, neither differing from joint at $p{<}0.2$). Filtering thus removes the toxic projection without discarding the useful one, as Corollary~\ref{cor:stf} predicts. Cross-market transfer (CSI 300/500/1000) reproduces the ordering; all financial numbers appear in the fold tables shipped with the code repository.
+
+Measured initialization spectra give $\rho=0.74\pm0.19$ (12 seeds, synthetic testbed), whence the predicted critical weight $\alpha_c=\langle 1/\rho\rangle=1.45\pm0.37$, consistent with the observed onset location; the same $\rho$ is reproduced in every scientific domain via the projection estimate of Definition~\ref{def:toxicity}.
+
+\section{Proofs and Additional Analysis}\label{app:proofs}
+
+\subsection{Statements deferred from the main text}
+For readability, the following statements are made in the main text only in prose; we collect their
+formal form here. Numbering is shared with the main text.
+
+\begin{proposition}[Gradient vanishing at constant output]\label{prop:gradient_vanishing}
+Let $\hat{y}=c\cdot\mathbf{1}$ be an attainable constant output. A loss depending only on the \emph{relative ordering} or \emph{cross-sectional distribution} of $\hat{y}$ has a vanishing parameter gradient at $\hat{y}=c$ wherever defined: ranking losses (Spearman/Pearson IC, ListNet/ListMLE, pairwise ranking) degrade to \texttt{NaN} or a flat tie, sign agreement is constant, and distributional losses collapse to the unconditional statistics, so that either $\nabla_{\hat{y}}L_k=0$ or $\sum_i\partial L_k/\partial\hat{y}_i=0$ --- a common shift leaves the ordering and the product-moment invariant. At the constant output $\hat{y}_i$ is the same function of $\theta$ for every $i$, so $J_\theta=\partial\hat{y}/\partial\theta$ degenerates to identical rows and $\nabla_\theta L_k=J_\theta^{\!\top}\nabla_{\hat{y}}L_k=0$: the objective is locally flat around the constant fixed point and no parameter change yields a learning signal from these losses.
+\end{proposition}
+
+\begin{proposition}[Minimality: sign-preserving transforms cannot prevent collapse]\label{prop:minimality}
+For any continuous, sign-preserving intervention $f$ applied to the auxiliary gradient before accumulation (scaling $f(g)=\beta g$ with $0<\beta\le1$; clipping $f(g)=g\cdot\min(1,\tau/\|g\|)$; positive per-task reweighting as in FAMO/GradNorm/IMTL, each mapping $g$ to a positive multiple of itself (ray-preserving)), the encoder update $\theta_{t+1}=\theta_t-\eta(g_p+\tilde{g}_{aux}(t))$ with $\tilde{g}_{aux}=f(g_{aux})$ retains the collapse trajectory: sign preservation keeps every step inside the contracting half-space, and by linearity of accumulation the contracted axis --- hence the terminal collapse state --- is unchanged, a norm-dependent rescaling altering only the rate at which it is reached. Only an intervention that breaks sign preservation by \emph{annihilating} the toxic projection (the discrete case $f(g)=0$ on the toxic subspace) guarantees prevention.
+\end{proposition}
+
+\begin{proposition}[Rank-dilution scaling]\label{prop:rank_dilution}
+Let the effective rank of the toxic projection grow with encoder width as $m_\Pi\propto m^{\beta}$, $0\le\beta<1$. Then the exponents of Theorem~\ref{thm:capacity} rescale as
+\begin{equation}
+\gamma \;=\; \gamma_0\,(1-\beta), \qquad \gamma_0 \ge 1,
+\label{eq:rank_dilution}
+\end{equation}
+with $\gamma_0\ge1$ the fixed-rank exponent, equal to the mean-field value $1$ when the toxic norm grows as the square root of its rank and above it otherwise. A \emph{fixed-rank} head (random projections, $m_\Pi$ constant) realizes $\beta=0$ and the full exponent $\gamma_0$, whereas a \emph{trained} head absorbs part of the added width into its toxic subspace, $\beta>0$, and yields the diluted exponents $\gamma<1$ of the real domains. The two branches of Theorem~\ref{thm:capacity} are the cases $\gamma_0=1$ and $\gamma_0>1$ at $\beta=0$.
+\end{proposition}
+
+\begin{corollary}[Aligned heads add, orthogonal heads compete]\label{cor:additive}
+Let $K$ degenerate heads have toxic directions $u^{(k)}$ with single-head ratios $\rho_k$. If the $u^{(k)}$ are mutually orthogonal then $\rho_\star=\max_k\rho_k$; if they are all aligned on one axis then $\rho_\star=\sum_k\rho_k$, so
+$\alpha_c=1/\sum_k\rho_k$. Attaching a further degenerate head therefore leaves the collapse threshold unchanged when its toxic direction is genuinely new and divides it by ${\approx}k$ when it is aligned with the existing ones. The production failure of Section~\ref{app:finance}, which attached a distributional, a reconstruction and a view-matching head, is the $K{=}3$ instance.
+\end{corollary}
+
+
+We prove Theorem~\ref{thm:transition} in expanded form. Write the batch-centered deviation of the shared representation as $\delta h_i=h_i-\bar h$ with $\bar h=\mathbb{E}_b[h]$, and let $\sigma_{h,\parallel}^2=\mathbb{E}_b\|\Pi_c\,\delta h_i\|^2$, $\sigma_{h,\parallel}=\chi\,\sigma_h$ with $\chi\in(0,1]$ the parallel fraction of the scatter.
+
+Step 1 isolates the radial toxic gradient. By Definition~\ref{def:degmin} $L_a$ is stationary at every constant output and flat along discriminative directions, so its gradient there is purely radial. Taylor expansion at the batch mean gives, for the batch-averaged toxic projection,
+\begin{equation}
+\Pi_c\,g_a \;=\; \kappa_c\,\delta h^{\parallel} + o(\sigma_{h,\parallel}),\qquad \kappa_c>0,
+\label{eq:radial}
+\end{equation}
+where $\kappa_c$ is the auxiliary curvature along the batch-centered subspace: the auxiliary loss increases quadratically along variance directions and has zero curvature along their orthogonal complement. The toxic term of the flow \eqref{eq:flow} is therefore the linear contraction $\dot\sigma_{h,\parallel}^2=-\,2c_1\alpha\kappa_c\,\sigma_{h,\parallel}^2$: it removes variance at the constant rate $2c_1\alpha\kappa_c$, independent of how degraded the representation already is.
+
+Step 2 describes the primary restoration and its hump condition. Let $b(\sigma_h)$ denote the primary restoration flux, the rate at which the primary gradient re-inflates the parallel scatter. We assume (A2): $b(\sigma)=\lambda_1\sigma^2+o(\sigma^2)$ as $\sigma\to0$, and $b(\sigma)/\sigma\to0$ as $\sigma\to\infty$, with $b(\sigma)/\sigma$ attaining its maximum $\lambda_*>0$ at some $\sigma_*$. The quadratic vanishing at zero is the encoder-level form of the co-adaptation trap: once the head has converged onto a degenerate representation (Proposition~\ref{prop:gradient_vanishing}, Lemma~\ref{lem:irreversible}), its absolute restoring flux vanishes faster than the scatter itself, which is what makes the collapsed state locally absorbing. Saturation at large $\sigma$ says that a healthy primary stops pushing. Both limits are population-level properties of the loss and hold for every primary we consider (cross-entropy, MSE, pairwise rank).
+
+Step 3 solves for the fixed points and locates the saddle-node. The flow \eqref{eq:flow} with \eqref{eq:radial} and $\sigma_{h,\parallel}=\chi\sigma_h$ reads $\dot\sigma_h=-\,c_1\alpha\kappa_c\,\sigma_h+(c_2/\chi)\,b(\sigma_h)$, in the same scatter variable as \eqref{eq:flow}. Nonzero fixed points solve
+\begin{equation}
+\frac{b(\sigma)}{\sigma}\;=\;\frac{c_1\kappa_c\chi}{c_2}\,\alpha.
+\label{eq:fp}
+\end{equation}
+The left side is hump-shaped with peak $\lambda_*$ (A2), the right side is a horizontal line rising in $\alpha$. For $\alpha<\alpha_c\triangleq c_2\lambda_*/(c_1\kappa_c\chi)$ there are two positive roots $\sigma_1<\sigma_*<\sigma_2$. Stability follows from the sign of $\dot\sigma_h^2$: below $\sigma_1$ contraction dominates, so $\sigma=0$ is stable (the collapse basin); between $\sigma_1$ and $\sigma_2$ restoration dominates, so $\sigma_1$ is unstable (the basin boundary) and $\sigma_2$ is the stable healthy fixed point. Training from a healthy initialization ($\sigma_h(0)>\sigma_1$) therefore converges to $\sigma_2>0$. For $\alpha>\alpha_c$ no positive root survives and $\sigma_h^2\to0$ for every initialization. At $\alpha=\alpha_c$ the stable fixed point and the unstable boundary collide and annihilate: a saddle-node bifurcation, with the collapsed state absorbing before \emph{and} after the transition, which is the formal content of Lemma~\ref{lem:irreversible}.
+
+Step 4 converts the fixed-point condition into the critical ratio $r_c=1$. Define $r\triangleq c_1\alpha\kappa_c\chi/(c_2\lambda_*)=\alpha/\alpha_c$. Evaluating the order parameter $\rho=\|\Pi_cg_a\|/\|g_p\|$ at the healthy anchor $\theta^*$ (where $\|\Pi_cg_a\|=\kappa_c\chi\sigma_h^{*}$) and normalizing the restoration flux $b$ so that $\lambda_*=\|g_p\|^{*}/\sigma_h^{*}$, i.e.\ the peak restoration rate equals the anchor primary-gradient norm per unit scatter, gives $\alpha\rho^{*}=(c_2/c_1)\,r$. With the paper's unit convention $c_1=c_2$ the critical point is exactly $r_c=1$, and $\alpha_c=1/\rho^{*}$ is the operational prediction used in Section~\ref{sec:diagnosis}. Without this convention the transition persists unchanged, at a shifted and architecture-dependent location $r_c=c_2/c_1$ scaled by the anchor conversion: the two regimes, the saddle-node structure, and the prediction $\alpha_c\propto1/\rho$ are all unaffected. Every reported quantity is a dimensionless ratio anchored per seed to its own single-task ceiling (Section~\ref{sec:unified_protocol}), which realizes this convention operationally.
+
+Step 5 transfers the analysis to discrete time. With learning rate $\eta$ and encoder Lipschitz constant $L$, the Euler discretization of the flow is valid for $\eta<1/L$, and the parallel-variance update takes the explicit form
+\begin{equation}
+\begin{aligned}
+\sigma_{h,\parallel}^2(t{+}1)\;&=\;\bigl(1-\eta\,(c_1\alpha\kappa_c-\lambda_p(\sigma_h(t)))\bigr)^{2}\,\sigma_{h,\parallel}^2(t)\;+\;O(\eta^{2}),\\
+\lambda_p(\sigma)\;&\triangleq\;\frac{c_2\,b(\sigma)}{\sigma_{h,\parallel}},
+\end{aligned}
+\label{eq:parallel_contraction}
+\end{equation}
+with $\lambda_p$ the instantaneous primary restoration rate. The fixed points and their stability carry over from Step 3 to first order in $\eta$; in particular the collapse state is locally attracting exactly when the net contraction rate $c_1\alpha\kappa_c-\lambda_p$ is positive. \hfill$\square$
+
+We prove Proposition~\ref{prop:gradient_vanishing} by fixing an attainable constant output $\hat y=c\,\mathbf 1$ and showing $\partial L_k/\partial h=0$ there for each loss class.
+For ranking and correlation losses, Spearman/Pearson information coefficient, ListNet/ListMLE and pairwise ranking depend on $\hat y$ only through the cross-sectional ordering (or the product-moment) of its entries. At $\hat y=c\,\mathbf 1$ every entry is equal, so every pairwise difference $\hat y_i-\hat y_j$ vanishes; Spearman is undefined (division by a zero rank variance) and ListNet/ListMLE reduce to the uniform tie with a flat logit gradient. A pairwise rank loss $\ell(\hat y_i-\hat y_j)$ has $\nabla_{\hat y}\ell=0$ at zero margin wherever $\ell$ is differentiable with $\ell'(0)=0$, and otherwise the pairwise terms cancel so that $\sum_i\partial L_k/\partial\hat y_i=0$. Hence $\nabla_{\hat y}L_k=0$, or its batch sum vanishes.
+Distributional losses behave the same way: a mixture-density or histogram head fitted to the empirical label law is minimized at the unconditional distribution $\mathbb E_b[P(y)]$, which is attained by a representation that carries no per-sample information; at that minimizer the head parameters are stationary and $\partial L_k/\partial h=0$.
+The chain rule carries the same flatness to the parameters. In all cases $\nabla_\theta L_k=J_\theta^{\!\top}\nabla_{\hat y}L_k$ with $J_\theta=\partial\hat y/\partial\theta$ finite; at the constant output every prediction is the same function of $\theta$, so all rows of $J_\theta$ coincide and $\nabla_\theta L_k$ is that single row times $\sum_i\partial L_k/\partial\hat y_i=0$. The objective is therefore locally flat and no parameter perturbation yields a first-order learning signal. \hfill$\square$
+
+For Lemma~\ref{lem:irreversible}, train at $\alpha=0$ to a stationary point of the primary loss, $\|g_p\|=\|J_{hy}^{\!\top}\nabla_{\hat y}L_p\|\to0$ with $J_{hy}=\partial\hat y/\partial h$ the head Jacobian. The comparison is instantaneous --- evaluated at this frozen primary anchor, before the coupled dynamics of Theorem~\ref{thm:spectral} shift the optimum. By Definition~\ref{def:degmin} the auxiliary gradient vanishes only at constant outputs, so at this (non-degenerate) primary optimum it is nonzero: \eqref{eq:radial} gives $\Pi_c g_a=\kappa_c\,\delta h^{\parallel}+o(\sigma_{h,\parallel})$ with $\kappa_c>0$, so $\|g_a\|=O(\sigma_{h,\parallel})\neq 0$ unless $\sigma_{h,\parallel}=0$ exactly. Therefore
+$\rho=\|\Pi_c g_a\|/\|g_p\|\to\infty$ as $\|g_p\|\to0$, and the critical weight $\alpha_c=1/\rho\to0$: \emph{every} $\alpha>0$ already satisfies $r=\alpha\rho>1$ (Theorem~\ref{thm:transition}), so the healthy optimum is on the collapsed side of the transition for any nonzero auxiliary weight. Irreversibility follows from Step~3: at the prediction-level trap of Proposition~\ref{prop:gradient_vanishing} the restoring flux is $g_p\equiv0$ along the trap and the quadratic vanishing of $b(\sigma)$ makes $\sigma=0$ the unique asymptotically stable fixed point, so no subsequent training signal restores variance. \hfill$\square$
+
+We prove Proposition~\ref{prop:minimality} for any intervention $f$ that is continuous and \emph{sign-preserving}, meaning ray-preserving: $f(g)=\lambda(g)\,g$ with $\lambda(g)>0$ for every $g\neq0$. This holds for scalar scaling $f(g)=\beta g$ with $0<\beta\le1$ (including the reweightings of FAMO/GradNorm/IMTL, whose weights are positive) and for norm clipping $f(g)=g\min(1,\tau/\|g\|)$. Ray preservation is what Step~1 uses: $f(g_a)$ is then a positive multiple of $g_a$, hence of $\Pi_cg_a$, so the projected pairing below is strictly positive, whereas the weaker condition $\langle f(g),g\rangle>0$ alone does not imply it.
+Step 1 decomposes the auxiliary gradient: $g_a=\Pi_c g_a+\Pi_c^{\perp}g_a$. Since $\Pi_c g_a\propto\delta h^{\parallel}$ (\eqref{eq:radial}), the auxiliary contribution to the accumulated displacement $D_{t+1}=D_t-\eta(g_p+\tilde g_{aux})$ satisfies
+\[
+\begin{aligned}
+\big\langle \tilde g_{aux},\, \delta h^{\parallel}\big\rangle
+&=\kappa_c^{-1}\,\big\langle f(g_a),\, \Pi_c g_a\big\rangle \\
+&>0,
+\end{aligned}
+\]
+because $f(g_a)=\lambda(g_a)\,g_a$ and $\langle g_a,\Pi_cg_a\rangle=\|\Pi_cg_a\|^2>0$ whenever $\delta h^{\parallel}\neq0$. Thus every step moves the representation along $-\delta h^{\parallel}$: the auxiliary term contracts $\sigma_{h,\parallel}^2$ unconditionally, exactly as in the unfiltered flow \eqref{eq:flow}.
+Step 2 shows the primary term is untouched: it contributes the restoring flux $c_2\|g_p\|\Psi(\sigma_h)$ and is unchanged by $f$. The parallel-variance flow therefore retains the toxic contraction term $c_1\alpha\|\Pi_c g_a\|$ up to the constant $\langle f(g_a),\Pi_c g_a\rangle/\langle g_a,\Pi_c g_a\rangle>0$; its sign and hence the existence of the saddle-node at $r=1$ are unaltered, and for $r>1$ the variance still decays to zero. Only the constants ($c_1$, and the time to collapse) change.
+Step 3 uses linearity of the accumulation, so the terminal direction $\lim_t \delta h^{\parallel}_t/\|\delta h^{\parallel}_t\|$ is invariant under any positive diagonal reweighting of the auxiliary term: all such $f$ produce the same collapsed limit point, differing only in when it is reached.
+Step 4 identifies where the argument fails: it fails exactly when sign preservation is broken so that $\langle \tilde g_{aux},\delta h^{\parallel}\rangle\le0$, which requires $f(g_a)\in\Pi_c^{\perp}$. The intervention that ``annihilates the toxic projection'' is of this form, $f(g_a)=g_a-\Pi_c g_a$, and it removes the contractive term from \eqref{eq:flow}, eliminating the saddle-node. Hence within continuous sign-preserving transforms collapse cannot be prevented; breaking sign preservation by annihilating $\Pi_c g_a$ is necessary. \hfill$\square$
+
+For sufficiency, replace $g_a$ by $g_a^{\mathrm{STF}}=g_a-\Pi_c g_a=\Pi_c^{\perp}g_a$. Then $\Pi_c g_a^{\mathrm{STF}}=0$, so the toxic contraction term of \eqref{eq:flow} vanishes and the effective ratio is $r=\alpha\rho_{\perp}$ with $\rho_{\perp}=\|\Pi_c g_a^{\mathrm{STF}}\|/\|g_p\|=0$; for every finite $\alpha$ we have $r=0<1$ and Theorem~\ref{thm:transition} gives a positive variance floor: no collapse. \textsc{stf-hard} applies the same projection only when $\alpha\rho\ge1$, so the filter degenerates to the identity when $\alpha\rho$ is safely subcritical and auxiliary learning is retained; \textsc{stf-soft} replaces the hard projection by a differentiable retention gate $1-w_\beta(\rho)$ that is $1$ for $\alpha\rho\ll1$ and $0$ for $\alpha\rho\ge1$, continuously interpolating between identity and \textsc{stf-hard} and hence also driving $r$ below unity on the toxic branch. \textsc{stf-0} is the boundary case in which $w_\beta\equiv1$ on the whole auxiliary gradient.
+For necessity, if an intervention leaves the effective ratio at $r\ge1$, Theorem~\ref{thm:transition} forces collapse; by Proposition~\ref{prop:minimality} no continuous sign-preserving pointwise transform can reduce $r$, and by Step~4 of that proof the only escape is to place the surviving update in $\Pi_c^{\perp}$, i.e.\ to annihilate the toxic projection. STF is the minimal operator of this form. \hfill$\square$
+
+For a fixed-rank toxic projection of rank $m_\Pi$ onto the batch-mean direction the auxiliary gradient concentrates incoherently, each toxic direction carrying an $O(1)$ curvature, so the contraction rate accumulating over the toxic subspace is $\kappa_c=\Theta(m_\Pi)$; the primary restoration, by contrast, acts on all $m$ directions at once and its rate is extensive in the width, $\lambda_p=\Theta(m)$; the width-scaling of feature learning is itself parametrization-dependent~\citep{yang2021feature}, but the balance below depends only on the two rates. Balancing the two rates in \eqref{eq:fp} gives $\alpha_c\propto m/m_\Pi$, i.e.\ $\alpha_c\propto (m/m_\Pi)^{\gamma}$ with $\gamma=1$. When the transition is coherence-dominated (the toxic direction and the dominant representation mode are coupled, as in the stochastic-gradient regime), the effective ratio acquires width-dependent correlations and $\gamma>1$.
+
+A direct measurement on the synthetic testbed shows what the rank schedule does. The testbed uses controlled random toxic projections of rank $\lfloor m/2\rfloor$ onto a low-rank primary ($2$--$8$ active directions across seeds, mean $5.3$) with a pairwise-rank loss, and sweeps a 17-point log-spaced $\alpha$ grid over $[3{\times}10^{-4},10]$ at six widths $m\in\{8,\dots,256\}$. Its toxic rank is a fixed \emph{fraction} of the width, so the testbed realizes $\beta=1$ --- the diluted end of the axis, not the undiluted anchor. Read with the relative half-height rule of Section~\ref{sec:capacity_law} it gives $\gamma=0.07$ over the six widths and $\gamma=0.01$ over the four widths used below: no capacity law at all, exactly as \eqref{eq:rank_dilution} predicts at $\beta=1$.
+
+The exponent previously reported here, $\gamma=1.53$ ($R^2=0.91$), is the same curves read against a fixed absolute scatter level $\sigma_h=1.5\times10^{-3}$, and the artifact is mechanical. The healthy scatter itself grows with width, $\sigma_h(0)\propto m^{0.95}$ (measured on the fixed-rank family below), so a fixed absolute level is a relative depth that shallows as $m$ grows and the crossing drifts into the collapsed tail. The artifact is also directly visible: the same absolute rule applied to the rank-schedule family returns $\gamma=1.94,2.02,2.04,1.96,1.89$ for $\beta=0,\dots,1$ --- flat to within $0.15$ across the whole axis, i.e.\ blind to the very parameter the law is about. The undiluted anchor is measured instead on a family whose rank does not scale with width ($r$ fixed, hence $\beta=0$ by construction): $\gamma_0=2.43$ ($R^2=0.90$, four widths), in the collective branch ($\gamma_0>1$).
+
+Both new families sweep the paper's grid extended down to $\alpha=0$ ($21$ points) at four widths $m\in\{32,64,128,256\}$, five seeds, $800$ epochs, everything else as in the testbed; the fixed-rank family is the $\beta=0$ slice of the same code path with $r$ held constant, and it agrees with the $\beta=0$ rank-schedule run in $\alpha_c$ to $+3.1\%,+1.8\%,-5.8\%,+19.7\%$ for $m=32,\dots,256$ --- two independent runs of the same schedule that differ only in seed count ($10$ against $5$), the residual being the seed scatter of the healthy anchor at large width.
+
+Two controls on the crossing rule. First, a half-height crossing is meaningful only where the curve actually collapses: for fixed rank $r\le4$ the scatter settles on a plateau at $2$--$23\%$ of $\sigma_h(0)$ and never reaches the collapsed floor, so those cells carry no capacity threshold at all; only $r\ge8$ (plateau $\le0.9\%$) does. Second, for the synthetic families the healthy level is read at the first \emph{penalised} grid point, $\alpha=3\times10^{-4}$: at $\alpha=0$ the variance penalty is absent, so $\sigma_h(0)$ is set by the ranking loss alone, is identical for every toxic rank, and sits $30$--$40\%$ above the penalised curve's own trend. Sweeping the anchor over $\alpha\in[0,3\times10^{-3}]$ leaves the shape of $\gamma(\beta)$ unchanged --- monotone decreasing, from $\gamma_0\in[1.55,3.23]$ at $\beta=0$ to $\gamma(\beta{=}1)\in[-0.06,+0.74]$ --- so the ordering and the sign of the dilution are properties of the data, not of the crossing rule.
+
+Proposition~\ref{prop:rank_dilution} repeats the derivation above with a width-dependent toxic rank: the same balance between a contraction rate extensive in $m_\Pi$ and a restoration rate extensive in $m$, $\alpha_c\propto m/m_\Pi$, gives $\alpha_c\propto(m/m_\Pi)^{\gamma_0}$. Substituting $m_\Pi\propto m^{\beta}$,
+\begin{equation}
+\alpha_c \;\propto\; m^{\gamma_0(1-\beta)}, \qquad \gamma=\gamma_0(1-\beta),
+\end{equation}
+so part of the added width is absorbed by the toxic subspace itself and the dilution of toxicity with width slows by the factor $(1-\beta)$. Since $m_\Pi\le m$ forces $\beta\le1$, every $\gamma$ stays positive: wider encoders are harder to poison for any toxic-rank growth rate, and the mean-field ($\gamma_0{=}1$, $\beta{=}0$) and collective ($\gamma_0{>}1$) branches are recovered at $\beta=0$. The rank-schedule sweep below spans both ends of the axis, and $\beta$ is read off the measured $\gamma$ rather than set independently, so the ordering is a consistency check: a fixed-rank projection ($\beta=0$) has the largest exponent ($\gamma_0=2.43$); HAR's trained auxiliary head absorbs most of the added width ($\gamma_{\mathrm{HAR}}=0.67$, i.e.\ $\beta\approx0.73$ for $\gamma_0=2.43$); RadioML is further saturated ($\gamma_{\mathrm{RML}}=0.02$, i.e.\ $\beta\approx0.99$); battery sits at the same boundary ($\gamma_{\mathrm{bat}}=0.10$, i.e.\ $\beta\approx0.96$, Section~\ref{sec:capacity_law}), where the transition is width-independent because the toxic subspace tracks the encoder width one-for-one; and the synthetic testbed, whose toxic rank is a fixed fraction of the width, closes the axis at $\beta=1$ with $\gamma\approx0$. \hfill$\square$
+
+The exponents above are read with the relative half-height rule, and the qualitative conclusion survives a change of rule. On HAR, taking the crossing at a fixed absolute scatter level $T\in[0.20,0.50]$ instead of the relative half-height gives $\gamma_{\mathrm{HAR}}\in[0.67,0.82]$ against $0.67$ --- a factor of $1.2$ in the fitted value, with both far below $\gamma_0$. The battery exponent is measurable only on a grid that reaches the healthy branch: earlier sweeps began at $\alpha=300$, where the relative scatter is already $0.07$--$0.11$, below the collapse threshold, so every width returned the left endpoint of the grid and the exponent was left-censored rather than fitted. Extending the grid to $\alpha\in[10^{-4},300]$ at five seeds reaches the healthy branch (relative scatter $1.000\pm0.005$ for $\alpha\le10^{-3}$) and brackets the transition at $\alpha_c=0.95,0.89,0.90,1.18$ for $m=32,\dots,256$, giving $\gamma_{\mathrm{bat}}=0.10$ ($R^2=0.43$); across crossing rules the value ranges over $[-0.10,+0.12]$: four widths resolve the width-independence of the battery transition but not its exponent.
+
+The four widths also bound how much of the law is resolved at all. Treating each width's crossing as one observation, the OLS slope carries a $95\%$ interval ($n=4$, two residual degrees of freedom) of $[-0.07,+4.93]$ at $\beta=0$, $[-0.16,+1.49]$ for HAR, $[-0.24,+0.43]$ for battery, and $[-1.16,+1.20]$ for RadioML. At this sample size no individual exponent is separated from zero, the anchor included. What the sweep does resolve is the \emph{dilution}: the intermediate points of the rank-schedule family sit clear of zero ($\gamma=2.57$, $95\%$ CI $[+0.87,+4.27]$ at $\beta=0.25$; $1.86$, $[+0.81,+2.91]$ at $\beta=0.50$), while the $\beta=1$ endpoint is consistent with zero, which is what \eqref{eq:rank_dilution} predicts there. It also resolves the width-independence of the saturated domains, whose crossing moves by a factor of $1.3$ (battery) to $2.3$ (RadioML) across an eightfold range in $m$. The law is therefore supported in form, in ordering, and in its dilution with toxic rank; its individual coefficients are estimates at four widths, not measured constants. Whether the interior follows the linear form of \eqref{eq:rank_dilution} is a separate question, and four widths do not resolve it: at the anchor used here the prediction $\gamma_0(1-\beta)$ lies inside all four intervals --- $1.82$ against $[+0.87,+4.27]$ at $\beta=0.25$, $1.21$ against $[+0.81,+2.91]$ at $\beta=0.50$, $0.61$ against $[-0.68,+1.92]$ at $\beta=0.75$, and $0$ against $[-0.47,+0.48]$ at $\beta=1$ --- so the sweep is consistent with \eqref{eq:rank_dilution} without pinning its slope. At the shallower anchor $\alpha=10^{-4}$ the same prediction is excluded at $\beta=0.75$ ($0.74$ against $[+0.26,+0.39]$), so the consistency is anchor-dependent, and of the dilution we claim only its sign and its endpoints.
+
+The four-width bound of the previous paragraph tightens when the HAR and battery sweeps are repeated at nine widths. Running the identical protocol --- same driver, seeds, epochs and $\alpha$ grids --- at $m\in\{16,24,32,48,64,96,128,192,256\}$ reproduces every cell the two grids share to floating-point equality (largest disagreement $2\times10^{-16}$), so the extended grid is the published one at finer width resolution rather than a second measurement of a different quantity. HAR's exponent becomes $\gamma_{\mathrm{HAR}}=0.38$ ($95\%$ CI $[+0.10,+0.67]$, $R^2=0.60$, $n=9$): the interval narrows from the $[-0.16,+1.49]$ quoted above and, unlike it, excludes zero, so HAR is the first individual exponent the sweep separates from zero. The four-width value of the main text lies at its upper edge --- the two grids agree, but the finer one prefers the smaller exponent --- and dropping the two narrowest widths leaves the exponent at $0.60$. Battery stays where the four-width fit put it, $\gamma_{\mathrm{bat}}=-0.06$ ($95\%$ CI $[-0.17,+0.06]$), consistent with width-independence and inside the rule-to-rule range quoted above. What does not tighten is the crossing itself: at $m=32$ the HAR curve reads $0.5026\pm0.0524$ at $\alpha=10^{-3}$, so the crossing sits within one seed standard error of a grid node and the interpolated $\alpha_c$ is decided by the draw as much as by the grid. Nine widths therefore sharpen the ordering and the sign of the intermediate exponent without pinning its value, and the main text keeps the four-width estimates for that reason.
+
+Encoder architecture does not change what the probe reads. Repeating the one-probe calibration with the Transformer encoder of Section~\ref{sec:validation} at $m\in\{32,64,128\}$, ten seeds and otherwise the protocol of Section~\ref{sec:unified_protocol}, gives probe exponents $\gamma^{\mathrm{probe}}_{\mathrm{HAR}}=-0.93$ ($R^2=0.99$), $\gamma^{\mathrm{probe}}_{\mathrm{bat}}=+0.39$ ($R^2=0.87$) and $\gamma^{\mathrm{probe}}_{\mathrm{RML}}=-0.17$ ($R^2=0.79$), against $-1.63$ ($R^2=0.96$), $+0.67$ ($R^2=0.86$) and $+0.28$ ($R^2=0.40$) for the harness MLP. The signs agree on HAR (both negative) and on battery (both positive), RadioML is consistent with zero under both, and the $95\%$ intervals overlap in all three domains: the calibration's width-dependence is a property of the domain, not of the encoder. This is the capacity-side counterpart of the protection transfer of Section~\ref{sec:validation}, and \texttt{probe\_exponent.py} reproduces it from the shipped calibration runs.
+
+These are probe exponents, not the crossing exponents of Section~\ref{sec:capacity_law}. The two estimators agree in sign on RadioML ($+0.28$ against $+0.02$) and disagree on HAR ($-1.63$ against $+0.38$) and battery ($+0.67$ against $-0.06$). The crossing locates the dose at which the \emph{trained} scatter has lost half its variance, whereas the probe reads $1/\hat\rho$ on the healthy anchor; the two place the transition within a factor of a few of each other at a fixed width (a factor of $7$ at $m{=}64$ on NYUv2) but need not share its width-scaling. Where they do not, it is the probe that leaves the admissible range: \eqref{eq:rank_dilution} admits only $\gamma\ge0$, so a negative probe exponent is not a capacity exponent. The exponents of Section~\ref{sec:capacity_law} are therefore the crossing ones, and the probe is reported for NYUv2 (Appendix~\ref{app:nyu}) because there it is the quantity \textsc{stfcal} itself gates on.
+
+The testbed also exposes the finite-width precursor: across seeds, the transition curve $P(\text{collapse}|\alpha)$ steepens with $m$, and the per-seed relative scatter is bi-modal near $\alpha_c$ (a healthy and a collapsed cluster coexist within the same width), the statistical-physics fingerprint of a saddle-node bifurcation. Bi-modality is strongest in the large-data domains (RadioML) and weakest in the small-regime (battery), the ordering predicted by Proposition~\ref{prop:finitebatch} through the sample size per cell.
+
+All numbers use deterministic seeds, bf16 autocast with TF32 matmul on an NVIDIA A100 80\,GB, Adam ($\mathrm{lr}=10^{-3}$, batch 256). The relative-collapse threshold is $0.3\times$ the per-seed single-task ceiling; recovery is defined relative to the same-seed joint baseline. Code, seeds, hyper-parameters and per-fold tables ship with the repository.
+
+\section{Generalizations and Finite-Size Theory}\label{app:general}
+
+We prove Theorem~\ref{thm:spectral} in four steps. Step 1 shows the two pushes are linear. By Definition~\ref{def:degmin} the auxiliary loss attains its minimum at \emph{every} constant encoder output, so $L_a$ is invariant to a common shift of $h$ across the batch. Differentiating $L_a(h+c\mathbf 1)=L_a(h)$ twice gives $A_a\mathbf 1=0$ for the Hessian $A_a\triangleq\nabla^2_hL_a$, and $A_a\succeq0$ because the constant outputs are minima: any spread about the batch mean can only increase $L_a$. Expanding about the batch mean therefore gives $g_a=\nabla_hL_a=A_a\,\delta h+o(\|\delta h\|)$ with $\delta h=h-\mathbb E_b[h]$. Near its healthy anchor the primary loss is stationary with $g_p=\nabla_hL_p=-S_p\,\delta h+o(\|\delta h\|)$, $S_p\succeq0$: the primary push is \emph{restoring}, i.e.\ it re-inflates spread along the informative directions.
+
+Step 2 converts the deviation dynamics into a modal variance flow. To first order the batch-centered deviation follows $\dot{\delta h}=-(\alpha A_a+S_p)\,\delta h$, so the second moment satisfies the Lyapunov equation $\dot\Sigma=-M\Sigma-\Sigma M$ with $M\triangleq\alpha A_a+S_p$. For any unit $v$, $\dot\varsigma_v^2=-2\,v^{\!\top}Mv\,\varsigma_v^2+o(\varsigma_v^2)$. Writing $\kappa_a(v)=\langle v,A_av\rangle\ge0$ and $\lambda_p(v)=\langle v,S_pv\rangle$ and restoring the $\alpha$-independent constants $c_1,c_2$ of \eqref{eq:flow} yields the modal flow \eqref{eq:modal}; the two are one statement in different variables, since dividing \eqref{eq:modal} by $2\varsigma_v$ recovers \eqref{eq:flow} with $\kappa_a(v)$ in place of $\kappa_c$.
+
+Step 3 reduces the criterion to the largest generalized eigenvalue. The transition is governed by the worst-restored mode: the encoder collapses once some mode's contraction beats its restoration, $\max_v\big(c_1\alpha\kappa_a(v)-c_2\lambda_p(v)\big)>0$, and no mode is driven to zero when
+$\max_v c_1\alpha\kappa_a(v)/c_2\lambda_p(v)\le1$; the onset therefore occurs along the dominant toxic eigenvector. The maximum ranges over unit vectors $v$ in the batch-centered subspace $\mathrm{range}(\Pi_c)$; because $\kappa_a(v)=0$ for every $v\in\ker A_a$, the maximizer lies in $H_c\triangleq\mathrm{range}(\Pi_cA_a\Pi_c)$, which is where the criterion is therefore defined and where the filters act. Absorbing $c_1/c_2$ into the normalization, the maximizer of the ratio of quadratic forms over $H_c$ is the largest generalized eigenvalue of the pencil $(\Pi_cA_a\Pi_c,\,S_p)$ restricted to $H_c$. Symmetrising, this is the Rayleigh quotient associated with $R^{-1/2}\Pi_cA_a\Pi_cR^{-1/2}$ with $R=\Pi_cS_p\Pi_c$ inverted on $H_c$, i.e.\ its largest eigenvalue over that range, which is the stated $\rho_\star$; the restriction to $H_c$ is what makes the maximizer unique up to scaling and is needed for necessity, since a filter acting outside $H_c$ cannot change any $\kappa_a(v)$ in the maximum. Under the unit convention of Theorem~\ref{thm:transition} (restoration flux normalized at the healthy anchor, $c_1=c_2$) we have $R=\mathbf 1$ on $H_c$ and $\rho_\star=\|\Pi_cA_a\Pi_c\|_{\mathrm{op}}=\|T\|_{\mathrm{op}}$ with $T\triangleq\Pi_cA_a\Pi_c$.
+
+Step 4 reduces to the rank-one case. Let $T=\kappa_c\chi\,uu^{\!\top}$ (the radial case \eqref{eq:radial} of the main proof, supported on the batch-centered direction $u$). Then $\|T\|_{\mathrm{op}}=\kappa_c\chi$, and the order parameter of Definition~\ref{def:toxicity} at the anchor is $\rho=\|\Pi_cg_a\|/\|g_p\|=\kappa_c\chi$ after the same normalization. Hence $\rho_\star=\rho$ and $\alpha\rho_\star>1$ is exactly the saddle-node condition of Theorem~\ref{thm:transition}. \hfill$\square$
+
+For Corollary~\ref{cor:additive}, with $K$ heads the toxic operator is $T=\sum_{k=1}^{K}\Pi_{u^{(k)}}A_a^{(k)}\Pi_{u^{(k)}}$, restricted to $U=\mathrm{span}\{u^{(1)},\dots,u^{(K)}\}$, where $\Pi_{u^{(k)}}$ projects onto the $k$-th toxic direction and $A_a^{(k)}=\kappa_ku^{(k)}u^{(k)\top}$ by \eqref{eq:radial}. If the $u^{(k)}$ are mutually orthogonal, $T$ is block diagonal with rank-one blocks, so $\|T\|_{\mathrm{op}}=\max_k\kappa_k$ and $\rho_\star=\max_k\rho_k$: a new toxic direction cannot make the encoder more than proportionally easier to poison. If all $u^{(k)}=u$, the sum telescopes to $T=\big(\sum_k\kappa_k\big)uu^{\!\top}$, so $\|T\|_{\mathrm{op}}=\sum_k\kappa_k$ and $\rho_\star=\sum_k\rho_k$. In both cases $\alpha_c=1/\rho_\star$ by Theorem~\ref{thm:spectral}, so aligned heads divide the critical weight by the number of heads --- the formal content of the motivating observation that the production model required three simultaneous auxiliary heads to collapse while no single head did. \hfill$\square$
+
+\begin{proposition}[Partial attenuation cannot remove the transition]\label{prop:attenuation}
+Let $F_\lambda[g_a]=g_a-\lambda\,\Pi_cg_a$ for $\lambda\in[0,1]$. Then the effective control ratio is $(1-\lambda)\,\alpha\rho_\star$ and
+$\alpha_c(\lambda)=\alpha_c(0)/(1-\lambda)$, finite for every $\lambda<1$ and diverging as $\lambda\to1^{-}$. Above threshold the contracting mode is the unstable direction of the saddle-node and grows as $\varsigma_v^2(t)\propto e^{2(c_1\alpha(1-\lambda)\kappa_a-c_2\lambda_p)t}$, a rate that recedes linearly in $(1-\lambda)$ and vanishes only at $\lambda=1$; below it the mode is stable and the scatter is pinned by the quadratic term of $b$. Equation~\eqref{eq:modal} is thus the correct local statement on both sides and no series in $\lambda$ is summed. The collapse transition therefore survives every partial attenuation, however strong, and is removed only at the endpoint $\lambda=1$; by Theorem~\ref{thm:filters} this is the special case $U\subseteq H_c$ of the general criterion $U\subseteq\ker F$. Within this family the least removal that keeps the encoder safe at a fixed operating point $\alpha$ is $\lambda^\star=\max\big(0,\,1-1/(\alpha\rho_\star)\big)$, which is zero below threshold and approaches full deletion only in the limit $\alpha\rho_\star\to\infty$.
+\end{proposition}
+\begin{proof}
+Since $\Pi_c^2=\Pi_c$, applying $F_\lambda$ replaces the toxic operator $T$ by $T-\lambda T=(1-\lambda)T$. By Theorem~\ref{thm:spectral} the encoder collapses iff $(1-\lambda)\alpha\rho_\star>1$, i.e.\ iff $\alpha>\alpha_c(0)/(1-\lambda)$. The threshold is finite for every $\lambda<1$, so the transition persists and merely recedes; it escapes to infinity only in the limit $\lambda\to1$. At $\lambda=1$ the control ratio is identically zero for every finite $\alpha$ and the saddle-node is eliminated. Both sides of the threshold are read off the \emph{same} modal equation \eqref{eq:modal}: above it the contracting mode is unstable and grows without bound until the nonlinear term of $b$ saturates it, below it the mode is stable and settles at the fixed point of \eqref{eq:fp}, so at no point is a series in $(1-\lambda)$ summed and the variance never changes sign. For optimality, the encoder is safe iff $(1-\lambda)\alpha\rho_\star\le1$, equivalently $\lambda\ge1-1/(\alpha\rho_\star)$; the least removal meeting the constraint is $\lambda^\star=\max\big(0,1-1/(\alpha\rho_\star)\big)$, which is zero for $\alpha\rho_\star\le1$ and rises continuously to $1$ as $\alpha\rho_\star\to\infty$. \hfill$\square$
+\end{proof}
+
+\begin{theorem}[Complete characterization of collapse-removing filters]\label{thm:filters}
+Let $F$ be a linear filter preserving the batch-centered subspace ($F\Pi_c=\Pi_cF$) --- a class that contains the whole STF design space, every projector onto a subspace of $H_c$, and full deletion $F_0[g_a]=0$ --- and let $T_F\triangleq\Pi_cF\Pi_cA_a\Pi_c$ be its effective toxic operator, with $T\triangleq\Pi_cA_a\Pi_c$ and $U\triangleq\mathrm{range}(T)\subseteq H_c$.
+(i) If $T_F\neq0$ then $\alpha_c(F)=1/\rho_\star(F)$ with $\rho_\star(F)=\|R^{-1/2}T_FR^{-1/2}\|_{\mathrm{op}}$, $R=\Pi_cS_p\Pi_c$; and $\alpha_c(F)=\infty$ \emph{iff} $U\subseteq\ker F$.
+(ii) Among orthogonal filters ($F=F^\top$) with $\alpha_c(F)=\infty$, the benign-branch distortion $\|F-(I-P_U)\|$ is uniquely minimized by $F^\star=I-P_U$, with distortion zero: exact annihilation of the toxic range is the only distortion-free safe filter, and any other safe filter pays a strictly positive price on the informative branch.
+(iii) The attenuation family $F_\lambda=I-\lambda\Pi_c$ removes the transition iff $\lambda=1$; for $\lambda<1$, $\alpha_c(F_\lambda)=\alpha_c(0)/(1-\lambda)$, so Proposition~\ref{prop:attenuation} is the special case $U\subseteq H_c$.
+(iv) If the toxic range saturates the batch-centered subspace, $U=H_c$, then $F^\star$ annihilates every direction on which the collapse dynamics \eqref{eq:modal} live and therefore coincides with full deletion $F_0[g_a]=0$: the blunt boundary case \textsc{stf-0} is the \emph{optimal} member of the class.
+\end{theorem}
+\begin{proof}
+(\emph{i}) Under $F\Pi_c=\Pi_cF$ and $\Pi_cT=T$ we have $T_F=F\Pi_cT=FT$. Steps~1--3 of the proof of Theorem~\ref{thm:spectral} give collapse iff $\max_v\{c_1\alpha\kappa^F_a(v)-c_2\lambda_p(v)\}>0$ with $\kappa^F_a(v)=\langle v,\Pi_cF\Pi_cA_a\Pi_cv\rangle=\langle v,T_Fv\rangle$, so $\alpha_c(F)=\rho_\star(F)^{-1}$, finite exactly when $T_F\neq0$. Since $\ker\Pi_c=\mathbb R\mathbf 1$ and $U\subseteq H_c$, $T_F=0\iff FT=0\iff F\xi=0$ for every $\xi\in U$, i.e.\ $U\subseteq\ker F$.
+(\emph{ii}) $U\subseteq\ker F$ gives $F|_U=0=(I-P_U)|_U$; on $U^\perp$ the difference is $F|_{U^\perp}-I_{U^\perp}$. Orthogonality makes both blocks invariant, so $\|F-(I-P_U)\|=\|F|_{U^\perp}-I\|_{\mathrm{op}}\ge0$, with equality iff $F|_{U^\perp}=I$, i.e.\ $F=I-P_U$; the constraint $\|F\|\le1$ admits this choice.
+(\emph{iii}) For $0\neq u\in U\subseteq H_c$, $\Pi_cu=u$, so $F_\lambda u=(1-\lambda)u$, which vanishes iff $\lambda=1$; otherwise $T_{F_\lambda}=(1-\lambda)T$ and $\rho_\star(F_\lambda)=(1-\lambda)\rho_\star(0)$.
+(\emph{iv}) If $U=H_c$ then $I-P_U=I-\Pi_c=\Pi_c^\perp$, which is zero on $H_c$ and the identity on $H_c^\perp$; the modal flow \eqref{eq:modal} is supported on $H_c$, where $F^\star$ therefore deletes the whole auxiliary gradient. \hfill$\square$
+\end{proof}
+
+\begin{corollary}[Subspace-estimation slack, and why the estimated variants saturate]\label{cor:estimation}
+Let $\hat U$ be an estimate of the toxic range with principal-angle error $\|P_U-P_{\hat U}\|\le\epsilon$, and let $\hat F=I-P_{\hat U}$. Then $\|T_{\hat F}\|\le\epsilon\,\|T\|=\epsilon\kappa_c\chi$, hence
+\begin{equation}
+\rho_\star(\hat F)\;\le\;\epsilon\,\rho_\star,\qquad
+\alpha_c(\hat F)\;\ge\;\epsilon^{-1}\alpha_c.
+\label{eq:estimation}
+\end{equation}
+\end{corollary}
+\begin{proof}
+$T_{\hat F}=\Pi_c(I-P_{\hat U})\Pi_cT=\Pi_c(P_U-P_{\hat U})T$ because $T$ is supported on $U$, so $\|T_{\hat F}\|\le\|P_U-P_{\hat U}\|\,\|T\|\le\epsilon\kappa_c\chi$ with $\|T\|=\kappa_c\chi$ from Step~4 of Theorem~\ref{thm:spectral}. Substituting into $\rho_\star(F)=\|R^{-1/2}T_FR^{-1/2}\|_{\mathrm{op}}$ and inverting gives \eqref{eq:estimation}. \hfill$\square$
+\end{proof}
+
+Corollary~\ref{cor:estimation} delimits where the estimated variants operate. Any filter built from an \emph{estimated} toxic subspace keeps a finite threshold, so at extreme toxicity ($\alpha\gg\epsilon^{-1}\alpha_c$) the transition is re-entered and the encoder collapses again; a tighter estimate pushes the threshold out by $1/\epsilon$ but never removes it. Exact annihilation is the only operator that escapes, and the only one that needs no estimate, because it deletes the whole auxiliary branch. The design therefore has two regimes: the spectral variants, where the probe resolves the toxic subspace, and \textsc{stf-0} beyond them, which Theorem~\ref{thm:filters}(iv) identifies as the optimal member of the family in the saturated regime where the estimated projectors fail.
+
+The characterization above is binary --- a filter either removes the transition or does not --- and therefore silent about the fixed-$\alpha$ regime, where the open question is \emph{how much} of the auxiliary signal must be given up. The following theorem proves that the calibrated rank rule of Section~\ref{sec:stfcal} is optimal rather than heuristic. It is stated for filters that delete a spectral subspace of the toxic operator on $H_c$, the class for which the necessity direction holds; part~(iv) shows that the rank it returns is minimal among \emph{all} orthogonal filters, so the restriction costs nothing at the level of the design decision.
+
+\begin{theorem}[Minimal-intervention optimality of the calibrated rank]\label{thm:minimalrank}
+Let $T=\Pi_c\,A_a\,\Pi_c$ have spectral decomposition $T=\sum_{j\ge1}\kappa_j\,u_ju_j^{\!\top}$ with $\kappa_1\ge\kappa_2\ge\cdots>0$ on $U=\mathrm{range}(T)\subseteq H_c$, and restrict to the orthogonal filters $F_S=I-P_S$ that delete a \emph{spectral} subspace $S=\mathrm{span}\{u_j:j\in J\}$ of $T$, $S\subseteq H_c$, of dimension $r$. At operating weight $\alpha$:
+\begin{enumerate}[leftmargin=*,itemsep=1pt,topsep=2pt]
+\item[(i)] $F_S$ is safe, $\alpha\|T_{F_S}\|_{\mathrm{op}}\le1$, \emph{if and only if} $S\supseteq S_c(\alpha)$, where $S_c(\alpha)\triangleq\mathrm{span}\{u_j:\kappa_j>1/\alpha\}$ is the \emph{supercritical eigenspace}. Consequently the minimal admissible rank is
+$r^\star(\alpha)=\dim S_c(\alpha)=\min\{r:\kappa_{r+1}\le1/\alpha\}$,
+it is non-decreasing in $\alpha$, and it vanishes exactly for $\alpha<1/\kappa_1$.
+\item[(ii)] The deleted auxiliary energy $\mathcal D(S)\triangleq\mathbb E_b\|P_Sg_a\|^2$ is monotone under inclusion. Since safety forces $S\supseteq S_c(\alpha)$, the retained energy $\mathbb E_b\|F_Sg_a\|^2$ is uniquely maximized by $F^\star=I-P_{S_c(\alpha)}$: deleting exactly the supercritical directions is the least intervention that restores safety. In particular, no direction outside $U$ --- no part of the benign auxiliary signal --- is ever required, so any safe filter that deletes more is strictly wasteful.
+\item[(iii)] $g^\star=\mathbf 1[\kappa_1>1/\alpha]=\mathbf 1[r^\star(\alpha)\ge1]$, so \textsc{stfcal} needs a single calibrated object --- the spectrum of $\hat T$ --- from which both the on/off decision and the minimal rank follow, with no additional hyper-parameter.
+\item[(iv)] No orthogonal filter whatsoever --- spectral or not --- restores safety at rank $r<r^\star(\alpha)$. Hence $r^\star(\alpha)$ is the minimal admissible deletion rank in the full orthogonal class, and the calibrated rank rule is rank-optimal there as well; the spectral restriction is needed only for the \emph{energy} statement of~(ii).
+\end{enumerate}
+\end{theorem}
+\begin{proof}
+Both directions use $T_{F_S}=(I-P_S)T(I-P_S)$, whence $\langle v,T_{F_S}v\rangle=\langle v,Tv\rangle$ for every $v\perp S$; for spectral $S$ the complement is spanned by the remaining eigenvectors, which is what makes the two directions below exhaustive. For necessity, if some $u_j\notin S$ has $\kappa_j>1/\alpha$, then $u_j\perp S$ and $\langle u_j,T_{F_S}u_j\rangle=\kappa_j>1/\alpha$, so $\|T_{F_S}\|_{\mathrm{op}}>1/\alpha$ and $F_S$ is unsafe. For sufficiency, if $S\supseteq S_c(\alpha)$, then any $v\perp S$ is orthogonal to every eigenvector with $\kappa_j>1/\alpha$, so $\langle v,Tv\rangle\le\max\{\kappa_j:u_j\perp S\}\le1/\alpha$, giving $\|T_{F_S}\|_{\mathrm{op}}\le1/\alpha$. Monotonicity of $r^\star$ follows from $S_c(\alpha)\subseteq S_c(\alpha')$ for $\alpha\le\alpha'$, and $r^\star(\alpha)=0\iff S_c(\alpha)=\varnothing\iff\kappa_1\le1/\alpha$. For (ii), $S\subseteq S'$ implies $P_S=P_SP_{S'}$ and hence $\mathcal D(S)\le\mathcal D(S')$; minimizing a monotone functional over the feasible set $\{S:S\supseteq S_c(\alpha)\}$ returns exactly its least element $S_c(\alpha)$, which lies in $U$ because it is spanned by eigenvectors of $T$. Part (iii) restates (i) at $r=0$. For (iv), let $F_S=I-P_S$ be any orthogonal filter with $\dim S<r^\star(\alpha)$ and $Q\triangleq I-P_S$, so $\mathrm{range}(Q)=S^\perp\subseteq\mathbb{R}^d$ has dimension $d-r>d-r^\star(\alpha)=\dim V_+^\perp$, where $V_+\triangleq\mathrm{span}\{u_j:\kappa_j>1/\alpha\}$; hence $S^\perp\cap V_+\neq\{0\}$. Choose a unit $v\in S^\perp\cap V_+$; since $v\perp S$ we have $Qv=v$, so $\langle v,T_{F_S}v\rangle=\langle v,Tv\rangle=\sum_{j\in J_+}c_j^2\kappa_j\ge\min_{j\in J_+}\kappa_j>1/\alpha$, whence $\|T_{F_S}\|_{\mathrm{op}}>1/\alpha$ and $F_S$ is unsafe. Non-spectral filters of the same rank can also be safe --- for $T=\mathrm{diag}(3,2)$ and $1/\alpha=2.5$, deleting a rotated direction meets the bound exactly --- which is why (ii), but not (iv), is stated in the spectral class. \hfill$\square$
+\end{proof}
+
+\begin{corollary}[The blunt filter is the saturated endpoint of the calibrated family]\label{cor:saturated}
+Since $S_c(\alpha)\nearrow U$ as $\alpha\to\infty$, the minimal-intervention filter $F^\star=I-P_{S_c(\alpha)}$ interpolates continuously from no filtering ($\alpha<1/\kappa_1$, $r^\star=0$) to full deletion \textsc{stf-0} ($\alpha$ exceeding $1/\kappa_j$ for every $j$, $r^\star=\dim U$, $F^\star=F_0$). Theorem~\ref{thm:filters}(iv) is therefore the endpoint of a one-parameter family rather than a separate design: \textsc{stf-0} is optimal exactly in the saturated regime $\alpha>\max_j\kappa_j^{-1}$, and strictly suboptimal below it, where it deletes benign auxiliary signal that safety does not require.
+\end{corollary}
+\begin{proof}
+$S_c(\alpha)$ is an increasing family of subspaces of $U$ with $\bigcup_{\alpha>0}S_c(\alpha)=U$, because each finite $\kappa_j$ eventually exceeds $1/\alpha$. Hence $F^\star\to I-P_U=F_0$ pointwise, and $r^\star(\alpha)=\dim U$ exactly when $1/\alpha<\min_j\kappa_j$, i.e.\ $\alpha>\max_j\kappa_j^{-1}$. \hfill$\square$
+\end{proof}
+
+Theorem~\ref{thm:minimalrank} is stated for $T$, whereas \textsc{stfcal} reads $\hat\rho_{\mathrm{res}}[r]$ off the top-$r$ principal directions of the centered representation. The two coincide when the auxiliary Hessian is diagonal in the representation's principal basis --- the case for a variance-shrinkage toxifier, whose contraction is isotropic on $H_c$ --- and otherwise the residual pull stands for $\kappa_{r+1}$ up to the normalization of Definition~\ref{def:toxicity}; Corollary~\ref{cor:certificate} makes this surrogate admissible at finite probe size. The calibrated ranks reported in Section~\ref{sec:stfcal} are therefore the representation directions whose residual pull exceeds $1/\alpha$, computed within the probe depth $R$.
+
+\begin{proposition}[Finite-batch rounding of the transition]\label{prop:finitebatch}
+The operational order parameter is a mean of per-cell ratios over $B$ samples, so $\hat\rho=\rho+\xi$ with $\mathbb E[\xi]=0$ and, by the delta method,
+\begin{equation}
+\mathrm{Var}(\hat\rho)\;\approx\;\frac{\rho^2}{B}\big(\mathrm{CV}_a^2+\mathrm{CV}_p^2\big)\;\triangleq\;\frac{\rho^2c_0^2}{B},
+\end{equation}
+with $\mathrm{CV}_a,\mathrm{CV}_p$ the coefficients of variation of the projected auxiliary and primary gradients. The realized control ratio $\hat r=\alpha\hat\rho$ is therefore approximately normal with mean $\alpha\rho$ and standard deviation $\Delta=\alpha\rho c_0/\sqrt B$, and
+\begin{equation}
+P(\text{collapse})\;=\;\Phi\!\left(\frac{\sqrt B\,(\alpha\rho-1)}{\alpha\rho\,c_0}\right),
+\end{equation}
+a sigmoid in $\log\alpha$ whose width in $\alpha$ is $\Delta\alpha\approx\alpha c_0/\sqrt B$. The transition therefore sharpens as $B^{-1/2}$ with the sample size per cell, and it sharpens with the toxic rank as well, since the projected auxiliary norm concentrates as $\mu_a=\Theta(m_\Pi^{1/2})$ while its per-sample fluctuation is $O(1)$, giving $\mathrm{CV}_a=O(m_\Pi^{-1/2})$.
+\end{proposition}
+\begin{proof}
+Write $\hat\rho=B^{-1}\sum_i\|a_i\|/\|p_i\|$ with $a_i=\Pi_cg_a^{(i)}$ and $p_i=g_p^{(i)}$ the per-cell projected auxiliary and primary gradients. The cells are i.i.d., so $\mathrm{Var}(\hat\rho)=B^{-1}\mathrm{Var}(\|a_i\|/\|p_i\|)$, and the delta method about $(\mu_a,\mu_p)=(\|\Pi_cg_a\|,\|g_p\|)$ expands the per-cell ratio as $\mu_p^{-1}\|a_i\|-\mu_a\mu_p^{-2}\|p_i\|+o(1)$, giving $\mathrm{Var}(\|a_i\|/\|p_i\|)\approx\mu_p^{-2}\sigma_a^2+\mu_a^2\mu_p^{-4}\sigma_p^2$ with $\sigma_a^2,\sigma_p^2$ the per-cell variances. Substituting $\mathrm{CV}_a=\sigma_a/\mu_a$, $\mathrm{CV}_p=\sigma_p/\mu_p$ and $\rho=\mu_a/\mu_p$ gives the stated variance, and the central limit theorem gives approximate normality of $\hat r$. Then $P(\text{collapse})=P(\hat r>1)=\Phi\big((\alpha\rho-1)/\Delta\big)$ with $\Delta=\alpha\rho c_0/\sqrt B$, and $\partial_\alpha\big((\alpha\rho-1)/\Delta\big)=\sqrt B/(\alpha c_0)$, giving the stated width. The rank statement is the concentration estimate $\|\Pi_cg_a\|=\Theta(m_\Pi^{1/2})$ already used in the capacity-law derivation. \hfill$\square$
+\end{proof}
+
+\begin{proposition}[Finite-batch calibration certificate and sample-size prescription]\label{prop:calibration}
+The calibration probe of Section~\ref{sec:stfcal} estimates $\hat\rho=B^{-1}\sum_i\|a_i\|/\|p_i\|$ from $B$ i.i.d.\ cells, with $a_i=\Pi_cg_a^{(i)}$ and $p_i=g_p^{(i)}$; the cells have mean $\rho$ and variance $\rho^2c_0^2$, and $R_i\triangleq\|a_i\|/\|p_i\|\in[0,R_{\max}]$ whenever the primary gradient is non-degenerate. Then, with the envelope $\kappa^2\triangleq2\rho^2c_0^2+\tfrac23R_{\max}\varepsilon$ built from the probe's own moments rather than from a worst-case cell,
+\begin{equation}
+\mathbb P\big(|\hat\rho-\rho|>\varepsilon\big)\;\le\;2\,e^{-B\varepsilon^2/\kappa^2},
+\label{eq:calibration}
+\end{equation}
+so $|\hat\rho-\rho|\le\varepsilon$ holds with probability at least $1-\delta$ whenever
+\begin{equation}
+B\;\ge\;\frac{\kappa^{2}}{\varepsilon^{2}}\ln\frac{2}{\delta},
+\qquad\text{i.e.}\qquad
+B\;\gtrsim\;\frac{2\rho^2c_0^2}{\varepsilon^{2}}\ln\frac{2}{\delta}
+\label{eq:samplesize}
+\end{equation}
+in the delta-method units of Proposition~\ref{prop:finitebatch}: the correction is $O(\varepsilon)$ against an $O(1)$ leading term, so the asymptotic prescription is recovered as $\varepsilon\to0$. Two design consequences follow. (i) Targeted at a \emph{relative} accuracy $\varepsilon=\eta\rho$ the prescription reads $B\gtrsim2c_0^2\eta^{-2}\ln(2/\delta)$: the warm-up cost is then independent of the toxicity scale and grows only logarithmically with confidence, whereas an absolute tolerance at fixed $\varepsilon$ costs a factor $\rho^2$. (ii) Because the confidence enters only through $\ln(2/\delta)$, raising it from $90\%$ to $99.9\%$ costs a factor $\ln(2/10^{-3})/\ln(2/0.1)\approx2.5$ in $B$ --- a single extra probe batch, not an order of magnitude.
+\end{proposition}
+\begin{proof}
+$\hat\rho$ is the mean of $B$ i.i.d.\ variables bounded in $[0,R_{\max}]$ with variance $\rho^2c_0^2$, so Bernstein's inequality for bounded variables gives
+$\mathbb P(|\hat\rho-\rho|>\varepsilon)\le2e^{-B\varepsilon^2/(2\rho^2c_0^2+\frac23R_{\max}\varepsilon)}$, which is \eqref{eq:calibration}; solving it for $B$ gives \eqref{eq:samplesize}.
+As $\varepsilon\to0$ the exponent tends to the delta-method scale $\sigma_\rho=\rho c_0/\sqrt B$ of Proposition~\ref{prop:finitebatch}, so the two rates agree in the leading term and differ only by the $O(\varepsilon)$ correction. Substituting $\varepsilon=\eta\rho$ cancels $\rho$ in $2\rho^2c_0^2\varepsilon^{-2}$, and $\ln(2/10^{-3})/\ln(2/0.1)=7.60/3.00$ gives the stated factor. \hfill$\square$
+\end{proof}
+
+\begin{corollary}[The calibrated gate and rank are certified away from the critical shell]\label{cor:certificate}
+At operating weight $\alpha$ the calibrated gate $\hat g=\mathbf 1[\alpha\hat\rho\ge1]$ differs from the exact criterion $g^\star=\mathbf 1[\alpha\rho\ge1]$ with probability at most $2\exp\!\big(-B(\rho-\alpha^{-1})^2/\kappa^2\big)$; the gate is therefore certified as soon as the margin $|\alpha\rho-1|$ exceeds the probe noise floor, and the ambiguous set is the $\varepsilon/\rho$-neighbourhood of $\alpha_c$. Likewise the calibrated minimal rank $\hat r=\min\{r\le R:\alpha\hat\rho_{\mathrm{res}}[r]<1\}$ of Theorem~\ref{thm:minimalrank} coincides with the exact rank except with probability at most $2(R{+}1)\exp(-B\Lambda^2/\kappa_\Lambda^2)$, where $\Lambda\triangleq\min_{r\le R}|\alpha\rho_{\mathrm{res}}[r]-1|$ and $\kappa_\Lambda$ is the envelope \eqref{eq:calibration} of the residual family. Both certificates degrade gracefully and unavoidably as $\alpha\to\alpha_c$: the margin and the shell gap vanish together, and no finite $B$ resolves a decision that is genuinely ambiguous at the transition.
+\end{corollary}
+\begin{proof}
+The gate errs only if $\hat\rho$ and $\rho$ fall on opposite sides of $1/\alpha$, which requires $|\hat\rho-\rho|\ge|\rho-\alpha^{-1}|$; apply \eqref{eq:calibration} at that $\varepsilon$. The rank errs only if the sign of $\alpha\hat\rho_{\mathrm{res}}[r]-1$ differs from that of $\alpha\rho_{\mathrm{res}}[r]-1$ for some $r\le R$; a union bound over the $R{+}1$ residuals, each with its own envelope \eqref{eq:calibration}, gives the second bound. Both margins vanish as $\alpha\to\alpha_c$, so the bounds become vacuous exactly where the decision is genuinely undecidable. \hfill$\square$
+\end{proof}
+
+\begin{proposition}[Lyapunov noise floor, and why the two thresholds differ]\label{prop:lyapunov}
+Add stochastic-gradient noise of variance $D$ to the parallel-variance recursion \eqref{eq:parallel_contraction}. Then
+\begin{equation}
+\mathbb E\big[\sigma_{\parallel}^2(t{+}1)\big]=a^2\,\mathbb E\big[\sigma_{\parallel}^2(t)\big]+\eta^2D,
+\qquad a\triangleq1-\eta\,(c_2\lambda_p-c_1\alpha\kappa_c),
+\end{equation}
+whose stationary value for $|a|<1$ is
+\begin{equation}
+\sigma_{\parallel,\infty}^2=\frac{\eta^2D}{1-a^2}\;\approx\;\frac{\eta\,D}{2\,c_1\kappa_c\,(\alpha_c-\alpha)}\qquad(\alpha\to\alpha_c^{-}),
+\end{equation}
+with $\alpha_c=c_2\lambda_p/(c_1\kappa_c)$, $\lambda_p$ being the restoration rate at the stable fixed point $\sigma_2$ of \eqref{eq:fp} about which the deviation is linearised here --- the supercritical branch is instead linearised about $\sigma=0$. The scatter therefore does not vanish below threshold: it settles at a positive floor that \emph{diverges} as $\alpha\to\alpha_c^{-}$, so any criterion read off the scatter curve --- such as the half-height rule of Section~\ref{sec:capacity_law} --- crosses its threshold strictly \emph{below} $\alpha_c$, converging to $\alpha_c$ only as the noise vanishes.
+\end{proposition}
+\begin{proof}
+Euler-discretising \eqref{eq:flow} with additive gradient noise $\xi_t$ satisfying $\mathbb E[\xi_t]=0$, $\mathbb E[\xi_t^2]=\eta^2D$ and collecting the linear term gives the recursion. Taking expectations and iterating gives $\mathbb E[\sigma^2_\infty]=\eta^2D\sum_{j\ge0}a^{2j}=\eta^2D/(1-a^2)$ for $|a|<1$. As $\alpha\to\alpha_c^{-}$ we have $a\to1^{-}$, so $1-a^2=(1-a)(1+a)\approx2(1-a)=2\eta\,(c_2\lambda_p-c_1\alpha\kappa_c)=2\eta\,c_1\kappa_c\,(\alpha_c-\alpha)$, giving the one-over-gap divergence. A scatter-based criterion at level $\ell$ is met when the floor reaches $\ell$, i.e.\ when $(\alpha_c-\alpha)=O(D)$: the criterion is satisfied strictly below $\alpha_c$ and tends to $\alpha_c$ only in the noise-free limit $D\to0$. \hfill$\square$
+\end{proof}
+
+Proposition~\ref{prop:lyapunov} explains a systematic feature of our sweeps: the half-height crossing of the mean scatter curve and the per-seed binary collapse flag do not coincide. The flag fires only when an individual seed actually reaches the degenerate state, whereas the half-height rule is read off the \emph{mean} scatter, whose floor is lifted by the noise term; the flag transition therefore sits above the half-height crossing, and the gap widens where the sample size per cell, and hence $B$, is smallest. This is the battery case of Section~\ref{sec:capacity_law}, where the width-independent half-height crossing sits near $\alpha\approx1$ while the flag flips an order of magnitude higher. Proposition~\ref{prop:finitebatch} accounts for the complementary effect: the transition is \emph{better resolved}, and the run-to-run statistics therefore more strongly bi-modal, in the large-sample domains --- the ordering reported in Appendix~\ref{app:proofs}.
+
+The finite-batch certificate is measurable directly rather than inferred. We freeze the healthy HAR anchor of Section~\ref{sec:stfcal} ($m=64$, four detached warm-up epochs, batch $256$) and re-run the shipped probe on $2000$ independent batches of size $B$ per seed over five seeds, drawing the cells \emph{with} replacement so that the $B$ cells are i.i.d.\ exactly as Proposition~\ref{prop:calibration} assumes. Table~\ref{tab:certificate} reports the outcome. The spread of $\hat\rho$ follows the predicted $B^{-1/2}$ law: the fitted log--log slope of $\mathrm{CV}(\hat\rho)$ against $B$ is $-0.500$ ($R^2=0.96$) and of $\mathrm{sd}(\hat\rho)$ is $-0.494$, while $\hat\rho$ itself is flat in $B$ (fitted slope $+0.006$), as it must be, because the mean-reduced primary criterion and the mean-reduced toxifier carry the same $1/B$ normalization. The Bernstein bound \eqref{eq:calibration} dominates the measured exceedance at every $B$ and at both target accuracies, and turns informative (below $1$) once $B$ clears the probe noise floor $c_0/\sqrt B$: from $B\approx6\times10^2$ at $\eta=0.2$ and $B\approx2\times10^3$ at $\eta=0.1$, about a factor of two above the noise-floor crossing itself ($B\approx3\times10^2$ and $10^3$), the offset being the $R_{\max}$ term in $\kappa^2$. The same sweep on the battery anchor ($n=1362$ training cells) gives $-0.521$ and $-0.530$. Two details of the aggregation are visible in the same run. First, the batch-mean ratio $\|\bar a\|/\|\bar p\|$ stays near $10^{-6}$ at every $B$ --- $1.4\times10^{-8}$ of $\hat\rho$ --- because $\sum_ig_a^{(i)}=0$ identically for a variance-shrinkage toxifier: the order parameter of Definition~\ref{def:toxicity} cannot be read off batch means, which is why the probe averages per-cell ratios, as Proposition~\ref{prop:calibration} states. Second, the operational probe draws its batch \emph{without} replacement from a finite pool, which adds the finite-population factor $\sqrt{1-B/n}$ at large $B$; that factor predicts slopes of $-0.555$ and $-0.634$ for the two sweeps, against measured $-0.558$ (HAR, $B/n$ up to $0.56$) and $-0.646$ (battery, $B/n$ up to $0.75$) --- the steeper exponents are the finite pool, not a deviation from the law.
+
+\begin{table}[t]
+\centering
+\small
+\caption{The finite-batch certificate of Proposition~\ref{prop:calibration}, measured. Healthy HAR anchor ($m=64$, four detached warm-up epochs), frozen; the shipped probe re-run on $2000$ batches of size $B$ per seed, five seeds, cells drawn with replacement. $\mathrm{sd}$ and $\mathrm{CV}$ are the spread of $\hat\rho$ across batches at a fixed anchor; ``meas.'' is the observed $\mathbb P(|\hat\rho-\rho|>\eta\rho)$ and ``bound'' the Bernstein envelope \eqref{eq:calibration} at the same $\eta$, evaluated from the probe's own moments ($\kappa^2=2\rho^2c_0^2+\frac23R_{\max}\varepsilon$). The bound is respected at every cell and becomes informative (below $1$) once the target accuracy clears the probe noise floor. Fitted slopes: $\mathrm{CV}$ vs.\ $B$, $-0.500$ ($R^2=0.96$); $\hat\rho$ vs.\ $B$, $+0.006$; and $\sum_ig_a^{(i)}$ vanishing to $4\times10^{-8}$ of $\sum_i\|g_a^{(i)}\|$. Raising confidence from $90\%$ to $99.9\%$ scales the prescription by $\ln(2/10^{-3})/\ln(2/0.1)=2.54$.}
+\label{tab:certificate}
+\begin{tabular}{rcccccccc}
+\toprule
+& & & & \multicolumn{2}{c}{$\eta=0.2$} & \multicolumn{2}{c}{$\eta=0.1$} \\
+\cmidrule(lr){5-6}\cmidrule(lr){7-8}
+$B$ & $\hat\rho$ & $\mathrm{sd}(\hat\rho)$ & $\mathrm{CV}(\hat\rho)$ & meas. & bound & meas. & bound \\
+\midrule
+$16$   & $74.30$ & $69.52$ & $0.947$ & $0.820$ & $1.94$ & $0.911$ & $1.98$ \\
+$32$   & $76.69$ & $50.40$ & $0.664$ & $0.740$ & $1.90$ & $0.866$ & $1.97$ \\
+$64$   & $77.03$ & $36.00$ & $0.471$ & $0.657$ & $1.83$ & $0.836$ & $1.94$ \\
+$128$  & $77.00$ & $25.34$ & $0.332$ & $0.526$ & $1.71$ & $0.756$ & $1.90$ \\
+$256$  & $77.74$ & $18.24$ & $0.237$ & $0.378$ & $1.49$ & $0.657$ & $1.83$ \\
+$512$  & $77.71$ & $12.92$ & $0.168$ & $0.221$ & $1.15$ & $0.538$ & $1.69$ \\
+$1024$ & $77.97$ & $9.20$  & $0.119$ & $0.094$ & $0.70$ & $0.384$ & $1.45$ \\
+$2048$ & $78.00$ & $6.34$  & $0.082$ & $0.022$ & $0.29$ & $0.218$ & $1.07$ \\
+$4096$ & $77.90$ & $4.54$  & $0.059$ & $0.003$ & $0.06$ & $0.095$ & $0.61$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\subsection{Prediction variance normalization and target $z$-scoring}\label{app:zscore}
+
+The representation-level filter of Section~\ref{sec:stf} removes the collapse attractor, but a \emph{second, prediction-level} trap remains: it lives in the output head rather than in the encoder, and it is why the regression path (SOH/RUL) needs one extra ingredient. Writing the head as $\hat y=w^{\!\top}h+b$ on a target with scale $s_y$, the head can drive its own loss to zero by shrinking $w$ and the encoder spread together, since the regression loss measures the product $w^{\!\top}\delta h$: a factor $1/c$ on $\delta h$ is undone by a factor $c$ on $w$ at no cost to $L_p$, so the flat direction of Proposition~\ref{prop:gradient_vanishing} survives at the output. An auxiliary head that also reads $h$ then sees a shrinking signal and its own gradient decays, leaving the representation looking healthy while the prediction path degrades.
+
+We break the degeneracy by fixing the two scales independently. First, every regression target is standardized, $y\mapsto(y-\mu_y)/s_y$, so the loss is written in units where a unit-output head is the natural scale. Second, the head's prediction is normalized to unit variance across the batch, $\hat y\mapsto(\hat y-\bar{\hat y})/\mathrm{std}_b(\hat y)$, before the loss is taken. The second step is what removes the trap: under it the loss is invariant to a uniform rescaling of $w$, so shrinking the head no longer buys anything and the residual gradient on $w$ points at the \emph{direction} of the target rather than at its magnitude. The encoder spread that the auxiliary head reads is therefore not silently drained, and the only route to collapse left is the auxiliary-driven one that \STF{} filters. The two steps are complementary: $z$-scoring alone still lets the head shrink, and normalization alone leaves the loss scale drifting with the batch. Together they make regression behave like classification, where the softmax logit scale is normalized by construction. In code this is a two-line change: the standardization is applied once when the target tensors are built, and the normalization is a detached $\mathrm{std}_b$ rescaling inside the head, so it adds no parameters and no measurable cost.
+
+\section{Additional Tables and Protocol}\label{app:tables}
+
+\begin{algorithm}[h]
+\caption{STF training protocol (per domain, per configuration)}
+\label{alg:stf}
+\begin{algorithmic}[1]
+\STATE \textbf{Input:} domain data $\mathcal{D}$, encoder width $m$, toxicity schedule $\{\alpha\}$, seeds
+\STATE \textbf{Phase 1 -- health anchor:} train the single-task encoder ($\alpha=0$), record healthy scatter $\mathcal{S}_{single}=\mathcal{S}_h(\theta^*)$ and healthy spectral ratio $\rho_0$.
+\STATE \textbf{Phase 2 -- calibration:} sweep $\alpha$ with mode \textsc{joint}; record $\rho$, relative scatter $\mathcal{S}_h/\mathcal{S}_{single}$, collapse flag; locate $\alpha_c$ by the threshold crossing.
+\STATE \textbf{Phase 3 -- repair:} train \textsc{joint}, \textsc{stf-0}, \textsc{stf-hard}, \textsc{stf-soft} at supercritical $\alpha>\alpha_c$; per step: forward $h=E_\theta(x)$ and form $L=L_p+\alpha\,L_a$; backprop to obtain $g_p$ and $g_a^{(k)}$; update $\theta\leftarrow\theta-\eta\,J_\theta^{\!\top}(g_p+\sum_k F_\beta[g_a^{(k)}])$, $J_\theta=\partial h/\partial\theta$; monitor $\rho$ and $\mathcal{S}_h/\mathcal{S}_{single}$.
+\STATE \textbf{Report:} collapse rate, recovery rate, $\rho$, $\mathcal{S}_h/\mathcal{S}_{single}$.
+\end{algorithmic}
+\end{algorithm}
+
+With the production auxiliary heads at $\alpha_{aux}{=}1$ on NASA, a batch-256 replication of the NASA column (ten seeds; the flagship NASA column of Table~\ref{tab:bmtl} uses batch 128) gives \textsc{joint} $11.95\pm0.79$ SOH-RMSE\% against the $9.20$ single-task ceiling, \textsc{stf-0} recovered to $9.33\pm0.50$ (paired $p{=}3.3{\times}10^{-5}$), while \textsc{stfcal} improves on \textsc{joint} only marginally ($11.65\pm0.97$, $p{=}0.035$): the probe reads $\hat\rho=0.29$, strictly sub-critical, so the gate stays closed --- at this real-head dose the SOH loss is the prediction-level trap rather than representational collapse (relative scatter $0.69$ of the ceiling), and only full detachment removes it.
+
+The \textsc{stfcal} row of Table~\ref{tab:bmtl} comes from a ten-seed run of the flagship configuration. On MATR the gate opens in $10/10$ seeds, always at rank $3$ (per-seed $\hat\rho=6.0$--$33.0$), and \textsc{stfcal} reaches $1.77\pm0.47$ SOH-RMSE\% against $5.24\pm0.54$ for \textsc{joint} (paired difference $-3.47$, $95\%$ CI $[-4.03,-2.92]$, $p{=}1.9{\times}10^{-7}$, $d_z{=}-4.5$; \textsc{joint} sits $10.3\times$ above the $0.51$ single-task ceiling). Its SOH repair matches \textsc{stf-0} ($1.68\pm0.41$ both on this run and in the flagship row of Table~\ref{tab:bmtl}); on RUL the finite-rank filter is \emph{worse} than full detachment ($419.8\pm33.6$ against $574.7\pm80.7$, closer to the collapsed value): deleting only the top-3 directions leaves residual toxic flux, so the rank rule suffices for the single head it was calibrated on but not for the coupled two-target case. On NASA the same probe reads $\hat\rho=0.40$ (per-seed $0.17$--$0.80$) and the gate stays closed in $10/10$ seeds, so \textsc{stfcal} ($11.40\pm0.78$) tracks \textsc{joint} ($11.42\pm0.85$) as reported above. One probe, both regimes, no tuning.
+
+\begin{algorithm}[h]
+\caption{Calibrated spectral filtering (\textsc{stfcal}); no tuned hyper-parameter beyond the operating weight $\alpha$ already chosen by the practitioner}
+\label{alg:stfcal}
+\begin{algorithmic}[1]
+\STATE \textbf{Input:} data $\mathcal{D}$, encoder width $m$, operating weight $\alpha$, probe depth $R$, warm-up length $W$
+\STATE \textbf{Warm-up:} train $\theta$ with the auxiliary branch detached ($\nabla_\theta L_a\equiv0$) for $W$ epochs; record the healthy anchor $\mathcal{S}^\star$ of \eqref{eq:cross_sample_scatter}
+\STATE \textbf{Probe:} on one batch of $B$ cells with per-cell gradients $g_p^{(i)},g_a^{(i)}$ and centered representation $H_c$ with principal basis $U$, average the per-cell ratio: $\hat\rho=B^{-1}\sum_i\|\Pi_cg_a^{(i)}\|/\|g_p^{(i)}\|$ and $\hat\rho_{\mathrm{res}}[r]=B^{-1}\sum_i\|\Pi_c(I-\sum_{j\le r}u_ju_j^{\!\top})g_a^{(i)}\|/\|g_p^{(i)}\|$ for $r=0,\dots,R$ (the batch-mean ratio $\|\Pi_c\bar g_a\|/\|\bar g_p\|$ vanishes for a variance-shrinking auxiliary)
+\STATE \textbf{Calibrate:} $\text{gate}\leftarrow\mathbf 1[\alpha\hat\rho\ge1]$; \textbf{if} gate $=1$ \textbf{then} $\mathcal R\leftarrow\{r\le R:\alpha\hat\rho_{\mathrm{res}}[r]<1\}$; \textbf{if} $\mathcal R=\emptyset$ \textbf{then} $r\leftarrow R$ (no safe rank within the probe: fall back to full deletion) \textbf{else} $r\leftarrow\min\mathcal R$ \textbf{else} $r\leftarrow0$
+\STATE \textbf{Latch:} freeze $(r,U)$ for the rest of training; apply $F[g_a]=g_a-\sum_{j\le r}(u_j^{\!\top}g_a)\,u_j$ to the parameter update through $J_\theta=\partial h/\partial\theta$ every step
+\STATE \textbf{Report:} gate, $r$, $\hat\rho$, $\mathcal{S}_h/\mathcal{S}^\star$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{table}[t]
+\centering
+\caption{The four scientific domains and the financial discovery domain, with their primary and auxiliary structure and evaluation metrics. Auxiliary toxicity is instantiated identically everywhere (variance-shrinkage projections); the flagship battery application and the NYUv2 dense benchmark (Appendix~\ref{app:nyu}) also pair the encoder with practical reconstruction heads.}
+\label{tab:domains}
+\small
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lllll}
+\toprule
+Domain & Signal & Primary task & Samples & Metric \\
+\midrule
+HAR (UCI-HAR) & motion (561-d) & 6-class activity & 7,352 / 2,947 & accuracy \\
+RadioML (2016.10A) & I/Q (256-d) & 11-class modulation & 110,000 / 110,000 & accuracy \\
+Battery (NASA+MATR) & charge/discharge & SOH + RUL & 18,696 / 3,210 & RMSE / MAE \\
+Finance (A-share) & 1,680-d factors & 5-d return rank & 800 stocks $\times$ 2,059 d & rank-IC \\
+NYUv2 & RGB-D (144$\times$192) & 13-class seg + depth + normals & 795 / 654 scenes & pxacc / mIoU / RMSE / angle \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Repair on the discovery domain (A-share ranking, 10-fold walk-forward $\times$ 10 seeds, OOS rank-IC, mean$\pm$std over 100 fold-cells). \textsc{stf-0} \emph{deletes} the auxiliary signal ($-39\%$ versus joint, paired $p{=}5{\times}10^{-5}$); both spectral gates retain it (\textsc{stf-hard} $+5\%$, \textsc{stf-soft} $-7\%$, neither significant), as predicted by Corollary~\ref{cor:stf}.}
+\label{tab:finance_repair}
+\small
+\begin{tabular}{lcc}
+\toprule
+Mode & OOS rank-IC & vs.\ joint \\
+\midrule
+\textsc{joint} & $+0.060\pm0.055$ & --- \\
+\textsc{stf-0} (\texttt{.detach()}) & $+0.036\pm0.056$ & $-39\%$ \\
+\textsc{stf-hard} & $+0.063\pm0.052$ & $+5\%$ \\
+\textsc{stf-soft} & $+0.056\pm0.053$ & $-7\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Censoring-supervision ablation on MATR, in SOH RMSE\% and RUL MAE (cycles; leave-cell-out, $d{=}128$; the legacy rows use $4$ seeds and the censoring-aware row $10$; bf16 training / fp32 evaluation). \emph{Legacy} treats right-censored lower bounds as exact targets (and, in the eol-only variant, discards the $96/185$ cells that never reach EOL, leaving a $14$-cell test split); \emph{censoring-aware} applies the Tobit-style one-sided hinge to the $59.2\%$ censored samples and retains all cells.}
+\label{tab:cens_ablation}
+\small
+\begin{tabular}{lccccc}
+\toprule
+ & \multicolumn{2}{c}{SOH rms(\%)} & \multicolumn{2}{c}{RUL MAE (cyc)} & \\
+Mode & \textsc{joint} & \textsc{stf-0} & \textsc{joint} & \textsc{stf-0} & cells used \\
+\midrule
+legacy ($\text{RUL}{=}0$ labels) & $5.56\pm0.17$ & $2.05\pm0.38$ & $94.1\pm5.7$ & $97.0\pm15.3$ & $185$ \\
+legacy + \texttt{--eol-only} & $1.53\pm0.13$ & $0.53\pm0.03$ & $77.5\pm2.3$ & $76.6\pm4.1$ & $89$ \\
+censoring-aware (ours) & $5.24\pm0.54$ & $1.68\pm0.41$ & $209.0\pm59.8$ & $574.7\pm80.7$ & $185$ \\
+\bottomrule
+\end{tabular}
+\vspace{1pt}
+{\footnotesize The legacy rows reproduce the \texttt{nocens} supervision, every other setting held fixed.}
+\end{table}
+
+
+% >>> tab:conflict_num
+\begin{table}[t]
+\centering
+\caption{Numeric multi-task baselines on the real battery path at supercritical $\alpha{=}10$ (5 seeds), reported as SOH-RMSE\% $\downarrow$, RUL-MAE in cycles $\downarrow$, and \emph{raw} representation scatter $\mathcal S_h$ (with the ceiling scatter of Table~\ref{tab:bmtl} for scale; the collapse rule of Appendix~\ref{app:tables} applies to the relative scatter $\mathcal S_h/\mathcal S_{\text{single}}$, not to these raw values). Replacing plain summation with PCGrad, FAMO, or CAGrad leaves the battery encoder degraded at the flagship caliber: on MATR every combiner sits at $4.0$--$10.1$\% SOH against $1.83$\% for \textsc{stf-0}, and on NASA at $11.9$--$16.0$\% against $8.81$\%. The widest raw scatter among the combiners reflects a reweighted collapse, not a healthy encoder: every one of them remains collapsed ($1.0$ rate) in Table~\ref{tab:conflict}. Single-task ceilings are those of Table~\ref{tab:bmtl}, whose \textsc{stf-0} row ($1.68\pm0.41$) is the flagship ten-seed configuration; the row here is re-measured at this dose with five seeds, and every \textsc{stf-0} value above lies inside the corresponding ten-seed interval of that row ($1.83\pm0.51$ vs.\ $1.68\pm0.41$ SOH on MATR, $8.81\pm0.72$ vs.\ $9.35\pm0.55$ on NASA, and both RUL values within the ten-seed $\pm$), so the two runs agree within seed noise.}
+\label{tab:conflict_num}
+\small
+\begin{tabular}{lcccccc}
+\toprule
+ & \multicolumn{3}{c}{MATR} & \multicolumn{3}{c}{NASA} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+Combiner & SOH rms(\%) & RUL MAE & scatter & SOH rms(\%) & RUL MAE & scatter \\
+\midrule
+single-task ceiling & $0.51$ & $694.6$ & -- & $9.17$ & $18.5$ & -- \\
+\textsc{joint} (sum, plain) & $6.43\pm0.19$ & $208.8$ & $0.126$ & $13.33\pm1.07$ & $18.7$ & $0.214$ \\
+PCGrad & $4.02\pm0.98$ & $172.9$ & $0.094$ & $11.89\pm0.73$ & $18.6$ & $0.164$ \\
+FAMO & $10.10\pm2.17$ & $295.3$ & $0.435$ & $16.02\pm0.50$ & $32.4$ & $0.474$ \\
+CAGrad & $6.33\pm0.45$ & $198.0$ & $0.166$ & $13.04\pm0.75$ & $17.7$ & $0.198$ \\
+\midrule
+\textsc{stf-0} (ours) & $1.83\pm0.51$ & $623.4$ & $0.198$ & $8.81\pm0.72$ & $17.1$ & $0.225$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+% <<< tab:conflict_num
+
+\begin{table}[t]
+\centering
+\caption{Auxiliary-weight (dose--response) sensitivity on MATR, in SOH RMSE (\%) and RUL MAE (cycles) at seed 0, with censoring-aware supervision and bf16 training / fp32 evaluation. \textsc{joint} trains the auxiliary reconstruction/distributional heads with loss weight $\lambda_{\mathrm{aux}}$; \textsc{stf-0} detaches them, so $\lambda_{\mathrm{aux}}$ never enters its computation and its row is identical at every dose. SOH RMSE (\%) degrades with the dose for \textsc{joint} at every width, while the benign dose $\lambda_{\mathrm{aux}}{=}10^{-2}$ recovers near-\textsc{stf-0} SOH. Single-task ceilings are the SOH-only model (SOH columns) and the RUL-only model (RUL columns) at each width.}
+\label{tab:aux_sweep}
+\small
+\begin{tabular}{ll ccc ccc}
+\toprule
+& & \multicolumn{3}{c}{SOH RMSE (\%)$\downarrow$} & \multicolumn{3}{c}{RUL MAE (cyc)$\downarrow$} \\
+\cmidrule(lr){3-5}\cmidrule(lr){6-8}
+Mode & $\lambda_{\mathrm{aux}}$ & $d{=}32$ & $d{=}128$ & $d{=}256$ & $d{=}32$ & $d{=}128$ & $d{=}256$ \\
+\midrule
+\multirow{4}{*}{\textsc{joint}} & $10^{-2}$ & $2.72$ & $1.36$ & $1.52$ & $478.0$ & $386.3$ & $377.5$ \\
+& $10^{-1}$ & $2.69$ & $2.23$ & $2.87$ & $230.4$ & $399.7$ & $411.0$ \\
+& $1$ & $5.96$ & $4.69$ & $5.53$ & $285.6$ & $198.0$ & $176.4$ \\
+& $10$ & $6.52$ & $6.58$ & $6.01$ & $178.5$ & $197.0$ & $182.0$ \\
+\midrule
+\textsc{stf-0} (dose-free) & --- & $2.36$ & $1.18$ & $1.51$ & $607.2$ & $627.4$ & $540.2$ \\
+\midrule
+single-task ceiling & --- & $0.60$ & $0.33$ & $0.57$ & $951.8$ & $761.7$ & $325.8$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A single-term attribution on MATR (4 seeds) isolates the gate factors: the fast-charge gain is carried by the rate term alone (fast-charge SOH-RMSE $0.95$ without it) and the extreme-temperature gain by the temperature term alone ($2.35$ without it), confirming that the percentile thresholds select the intended operating windows rather than an artifact of the joint gate; the $\omega$-sweep over $\{0.5,1,2\}$ brackets the operating point at $\omega{=}1$.
+
+The full grid behind the two predictions of Section~\ref{sec:conflict_ablations} is Table~\ref{tab:compose}. On HAR the conflict operator changes accuracy by $<0.010$ once the filter has acted ($0.943$ alone versus $0.933$/$0.940$ composed), and the unfiltered representation never leaves the collapsed band (relative scatter $\le0.15$ against the filtered $0.97$--$1.14$).
+
+The synthetic testbed uses a 17-point log-spaced $\alpha$ grid over six widths with untrained random projections of rank $\lfloor m/2\rfloor$; its toxic rank is a fixed fraction of the width, so it realizes $\beta=1$ and yields $\gamma=0.07$ under the relative half-height rule ($\gamma=1.53$ under the absolute rule, the artifact quantified above), the dilution predicted by Proposition~\ref{prop:rank_dilution}. The RadioML subcritical sweep ($\alpha\in[3\times10^{-3},1]$, 5 seeds, densified about the transition) locates crossings $\alpha_c=\{0.17,0.39,0.24,0.22\}$ for $m=\{32,64,128,256\}$: the eightfold width range moves the crossing by a factor of $2.3$, against the eightfold of mean-field $\gamma=1$ and more than an order of magnitude for the undiluted $\gamma_0=2.43$. The crossing is not resolved more finely than that by this grid --- at $m{=}64$ the per-seed crossings alone span $0.29$--$0.54$, so the width trend sits inside the seed spread --- and the near-zero $R^2$ of the power-law fit is that same flatness read off the line.
+
+The accompanying repository contains everything needed to regenerate every number in this paper.
+The cross-domain protocol (\texttt{cross\_domain\_mtl.py}), the flagship battery application (\texttt{battery\_bmtl\_v3.py}), and the NYUv2 dense benchmark (\texttt{nyu\_bmtl.py}) implement the whole STF family, including the calibrated variants \textsc{stfcal} and \textsc{stfcalrank} and the single-probe calibration of Algorithm~\ref{alg:stfcal}; the reported conflict-resolution baselines (PCGrad, CAGrad, FAMO) share the same harness, and so does Table~\ref{tab:compose}. The remaining families (MGDA, Aligned-MTL, Nash-MTL, IMTL-G, IMTL-L, GradNorm, uncertainty weighting) are benchmarked through it: \texttt{moo\_combiners.py} ports the kernels of the reference releases of the original authors and \texttt{cross\_domain\_mtl.py} combines them in one code path, so the collapse rates of Table~\ref{tab:conflict} and the battery numbers of Table~\ref{tab:conflict_num} are measured under the same optimizer, schedule and batch as the baselines they extend, with each family at its published defaults.
+
+Each experiment is specified as a JSON job manifest --- one entry per (domain, width, mode, seed) cell, carrying the exact command line, output path and log path --- and executed by a deterministic runner that skips cells whose outputs already exist; the manifests cover the four-domain collapse scans, the width-resolved capacity sweeps, the conflict-composition grid, the real-auxiliary-head comparisons, the auxiliary-weight sweep of Table~\ref{tab:aux_sweep}, the calibrated validation of Section~\ref{sec:stfcal}, the NYUv2 calibration, dose--response, and dense benchmark of Appendix~\ref{app:nyu}, and the multi-task-baseline coverage of Table~\ref{tab:conflict} in three domains.
+Every reported cell uses fixed integer seeds ($4$--$10$ per cell), each table states its seed count, and the JSON outputs retain per-seed values.
+
+All runs use one NVIDIA A100 80\,GB; Adam at $\mathrm{lr}=10^{-3}$; bf16 autocast with TF32 matmul; the calibration probe is evaluated in fp32 outside autocast on a detached clone. Batch size is $256$ for the unified protocol, the real-auxiliary comparison, the regularizer sweep and the MATR flagship runs, $128$ for the NASA conflict baselines ($256$ for its plain-summation runs), $32$ for NYUv2, and $512$ for the walk-forward discovery domain.
+A unified-protocol cell is a few GPU-minutes (the HAR calibration of Section~\ref{sec:stfcal} runs ten seeds in a few minutes), while the flagship battery runs of Section~\ref{sec:bmtl} take $150$ epochs per configuration.
+The finite-batch claims of Proposition~\ref{prop:calibration} are directly checkable from the artifacts: the probe persists $\hat\rho$, the residual family $\hat\rho_{\mathrm{res}}[0..R]$, and the gate and rank it induces, for every seed, and \texttt{calib\_cert\_b.py} re-probes a frozen healthy anchor over a sweep of probe sizes, which is Table~\ref{tab:certificate}.
+
+The cost of the filter relative to the alternatives is measured directly rather than asserted. Table~\ref{tab:overhead} times one training epoch on UCI-HAR at four widths for every variant of the family and for the gradient-surgery baselines, reporting the median over ten repetitions of the per-repetition median epoch time, with epoch $0$ dropped as warm-up and a device synchronisation inside each timed epoch. Two guards keep the ratio honest. The run starts only after the device reports idle for three consecutive samples, and the row order is rotated by one position per repetition, so no method is always measured first or last. Both matter: the same script, run while a co-tenant held the device, reported the reference epoch at $0.180$\,s instead of $0.099$\,s and FAMO at $0.0\%$ instead of $+31\%$, because the row that is always measured last absorbs whatever drift the device has. On the idle device the spectral variants cost $21.8\%$ at $m{=}32$, falling to $9.5\%$ (\textsc{stf-hard}) and $12.2\%$ (\textsc{stf-soft}) at $m{=}256$: the projection is $O(Bd)$ against the encoder's $O(Bd^2)$, so its relative cost shrinks as the encoder grows. The detaching variants are \emph{cheaper} than the unfiltered step at every width, by up to $65.0\%$ (\textsc{stf-0}) and $47.8\%$ (\textsc{stfcal}), because \texttt{.detach()} and the calibrated gate remove the toxic head's backward pass through the encoder. Gradient surgery is dearer at every width --- PCGrad $41.6\%$ to $21.1\%$, CAGrad $75.2\%$ to $38.5\%$, the price of a second per-task backward pass through the shared encoder --- and FAMO's learned scalarisation is not free either, at $31.0\%$ to $19.6\%$. The spectral variants are therefore the cheapest non-detaching option at every width, and no \STF{} variant exceeds $21.8\%$. The same matrix, repeated on the other four domains at the same four widths, keeps the ordering: over the twenty cells the spectral variants cost $+6.3\%$ to $+26.0\%$ against $+5.8\%$ to $+98.2\%$ for the surgery baselines, and both are cheaper than PCGrad and CAGrad in every cell. The single exception to the full ordering is FAMO at $m{=}256$ on CelebA and NYUv2, where it comes within six points of the cheaper spectral variant.
+
+\begin{table}[t]
+\centering
+\caption{Per-epoch wall-clock cost of the \STF{} family and of the gradient-surgery baselines on UCI-HAR at four widths (batch $256$), as a percentage of the unfiltered plain-summation step. Each cell is the median over ten repetitions of the per-repetition median epoch time, with epoch $0$ dropped as warm-up and a device synchronisation inside each timed epoch. The row order is rotated by one position per repetition and the run starts only after the device reports idle for three consecutive samples, so neither warm-up nor drift is charged to a method; an estimator that pairs the ratio inside each rotation position agrees with every cell to within $5$ percentage points. Plain summation takes $0.0813/0.0986/0.1283/0.1454$\,s per epoch at $m{=}32/64/128/256$. The detaching variants are cheaper than the unfiltered step because the toxic head no longer back-propagates through the encoder; the spectral variants are the cheapest non-detaching option at every width, and their relative cost is largest at the smallest width because the projection is $O(Bd)$ against the encoder's $O(Bd^2)$.}
+\label{tab:overhead}
+\small
+\begin{tabular}{lcccc}
+\toprule
+Method & $m{=}32$ & $m{=}64$ & $m{=}128$ & $m{=}256$ \\
+\midrule
+plain summation (s/epoch) & $0.0813$ & $0.0986$ & $0.1283$ & $0.1454$ \\
+\midrule
+\multicolumn{5}{l}{\itshape overhead relative to plain summation} \\
+\midrule
+\textsc{stf-0} (detach) & $-35.8\%$ & $-48.1\%$ & $-59.5\%$ & $-65.0\%$ \\
+\textsc{stf-hard} & $+21.8\%$ & $+18.1\%$ & $+14.3\%$ & $+9.5\%$ \\
+\textsc{stf-soft} & $+21.8\%$ & $+19.8\%$ & $+8.9\%$ & $+12.2\%$ \\
+\textsc{stfcal} & $-0.7\%$ & $-20.1\%$ & $-37.7\%$ & $-47.8\%$ \\
+PCGrad & $+41.6\%$ & $+31.4\%$ & $+26.6\%$ & $+21.1\%$ \\
+CAGrad & $+75.2\%$ & $+60.2\%$ & $+46.0\%$ & $+38.5\%$ \\
+FAMO & $+31.0\%$ & $+31.1\%$ & $+23.9\%$ & $+19.6\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+
+\section{NYUv2: Dense Perception Beyond Time Series}\label{app:nyu}
+
+NYUv2~\citep{silberman2012indoor,ladicky2014pulling} provides 795 training and 654 test scenes with per-pixel semantic segmentation (13 valid classes; boundary pixels labeled $-1$ and masked in loss and metric), monocular depth, and surface normals; we downsample to $144\times192$. The benchmark encoder is convolutional (four stride-2 blocks with batch-norm--ReLU, $3\to32\to64\to128\to256$ channels, flattened to $d{=}128$) with linear heads for the three tasks; losses are cross-entropy (ignore index $-1$), $L_1$ depth, and a cosine normal loss with zero-norm pixels masked; metrics are pixel accuracy, mIoU, depth RMSE/MAE, and mean angular error, all read at the final epoch over ten seeds with no test-set selection. Two auxiliary branches are studied: \emph{proj}, the controlled variance-shrinkage toxifier of the unified protocol over a fixed random projection to $d/4$, at the calibrated supercritical dose $\alpha{=}1$; and \emph{ae}, a trainable three-layer head reconstructing the input --- the production-style reconstruction aux of the battery flagship --- at $\alpha{=}250$, $3.4\times$ its calibrated $\alpha_c$. In the unified-protocol variant the primary task is the $9\times12$ coarse depth grid (108 outputs) and the harness MLP, optimizer, probe, and collapse criterion are exactly those of Section~\ref{sec:unified_protocol}.
+
+One probe per seed after four detached warm-up epochs on the harness encoder gives $\hat\rho=2.26\pm0.16$, $2.01\pm0.10$, $1.64\pm0.09$, $1.29\pm0.05$ at $m{=}32,64,128,256$ (per-seed ranges $2.06$--$2.65$, $1.90$--$2.20$, $1.51$--$1.77$, $1.22$--$1.38$), i.e.\ $\alpha_c=1/\hat\rho=0.44/0.50/0.61/0.78$: the critical dose \emph{grows} with width, and the four-point log--log fit gives capacity exponent $\gamma=0.27$ ($R^2=0.98$, $95\%$ CI $[+0.15,+0.40]$), inside the HAR--RadioML range and consistent with Proposition~\ref{prop:rank_dilution}. The estimator differs from the one used for the other domains, and the difference is not cosmetic: here $\alpha_c$ comes from the one-probe calibration ($1/\hat\rho$) at four widths, whereas the HAR, battery, and RadioML exponents are read off the scatter half-height crossing. That crossing, applied here, returns the \emph{opposite} ordering --- $\gamma=-0.77$ over the same four widths --- and the inversion is not an artefact of the threshold that reads it: sweeping the crossing level from $0.3$ to $0.7$ moves the exponent only between $-0.94$ and $-0.73$ ($R^2\ge0.99$), whereas the same sweep on HAR stays positive throughout ($+0.34$ to $+0.46$). The two estimators are therefore not interchangeable on this domain: they place the transition within a factor of $7$ of each other at $m{=}64$ ($0.069$ against $0.50$) but disagree on how it moves with width. We report the probe because it is the quantity \textsc{stfcal} gates on, and quote the crossing's value beside it so the two can be compared directly. The crossing is not a grid artefact --- extending the sweep four decades lower puts the scatter back on the anchor ($0.99$--$1.01$ at $\alpha=10^{-6}$, against $0.64$--$0.83$ at $\alpha=0.01$, the shallowest dose previously swept) and leaves the crossing where it was --- so the inversion is a property of the scatter curve, not of where the grid starts. $\gamma_{\mathrm{NYU}}=0.27$ is therefore the probe-based value and is not directly comparable with the crossing-based exponents of Section~\ref{sec:capacity_law}. The remaining degree of freedom is \emph{when} the probe is read; Appendix~\ref{app:warmup} measures it and finds the probe exponent stable in the read time here (it ranges over $0.17$, against $2.55$ on HAR, which changes sign), and that stability is what makes the probe usable as the estimator on this domain. On the benchmark encoder the same probe reads $\hat\rho=3.27\pm0.54$ (per-seed $2.45$--$3.92$), predicting $\alpha_c\approx0.31$; the \emph{ae} head reads $\hat\rho=0.0136\pm0.0015$, predicting $\alpha_c\approx73$.
+
+Table~\ref{tab:nyu_dose}: joint collapses $10/10$ for every $\alpha\ge0.5$ while \textsc{stfcal} collapses $0/10$ with the gate open in every seed (rank 3) and relative scatter $1.00$; at $\alpha{=}0.5$, exactly the predicted shell ($1/\alpha=2.0$ against per-seed $\hat\rho\in[1.90,2.20]$), the gate opens in exactly the five seeds with $\hat\rho>2$ and every gate-open seed is protected (rank 1 suffices) --- the fuzzy certified shell of Corollary~\ref{cor:certificate}, seen seed by seed. At sub-critical doses \textsc{stfcal} is indistinguishable from joint. The collapse is metric-silent: joint depth RMSE \emph{improves} monotonically from $1.335$ to $1.092$ ($-18\%$) as the relative scatter falls from $0.62$ to $0.04$, so the supercritical joint configuration \emph{beats} every repaired one on the primary metric while its representation has collapsed to $4\%$ of healthy scatter --- the operational case for monitoring $\rho$ rather than the loss (cf.\ the MATR case in Section~\ref{sec:validation}). Wilcoxon on per-seed relative scatter (joint vs.\ \textsc{stfcal}) gives $p=2\times10^{-3}$ at every supercritical $\alpha$, the smallest two-sided value attainable at $n{=}10$.
+
+\begin{table}[t]
+\centering
+\caption{NYUv2 dose--response under the unified protocol, reporting depth RMSE in meters on the $9\times12$ grid and relative scatter against the per-seed single-task anchor (harness MLP $m{=}64$, ten seeds; gate and rank from the one-probe calibration at $\hat\rho=2.01$, $\alpha_c=0.50$, i.e.\ rank 1 at $\alpha\le0.5$ and rank 3 at $\alpha\ge1$). \textsc{stf-0} is aux-free at every dose (RMSE $1.353$, relative scatter $1.000$ at every $\alpha$).}
+\label{tab:nyu_dose}
+\small
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lccccccccc}
+\toprule
+$\alpha$ & 0.03 & 0.1 & 0.3 & 0.5 & 1 & 3 & 10 & 30 & 100 \\
+\midrule
+\textsc{joint} RMSE & 1.335 & 1.336 & 1.316 & 1.307 & 1.305 & 1.280 & 1.221 & 1.100 & 1.092 \\
+\textsc{joint} rel.\ scatter & 0.62 & 0.45 & 0.30 & 0.26 & 0.22 & 0.16 & 0.10 & 0.04 & 0.04 \\
+\textsc{joint} collapsed & 0/10 & 0/10 & 5/10 & 10/10 & 10/10 & 10/10 & 10/10 & 10/10 & 10/10 \\
+\midrule
+\textsc{stfcal} RMSE & 1.339 & 1.327 & 1.314 & 1.328 & 1.354 & 1.353 & 1.353 & 1.354 & 1.354 \\
+\textsc{stfcal} rel.\ scatter & 0.63 & 0.45 & 0.31 & 0.63 & 1.01 & 1.01 & 1.01 & 1.00 & 1.01 \\
+\textsc{stfcal} collapsed & 0/10 & 0/10 & 4/10 & 5/10 & 0/10 & 0/10 & 0/10 & 0/10 & 0/10 \\
+calibrated gate open & 0/10 & 0/10 & 0/10 & 5/10 & 10/10 & 10/10 & 10/10 & 10/10 & 10/10 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Table~\ref{tab:nyu_bmtl}. The three dense tasks transfer positively: the aux-free three-task model beats every single-task ceiling on its own metric (mIoU $0.100$ vs.\ $0.083$; depth RMSE $1.130$ vs.\ $1.159$; normal angle $0.586$ vs.\ $0.593$). Absolute values are not comparable to published NYUv2 results, which use substantially larger backbones. The comparison here is within-table: all rows share the backbone, the split, the schedule, and the seed set, so between-row differences come from the auxiliary head. The \emph{proj} aux at $\alpha{=}1$ collapses the representation to $22\%$ of the aux-free scatter and costs $10\%$ segment mIoU ($0.090$ vs.\ $0.100$) while depth RMSE again \emph{improves} ($1.085$ vs.\ $1.130$); \textsc{stfcal} (gate open $10/10$, rank 3, $\hat\rho=3.30$) restores the scatter to $1.01\times$ the aux-free value and every task metric to the aux-free level, with \textsc{stfcalrank} intermediate. The production-style \emph{ae} aux at $\alpha{=}250$ produces comparable visible damage (mIoU $0.092$ vs.\ $0.099$) with less representational shrinkage ($0.55$ of healthy scatter vs.\ $0.22$); here the calibrated gate opens ($\alpha\hat\rho=5$), yet the latched rank-3 filter recovers only part of the damage (scatter $3.84$ vs.\ healthy $7.19$, mIoU $0.091$ vs.\ $0.099$). The probe sees the reconstruction gradient concentrated in the top representation eigendirections, so it commits to rank 3; the latched basis then drifts as training proceeds while the residual shrinkage pressure acts outside it. This is the finite-$R$, latched-projection boundary of Corollary~\ref{cor:estimation}, and it is quantitative: the residual toxic operator on the retained subspace scales with the principal-angle error $\epsilon$ between the probe-time basis and the current one, so the effective threshold is pushed out only to $\epsilon^{-1}\alpha_c$ and the filter degrades exactly as the probe ages, not all at once. The same $\epsilon$ governs the RadioML false negative of Section~\ref{sec:negatives}, where the error is small enough to pass the gate at $\alpha{=}1$ but not at the supercritical doses; both are one estimate-quality boundary seen from two sides, here on a standard vision benchmark.
+
+\begin{table}[t]
+\centering
+\caption{NYUv2 three-task benchmark on a convolutional encoder ($d{=}128$, ten seeds, final epoch). Upper block: single-task ceilings and the aux-free three-task baseline. Middle: the controlled \emph{proj} toxifier at the calibrated supercritical dose $\alpha{=}1$. Lower: the production-style \emph{ae} reconstruction aux at $\alpha{=}250$. Normal angle in radians (lower is better); depth RMSE in meters; scatter is the cross-sample representation variance. Absolute values are not comparable to published NYUv2 results (small fixed backbone); all rows share the backbone, split, and seeds, so the comparison is within-table.}
+\label{tab:nyu_bmtl}
+\small
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lccccc}
+\toprule
+Configuration & seg pxacc & seg mIoU & depth RMSE & normal angle & scatter \\
+\midrule
+single-seg & 0.359 & 0.083 & 2.780 & 1.574 & 2.22 \\
+single-depth & 0.076 & 0.032 & 1.159 & 1.573 & 5.08 \\
+single-normal & 0.074 & 0.031 & 3.346 & 0.593 & 12.43 \\
+joint3 (no aux) & 0.356 & 0.100 & 1.130 & 0.586 & 7.30 \\
+\midrule
++ proj aux ($\alpha{=}1$) & 0.365 & 0.090 & 1.085 & 0.580 & 1.64 \\
+\quad \textsc{stf-0} & 0.356 & 0.100 & 1.131 & 0.585 & 7.30 \\
+\quad \textsc{stfcal} & 0.357 & 0.100 & 1.134 & 0.586 & 7.37 \\
+\quad \textsc{stfcalrank} & 0.357 & 0.095 & 1.115 & 0.583 & 2.65 \\
+\midrule
++ ae aux ($\alpha{=}250$) & 0.350 & 0.092 & 1.168 & 0.580 & 3.99 \\
+\quad \textsc{stf-0} & 0.357 & 0.099 & 1.133 & 0.586 & 7.19 \\
+\quad \textsc{stfcal} & 0.338 & 0.091 & 1.171 & 0.594 & 3.84 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\section{Material moved from the main text}\label{app:moved}
+
+Per-domain values at ten seeds per cell confirm the calibrated validation of Section~\ref{sec:stfcal}. Supercritical dose --- joint relative scatter / \textsc{stfcal} relative scatter, with collapse rates in parentheses: HAR $\alpha{=}100$, $0.016$ $(10/10)$ vs.\ $0.990$ $(0/10)$; battery $\alpha{=}100$, $0.147$ $(10/10)$ vs.\ $1.001$ $(0/10)$; RadioML $\alpha{=}3000$, $0.014$ $(10/10)$ vs.\ $0.982$ $(0/10)$. Sub-critical dose --- \textsc{stfcal} with the gate closed is indistinguishable from joint: HAR $\alpha{=}0.001$, $0.525$ vs.\ $0.528$; battery $\alpha{=}0.01$, $0.963$ vs.\ $0.965$. Transformer encoder: HAR $\alpha{=}100$, joint $10/10$ collapsed (scatter $0.030$), \textsc{stfcal} $0/10$ ($1.041$); battery $\alpha{=}100$, joint $10/10$ ($0.036$, SOH-RMSE $0.447$), \textsc{stfcal} $0/10$ ($1.000$, $0.267$). CelebA $\alpha{=}100$ (five seeds): joint $5/5$ ($0.003$), \textsc{stfcal} $0/5$ ($0.934$).
+
+\begin{table}[t]
+\centering
+\caption{Every gradient-manipulation family of Table~\ref{tab:related}, benchmarked in the same harness as plain summation at each domain's supercritical dose (ten seeds per cell). A cell is the collapse rate over seeds and, in parentheses, the mean primary metric --- so the HAR column reads accuracy, the battery column log-SOH RMSE, and the RadioML column accuracy. Every family retains the $1.0$ collapse rate of \textsc{joint} in every domain, and on HAR seven of the ten fall below the $0.945$ of \textsc{joint} (four to $0.18$--$0.42$): the structural prediction of Table~\ref{tab:related} is confirmed by direct measurement, not by classification. Nine of the ten families sit exactly at the $1/11$ chance level of RadioML ($0.091$), the signature of a constant prediction, while \textsc{joint} ($0.256$) and GradNorm ($0.170$) keep partial signal and still meet the collapse criterion. CAGrad's $c{=}0.4$ and $c{=}0.8$ variants, run on the battery path only, behave identically (collapse rate $1.00$; log-SOH RMSE $0.608$ and $0.601$). \textsc{stf-0} is the only row that leaves the attractor; its repaired metrics are plotted in Figure~\ref{fig:unified}(c,d) and its recovery rates are in Table~\ref{tab:unified_repair}.}
+\label{tab:conflict}
+\small
+\resizebox{\columnwidth}{!}{\begin{tabular}{lccc}
+\toprule
+ & HAR & Battery & RadioML \\
+Combiner & acc.\ $\uparrow$ & log-SOH RMSE $\downarrow$ & acc.\ $\uparrow$ \\
+\midrule
+\textsc{joint} (plain summation) & $1.00$ ($0.945$) & $1.00$ ($0.611$) & $1.00$ ($0.256$) \\
+\midrule
+\multicolumn{4}{l}{\textit{conflict resolution}} \\
+\quad PCGrad & $1.00$ ($0.585$) & $1.00$ ($0.601$) & $1.00$ ($0.091$) \\
+\quad CAGrad ($c{=}0.5$) & $1.00$ ($0.952$) & $1.00$ ($0.607$) & $1.00$ ($0.091$) \\
+\midrule
+\multicolumn{4}{l}{\textit{Pareto}} \\
+\quad MGDA & $1.00$ ($0.200$) & $1.00$ ($0.385$) & $1.00$ ($0.091$) \\
+\midrule
+\multicolumn{4}{l}{\textit{gradient geometry}} \\
+\quad Aligned-MTL & $1.00$ ($0.865$) & $1.00$ ($0.609$) & $1.00$ ($0.091$) \\
+\quad IMTL-G & $1.00$ ($0.419$) & $1.00$ ($0.601$) & $1.00$ ($0.091$) \\
+\quad Nash-MTL & $1.00$ ($0.280$) & $1.00$ ($0.552$) & $1.00$ ($0.091$) \\
+\midrule
+\multicolumn{4}{l}{\textit{loss weighting}} \\
+\quad FAMO & $1.00$ ($0.182$) & $1.00$ ($0.613$) & $1.00$ ($0.091$) \\
+\quad UW (uncert.) & $1.00$ ($0.940$) & $1.00$ ($0.611$) & $1.00$ ($0.091$) \\
+\quad GradNorm & $1.00$ ($0.958$) & $1.00$ ($0.611$) & $1.00$ ($0.170$) \\
+\quad IMTL-L & $1.00$ ($0.947$) & $1.00$ ($0.611$) & $1.00$ ($0.091$) \\
+\midrule
+\textsc{stf-0} (ours) & $0.0$ & $0.0$ & $0.0$ \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+Table~\ref{tab:real_aux} reports the real-auxiliary comparison at $m=64$ and ten seeds. The two reconstruction heads are benign (no collapse; filtering them is harmless-to-mildly-harmful, as the near-zero measured $\rho$ predicts). The subject probe is a genuine hazard: joint training leaks identity into the representation (probe accuracy $0.646$ against $1/21$ chance) at a primary-task cost, and the filter restores the primary task while suppressing the probe to chance ($0.055$). The SNR head at supercritical $\alpha$ enters the saturation regime: joint collapses in every seed, \textsc{stf-hard} and \textsc{stf-soft} cannot recover it, and only full deletion is safe. Measured $\rho$ separates toxic from benign heads by orders of magnitude in every domain --- the deployment-time decision the protocol of Section~\ref{sec:diagnosis} calls for.
+
+The metrics agree in both directions. Where collapse is visible to the task metric the STF modes recover it; where it is not, they recover the representation and leave the metric alone. Two boundaries follow from the theory. The first is saturation. An estimated subspace keeps a finite threshold (Corollary~\ref{cor:estimation}), so at extreme toxicity the spectral variants fall back toward \textsc{stf-0}. The SNR-regression head is the clearest instance, and the same mechanism produces the RadioML false negative at $\alpha{=}1$, where the probe reads sub-critical and joint still collapses in $8/10$: an estimate good enough at one dose is not good enough at another. The second is what calibration commits to. \textsc{stfcal} reads $\rho$ on a detached warm-up anchor, so it presupposes that a short auxiliary-free warm-up is acceptable and that the anchor represents the configuration trained afterwards; it also inherits the finite-probe slack of Proposition~\ref{prop:calibration}, which becomes vacuous within an $O(B^{-1/2})$ neighbourhood of $\alpha_c$. Both costs are small in the regimes we measure: the warm-up is four epochs, which sets the gate's floor to $9.1\times10^{-3}$ and so to the measured transition itself (Appendix~\ref{app:warmup}), and the slack is logarithmic in the batch size. Below threshold the filter is inert. STF intervenes on the gradient flow and does not address non-gradient instabilities such as NaN-producing extreme-batch conflicts, which we handle with batch-level NaN-skip, nor the progressive loss of plasticity under non-stationary data~\citep{dohare2024loss}, a distinct route to a degenerate encoder.
+
+\begin{table}[t]
+\centering
+\caption{The MTL gradient-manipulation literature acts on directions or scalar weights and is therefore structurally blind to gradient toxicity, the failure mode in which tasks \emph{agree} along a variance-contracting axis. The last column states whether the family provably prevents the collapse transition of Theorem~\ref{thm:transition} at supercritical $\alpha\rho>1$; the gradient-manipulation families are measured in Table~\ref{tab:conflict} and the variance/covariance row in Table~\ref{tab:reg}.}
+\label{tab:related}
+\small
+\begin{tabular}{p{0.21\linewidth}p{0.25\linewidth}p{0.17\linewidth}p{0.22\linewidth}}
+\toprule
+Family & Operates on (cost) & Assumed pathology & Prevents collapse at $\alpha\rho>1$? \\
+\midrule
+Uncertainty weighting, GradNorm, IMTL~\citep{kendall2018multi,chen2018gradnorm,liu2021imtl} & scalar loss weights ($0$--$K$ backward) & loss imbalance & no \\
+PCGrad, CAGrad~\citep{yu2020pcgrad,liu2021cagrad} & pairwise gradient directions ($2K$ backward) & conflicting directions & no \\
+Nash-MTL, Aligned-MTL~\citep{navon2022multi,senushkin2023aligned} & gradient geometry ($K$ backward) & conflict and imbalance & no \\
+MGDA~\citep{sener2018multi} & min-norm Pareto weights ($K$ backward) & conflicting directions & no \\
+FAMO~\citep{liu2023famo} & weights from task progress ($2$ backward) & slow or stalled task & no \\
+Variance / covariance regularizers~\citep{zbontar2021barlow,bardes2022vicreg,ermolov2021whitening} & representation covariance ($O(m^2)$) & variance decay & primary objective only \\
+Stop-gradient \texttt{.detach()}~\citep{grill2020bootstrap,chen2021simsiam,caron2021emerging} & whole auxiliary gradient ($0$) & any auxiliary hazard & yes, but blunt: benign signal deleted too \\
+STF / \textsc{stfcal} (this work) & toxic projection $\Pi_cg_a$ ($O(Bd)$ + one probe) & constant-attractor auxiliary & yes, with minimal deletion (Thm.~\ref{thm:minimalrank}) \\
+\bottomrule
+\end{tabular}
+\vspace{1pt}
+{\footnotesize The variance/covariance row, measured at matched doses in Table~\ref{tab:reg}: the collapse rate stays at $1.0$ below a domain-specific weight, and above it the representation settles where the penalty puts it rather than at the single-task anchor --- flat at $0.36$ of the anchor on HAR, crossing the anchor on battery, and overshooting it to $1.29$ on RadioML, where clearing the criterion leaves accuracy below the collapsed \textsc{joint} baseline.}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Collapse rate and recovery rate under supercritical toxicity in three domains (HAR 5 seeds, battery 20 seeds, RadioML 10 seeds). Recovery is the fraction of seeds whose primary metric improves over joint training. On HAR the classifier separates activities even on a collapsed representation, so metric recovery is near-zero there while every STF mode restores the representation; recovery is $1.0$ in the domains where the metric itself collapses.}
+\label{tab:unified_repair}
+\small
+\resizebox{\columnwidth}{!}{\begin{tabular}{llccccc}
+\toprule
+ & & \textsc{joint} & \textsc{stf-0} & \textsc{stf-hard} & \textsc{stf-soft} \\
+Domain & Metric & coll.\ /\ rec. & coll.\ /\ rec. & coll.\ /\ rec. & coll.\ /\ rec. \\
+\midrule
+HAR & accuracy (flat) & $1.0$ / $0.0$ & $0.0$ / $0.1$ & $0.0$ / $0.2$ & $0.0$ / $0.1$ \\
+RadioML & accuracy & $1.0$ / $0.0$ & $0.0$ / $1.0$ & $0.0$ / $1.0$ & $0.0$ / $1.0$ \\
+Battery & log-SOH RMSE & $1.0$ / $0.0$ & $0.0$ / $1.0$ & $0.0$ / $1.0$ & $0.0$ / $1.0$ \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+A shared temporal encoder maps each cell's per-cycle window $x\in\mathbb{R}^{T\times D}$ (normalized voltage, current, temperature, resistance) to a representation $h\in\mathbb{R}^{d}$; the encoder stacks a \textsc{TSMixer}~\citep{ekambaram2023tsmixer} feature/temporal-mixing block and a gated state-space block~\citep{gu2022s4,gu2023mamba} for long-range degradation context. Three heads share $h$: a SOH regression head ($L_2$), a RUL regression head ($L_1$), and the auxiliary reconstruction/distributional heads of Definition~\ref{def:degmin}.
+
+RUL targets are right-censored, which governs every number below. A cell that has not crossed its end-of-life threshold when recording stops carries only a \emph{lower bound} on its remaining life, so writing the observation depth in as an exact target injects the contradiction ``$\text{RUL}=0$ while $\text{SOH}\approx90\%$'' and teaches the model to predict zero life for healthy cells. The problem is severe: $59.2\%$ of MATR samples ($96/185$ cells) never reach EOL within their window, and MATR summary arrays open with an initialization zero, so a naive threshold test latches onto index $0$ for a further $48/185$ cells and assigns $\text{RUL}=0$ to \emph{their entire lifetime}. Discarding them would leave a $14$-cell test split, so we supervise the censored cells with the classical Tobit-style form~\citep{tobin1958estimation}: $|\hat r-r|$ for an exact observation and the one-sided hinge $\max(0,r_{\text{lb}}-\hat r)$ for a censored one, penalising only predictions of \emph{less} remaining life than demonstrated. Keeping the EOL search within the physically valid suffix of each trajectory recovers the $48$ zero-prefixed cells rather than dropping them (Section~\ref{sec:bmtl_ablation}).
+
+Battery degradation is non-stationary: fast-charging and extreme-temperature windows carry disproportionate failure information yet are underrepresented. Following the multiplicative-gate principle (product beats sum under low signal-to-noise), BatteryMTL up-weights the critical windows by
+\begin{equation}
+\begin{aligned}
+w_i = &\;w_i^{(\mathrm{rate})}\;\cdot\;w_i^{(\mathrm{temp})}\;\cdot\;w_i^{(\mathrm{degrad})},\\
+w_i^{(\mathrm{rate})} = &\;1+\omega\,\mathbf{1}[\text{C-rate}_i>r_q],\\
+w_i^{(\mathrm{temp})} = &\;1+\omega\,\mathbf{1}[T_i<t_{lo}\vee T_i>t_{hi}],\\
+w_i^{(\mathrm{degrad})} = &\;1+\omega\,\tfrac{|\Delta\text{SOH}_i|}{\max_j|\Delta\text{SOH}_j|},\\
+\end{aligned}
+\label{eq:triweight}
+\end{equation}
+Equation~\eqref{eq:triweight} is a soft AND over rate, temperature, and degradation rate. Its thresholds are \emph{dataset-calibrated}: $r_q$ is the $70$th percentile of the training-fold C-rate and $t_{lo},t_{hi}$ its $10$th and $90$th temperature percentiles. Fixed physical cuts cannot serve here. MATR is a high-throughput fast-charge campaign in which $99.8\%$ of cycles exceed $1.5$C, so a $1.5$C cut marks almost every sample critical and erases the contrast the gate exists to create, and its $31$--$36^\circ$C band never crosses a $0/40^\circ$C rule. Percentile thresholds instead preserve \emph{which} windows count as hardest. Per-condition evaluation quantifies the gain on the hardest regimes (Section~\ref{sec:bmtl_ablation}), and the SOH-only / RUL-only models set the ceiling the joint model should exceed.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/battery_repair.pdf}
+\caption{On battery SOH the collapse is visible to the primary metric, and the filter repairs it (unified-protocol battery domain, NASA PCoE, $m{=}128$, $\alpha{=}10^{4}$, 20 seeds per mode). The metric is the log-SOH RMSE of Tables~\ref{tab:unified_repair} and~\ref{tab:conflict}; it is not the SOH-RMSE\% of the flagship Table~\ref{tab:bmtl}, which is a different dataset (MATR) and model, so the two scales are not comparable. (a) log-SOH RMSE (log axis): joint collapses to $0.611$, a constant map, while every STF mode recovers to $\approx0.305$. (b) Collapse rate $1.0\to0.0$, recovery rate $0.0\to1.0$. (c) Relative scatter restored from $0.02$ to the single-task ceiling $1.0$.}
+\label{fig:battery_repair}
+\end{figure}
+
+\begin{table}[t]
+\centering
+\caption{Composing the toxicity filter with conflict resolution at supercritical $\alpha$ (5 seeds, three domains). The ``combiner'' column acts on the unfiltered or filtered branch. On the unfiltered branch no combiner prevents collapse (scatter $\le0.15$ against the single-task $1.0$); the filter alone repairs it, and a conflict operator after the filter changes the metric by less than seed noise. On HAR accuracy stays flat even when collapsed, so only the scatter records recovery.}
+\label{tab:compose}
+\small
+\resizebox{\columnwidth}{!}{\begin{tabular}{llcccccc}
+\toprule
+& & \multicolumn{3}{c}{unfiltered (\textsc{joint})} & \multicolumn{3}{c}{filtered (\textsc{stf-hard})} \\
+\cmidrule(lr){3-5}\cmidrule(lr){6-8}
+& combiner & sum & PCGrad & CAGrad & sum & PCGrad & CAGrad \\
+\midrule
+\multirow{3}{*}{Battery} & log-SOH RMSE$\downarrow$ & $0.611$ & $0.592$ & $0.603$ & $\mathbf{0.294}$ & $0.283$ & $0.291$ \\
+ & collapse rate & $1.0$ & $1.0$ & $1.0$ & $0.0$ & $0.0$ & $0.0$ \\
+ & relative scatter & $0.02$ & $0.03$ & $0.03$ & $\mathbf{1.00}$ & $1.05$ & $1.18$ \\
+\midrule
+\multirow{3}{*}{HAR} & accuracy$\uparrow$ & $0.941$ & $0.667$ & $0.952$ & $0.943$ & $0.933$ & $0.940$ \\
+ & collapse rate & $1.0$ & $1.0$ & $1.0$ & $0.0$ & $0.0$ & $0.0$ \\
+ & relative scatter & $0.15$ & $0.00$ & $0.03$ & $\mathbf{0.97}$ & $1.14$ & $1.03$ \\
+\midrule
+\multirow{3}{*}{RadioML} & accuracy$\uparrow$ & $0.293$ & $0.091$ & $0.109$ & $\mathbf{0.301}$ & $0.296$ & $0.295$ \\
+ & collapse rate & $1.0$ & $1.0$ & $1.0$ & $0.0$ & $0.0$ & $0.0$ \\
+ & relative scatter & $0.02$ & $0.00$ & $0.00$ & $\mathbf{0.97}$ & $0.99$ & $1.04$ \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Anti-collapse regularizers at each domain's Table~\ref{tab:conflict} dose and seeds (ten per cell), added to the plain joint path with weight $\lambda$. Each domain block gives the collapse rate over seeds, the primary metric, and the relative scatter ($1.0$ = the single-task anchor). \textsc{joint}, \textsc{stf-0} and \textsc{stf-hard} are measured in the same runs, so every row is comparable. Both families pin the representation where the penalty puts it rather than at the anchor.}
+\label{tab:reg}
+\small
+\resizebox{\columnwidth}{!}{\begin{tabular}{lcccccc}
+\toprule
+ & \multicolumn{2}{c}{HAR} & \multicolumn{2}{c}{Battery} & \multicolumn{2}{c}{RadioML} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+ & coll.\ / acc.$\uparrow$ & rel.\ scat. & coll.\ / RMSE$\downarrow$ & rel.\ scat. & coll.\ / acc.$\uparrow$ & rel.\ scat. \\
+\midrule
+\textsc{joint} & $1.00$ ($0.945$) & $0.15$ & $1.00$ ($0.610$) & $0.022$ & $1.00$ ($0.256$) & $0.008$ \\
+\textsc{stf-0} & $0.00$ ($0.945$) & $1.00$ & $0.00$ ($0.297$) & $1.00$ & $0.00$ ($0.341$) & $1.00$ \\
+\textsc{stf-hard} & $0.00$ ($0.946$) & $0.99$ & $0.00$ ($0.299$) & $1.00$ & $0.00$ ($0.339$) & $0.97$ \\
+\midrule
+\multicolumn{7}{l}{\textit{VICReg (variance $+$ covariance)}} \\
+\quad $\lambda{=}1$ & $1.00$ ($0.950$) & $0.22$ & $1.00$ ($0.610$) & $0.023$ & $1.00$ ($0.249$) & $0.007$ \\
+\quad $\lambda{=}3$ & $0.20$ ($0.946$) & $0.31$ & $1.00$ ($0.610$) & $0.023$ & $1.00$ ($0.253$) & $0.007$ \\
+\quad $\lambda{=}10$ & $0.00$ ($0.944$) & $0.36$ & $1.00$ ($0.609$) & $0.024$ & $1.00$ ($0.256$) & $0.008$ \\
+\quad $\lambda{=}30$ & $0.00$ ($0.926$) & $0.36$ & $1.00$ ($0.604$) & $0.033$ & $1.00$ ($0.260$) & $0.008$ \\
+\quad $\lambda{=}100$ & $0.00$ ($0.902$) & $0.36$ & $1.00$ ($0.451$) & $0.14$ & $1.00$ ($0.301$) & $0.011$ \\
+\quad $\lambda{=}300$ & $0.00$ ($0.873$) & $0.36$ & $0.00$ ($0.339$) & $0.59$ & $1.00$ ($0.362$) & $0.035$ \\
+\quad $\lambda{=}10^3$ & $0.00$ ($0.843$) & $0.36$ & $0.00$ ($0.390$) & $1.95$ & $1.00$ ($0.320$) & $0.15$ \\
+\quad $\lambda{=}3\times10^3$ & $0.00$ ($0.831$) & $0.36$ & $0.00$ ($0.423$) & $3.70$ & $0.10$ ($0.207$) & $0.45$ \\
+\quad $\lambda{=}10^4$ & $0.00$ ($0.821$) & $0.36$ & $0.00$ ($0.423$) & $4.54$ & $0.00$ ($0.215$) & $1.29$ \\
+\midrule
+\multicolumn{7}{l}{\textit{Barlow Twins (redundancy reduction)}} \\
+\quad $\lambda{=}1$ & $1.00$ ($0.935$) & $0.11$ & $1.00$ ($0.607$) & $0.11$ & $1.00$ ($0.367$) & $0.016$ \\
+\quad $\lambda{=}3$ & $1.00$ ($0.765$) & $0.022$ & $1.00$ ($0.607$) & $0.13$ & $1.00$ ($0.330$) & $0.024$ \\
+\quad $\lambda{=}10$ & $1.00$ ($0.435$) & $0.006$ & $1.00$ ($0.606$) & $0.15$ & $1.00$ ($0.121$) & $0.074$ \\
+\quad $\lambda{=}30$ & $1.00$ ($0.352$) & $0.006$ & $1.00$ ($0.606$) & $0.16$ & $1.00$ ($0.105$) & $0.096$ \\
+\quad $\lambda{=}100$ & $1.00$ ($0.338$) & $0.006$ & $1.00$ ($0.605$) & $0.16$ & $1.00$ ($0.126$) & $0.072$ \\
+\quad $\lambda{=}300$ & $1.00$ ($0.347$) & $0.006$ & $1.00$ ($0.606$) & $0.16$ & $1.00$ ($0.141$) & $0.043$ \\
+\quad $\lambda{=}10^3$ & $1.00$ ($0.343$) & $0.006$ & $1.00$ ($0.606$) & $0.16$ & $1.00$ ($0.140$) & $0.042$ \\
+\quad $\lambda{=}3\times10^3$ & $1.00$ ($0.365$) & $0.006$ & $1.00$ ($0.607$) & $0.16$ & $1.00$ ($0.148$) & $0.053$ \\
+\quad $\lambda{=}10^4$ & $1.00$ ($0.339$) & $0.006$ & $1.00$ ($0.607$) & $0.16$ & $1.00$ ($0.153$) & $0.044$ \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\subsection{Relocated measurements}
+
+The two results below are stated in condensed form in Sections~\ref{sec:bmtl} and~\ref{sec:conflict_ablations}; the full measurements are given here.
+
+Composing a filter with a conflict operator at supercritical $\alpha$ (Table~\ref{tab:compose}) confirms the ordering. (i)~Because toxic gradients are aligned, a conflict operator on the \emph{unfiltered} branch has no opposed pair to act on: on battery it leaves the encoder collapsed in every seed (collapse rate $1.0$, relative scatter $0.029$/$0.030$ against the single-task $1.0$) even as the scalar metric moves --- the metric--representation decoupling again. (ii)~The filter alone (\textsc{stf-hard}$+$sum) drives the collapse rate to $0.0$, restores the scatter to $1.00$, and recovers SOH-RMSE from $0.611$ to $0.294$, essentially the single-task ceiling; layering conflict resolution \emph{after} it moves the metric by less than seed noise ($0.283$/$0.291$) and leaves the scatter on the healthy branch ($1.00$--$1.18$). HAR and RadioML reproduce the ordering: the two interventions complement each other, but only when \emph{sequenced}.
+
+Battery degradation is non-stationary, so BatteryMTL multiplies three \emph{dataset-calibrated} gates over C-rate, temperature, and degradation rate, a soft AND with percentile thresholds rather than fixed physical cuts. It leaves aggregate SOH unchanged but improves the hardest windows: a single-term attribution isolates the fast-charge gain to the rate factor ($0.95$ SOH-RMSE without it) and the extreme-temperature gain to the temperature factor ($2.35$ without it). The aggregate rows are in Table~\ref{tab:bmtl} (Appendix~\ref{app:moved}).
+
+\subsection{Why the Probe Cannot Be Tracked Online}\label{app:online}
+
+Section~\ref{sec:stfcal} rejects an online $\rho$-gate, and the reason is measurable. We re-ran the unfiltered joint path with the monitor on (\texttt{--rho-trace}), five seeds per cell, over the full schedule ($1730$ steps on HAR, $350$ on battery). The monitor only records: the aggregate rows of these runs reproduce the \textsc{bscale} cells they overlap exactly ($28$ of $28$ matched cells, $\max|\Delta|=0$ over the metric, the collapse rate, the relative scatter and $\hat\rho$), so the trajectories are not a perturbed training run.
+
+Three facts follow. First, the probe starts at the one-batch floor and \emph{rises}: on HAR it runs from $0.017$ to $1.9\times10^5$ at $m{=}32$, from $0.010$ to $1.0\times10^5$ at $m{=}64$, and from $0.006$ to $3.5\times10^4$ at $m{=}256$. Second, the rise is not a toxicity signal. With the toxifier \emph{inert} ($\alpha{=}0$) it reaches the same magnitudes --- $1.9\times10^5$, $1.0\times10^5$ and $3.5\times10^4$ --- and the lowest dose swept ($\alpha{=}10^{-4}$) lands in the same range, so whatever drives the rise, it is not the auxiliary weight. The only dose-dependence is downward: at $m{=}32$ the endpoint falls from $1.9\times10^5$ at $\alpha{=}0$ to $5.3\times10^2$ at $\alpha{=}10^{-2}$ and $1.1\times10^2$ at $\alpha{=}3\times10^{-2}$. Third, because the probe rises, the gate $\alpha\hat\rho\ge1$ opens at \emph{every} dose eventually: in all five seeds of ten HAR cells whose endpoint scatter is at or above the crossing (from $0.50$ to $1.04$) it opens between steps $110$ and $590$ of $1730$. An online gate built on the running probe would therefore delete representation directions on runs that never collapse.
+
+Battery is the contrast that motivates calibrating per domain rather than tracking: there the probe stays $O(1)$ ($0.29$--$0.49$ at step $0$, $0.3$--$2.9$ at the end), and the gate opens in one of the thirty-five seeds whose scatter stays above the crossing, at the final step. Whether a fixed online rule is inert or spurious is set by the domain's primary-gradient scale, which is what the healthy-branch calibration measures once. \texttt{repro/scripts/rho\_trace\_analyze.py} prints both tables from the shipped runs.
+
+\subsection{What the Calibration Commits To: the Read Time Sets the Gate's Floor}\label{app:warmup}
+
+The calibration reads $\hat\rho$ once, on a detached healthy anchor, and both the gate and the rank follow from that single read; every shipped run reads it after four primary-only epochs. To see what that choice is worth we re-ran the identical calibration with \emph{only} the read time $W$ varied over $\{1,2,4,8,16,32\}$ --- HAR and battery at five widths $32$--$512$ and ten seeds, NYUv2 at four widths and ten seeds. The $W{=}4$ column is the shipped configuration and reproduces it exactly: $\max|\Delta|=0$ across all $100$ HAR and battery cells, and $\hat\rho=2.258/2.008/1.637/1.285$ on NYUv2 against the $2.26/2.01/1.64/1.29$ of Appendix~\ref{app:nyu}. The sweep therefore varies nothing but the read time.
+
+The read is a trajectory quantity, and how strongly it moves is a property of the domain. On HAR the probe at $m{=}32$ climbs from $0.63$ to $6.9\times10^4$ across the sweep --- five decades --- and at $m{=}512$ from $51.9$ to $1.6\times10^4$; on battery it stays $O(1)$ throughout ($0.96$ to $1.92$ at $m{=}32$, $0.058$ to $0.67$ at $m{=}512$); on NYUv2 it moves by a factor of $2.2$ ($1.94$ to $4.19$ at $m{=}32$). The exponent $\alpha_c=1/\hat\rho$ inherits the drift: read as a width-scaling, the probe exponent runs from $-2.00$ to $+0.55$ on HAR --- it changes sign --- from $+0.37$ to $+0.97$ on battery, and from $+0.11$ to $+0.27$ on NYUv2. This is the measured reason the paper reads the capacity law off the crossing for HAR, battery and RadioML and off the probe for NYUv2 (Section~\ref{sec:capacity_law}, Appendix~\ref{app:nyu}): a probe exponent is a property of the domain only where $\hat\rho$ is stable in the read time, and where it is not, the probe's width-scaling is dominated by how fast each width's primary gradient decays --- the denominator of $\hat\rho$ --- rather than by the encoder's capacity.
+
+The same mechanism fixes what the gate can see. The gate opens on $\alpha\hat\rho\ge1$, so the read time sets its floor $1/\hat\rho$: on HAR at $m{=}64$ the floor is $1.34$ at $W{=}1$, $0.181$ at $W{=}2$, $9.07\times10^{-3}$ at $W{=}4$ and $1.7\times10^{-5}$ at $W{=}32$, against a measured transition at $\alpha_c\in[0.001,0.01]$; only $W\ge4$ puts the floor at or below the dose the filter is meant to defend. Measured on the shipped HAR repair recipe ($m{=}64$, ten seeds, sixty epochs, \textsc{joint}/\textsc{stf-0}/\textsc{stfcal} in the same run) at a marginal dose $\alpha=0.03$, three times the transition: at $W{=}1$ and $W{=}2$ the gate stays shut in all ten seeds and \textsc{stfcal} collapses in $10/10$, with metric $0.947$ and relative scatter $0.19$ and $0.20$ --- the unfiltered joint numbers ($0.949$, $0.19$) to within seed noise --- whereas from $W{=}4$ on the gate opens in every seed, \textsc{stfcal} collapses in $0/10$ and the relative scatter returns to $0.99$--$1.00$. At a dose far above any floor ($\alpha=100$) the gate opens for every read and the repair is independent of the read time ($0/10$ collapsed at all six). A warm-up that is too short therefore does not damage the run: it disables the filter, visibly (the gate is reported shut) and at no cost (the run is the unfiltered run). The operating condition is checkable before deployment --- choose $W$ so that $1/\hat\rho$ lies at or below the dose to be defended against --- and at four epochs it is satisfied, the floor landing on the measured transition. \texttt{repro/scripts/warmup\_sensitivity.py} prints both tables from the shipped runs.
+
+\section{Anti-Collapse Regularizers at Matched Doses}\label{app:reg}
+
+Table~\ref{tab:reg} runs the variance/covariance family of Table~\ref{tab:related} at each domain's Table~\ref{tab:conflict} dose and seeds, adding the penalty to the plain joint path with weight $\lambda$ on the shared representation: VICReg's variance hinge and off-diagonal covariance term, and Barlow Twins' redundancy reduction. VICReg's invariance term is dropped, there being no augmented view to be invariant to. Every row is compared against the same \textsc{joint} run, so the baseline is the unfiltered path and not a re-tuned primary objective.
+
+Neither family restores the representation to the single-task anchor, and the weight needed to reach the criterion is a property of the domain, not of the penalty: VICReg needs $\lambda{=}10$ on HAR, $\lambda{=}300$ on battery and $\lambda{=}10000$ on RadioML --- three orders of magnitude apart, with the collapse rate still $1.0$ at $\lambda{=}1$, $100$ and $1000$ respectively --- and Barlow Twins never clears it in any of the three. Above that weight the representation settles where the penalty puts it. On HAR the variance hinge saturates: from $\lambda{=}10$ to $10^4$ the relative scatter is flat at $0.36$ while accuracy falls from $0.944$ to $0.821$, and the accuracy at the clearing weight is indistinguishable from both \textsc{joint} ($0.945$) and \textsc{stf-0} --- the HAR metric is collapse-insensitive, as Table~\ref{tab:unified_repair} reports. On battery the scatter is monotone in $\lambda$ and crosses the anchor, and the primary metric has an interior minimum near the crossing: $0.339$ at $\lambda{=}300$ (relative scatter $0.59$) against the $0.297$ that \textsc{stf-0} reaches at the anchor, degrading on both sides ($0.390$ at $10^3$, $0.423$ at $10^4$). \textsc{stf-0} is better on 9 of the 10 seeds. RadioML separates the criterion from the metric outright: at $\lambda{=}10000$ the collapse rate does reach $0.0$, but the relative scatter has overshot the anchor to $1.29$ and accuracy is $0.215$ --- below the $0.256$ of the \emph{collapsed} \textsc{joint} path and far below the $0.341$ that \textsc{stf-0} reaches at the anchor, so the penalty has bought a healthy scatter at the cost of the task it was added to help. Barlow Twins drives the absolute scatter to $0.011$ on HAR, $0.012$ on battery and $0.013$ on RadioML, $172$, $6$ and $24$ times below the respective anchors: it clears the criterion nowhere, and on HAR it takes accuracy down to $0.34$--$0.44$, on RadioML to $0.11$.
+
+A finer grid around each crossing ($\lambda\in\{2,5,20,50,200,500\}$ on HAR and $\lambda\in\{200,500,700,1500,2000,5000\}$ on battery, ten seeds) narrows both readings without changing them: the battery threshold sits between $150$ and $200$, and the lowest battery metric anywhere on the grid is $0.339$ at $\lambda{=}300$ (relative scatter $0.59$), still above \textsc{stf-0}; the HAR scatter is flat at $0.36$ for every weight above the crossing. The RadioML crossing was not refined, so its threshold is only located between $\lambda{=}1000$, where the collapse rate is still $1.0$, and $\lambda{=}10000$, where it reaches $0.0$.
+
+The collapse criterion is a threshold on relative scatter. A penalty with a global weight has a fixed point of its own, set by $\lambda$ rather than by the data, and the single-task anchor is not where it lies.
+
+\end{document}
