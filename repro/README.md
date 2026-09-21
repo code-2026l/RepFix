@@ -150,7 +150,7 @@ audit. They are the artifacts the reproducibility statement names.
 | `theory_counterexamples.py` | eight executable counterexamples to two overbroad early claims; `--out` is required | `../results/OPERATOR_AUDIT/counterexamples.json` |
 | `reconstruction_basis_audit.py` | reconstruction-gradient energy against deletion rank, principal basis against auxiliary basis | `../results/OPERATOR_AUDIT/har_recon_basis.json` |
 | `battery_validation_protocol.py` | cell-disjoint train/validation/test, preprocessing fitted on training cells, observed-only RUL error reported apart from the censored shortfall | `../results/BAT_VALIDATION_V2/` |
-| `parameter_guard_har.py`, `parameter_variance_guard.py` | exploratory filter candidates, kept as candidates rather than as evidence of method superiority | `../results/PARAM_GUARD/` |
+| `parameter_guard_har.py`, `parameter_variance_guard.py` | exploratory filter candidates, kept as candidates rather than as evidence of method superiority; `--safety` sets the calibrated attenuation target, and `qgrid_a*.json` / `calsafety_a*_s*.json` are the matched-attenuation sweep behind the appendix's matched-attenuation table | `../results/PARAM_GUARD/` |
 | `paired_stats.py` | the paired joint-vs-STFcal tests of Section 5.2: exact two-sided Wilcoxon signed-rank, Cohen `d_z`, the battery SOH-RMSE interval and the Holm correction over the five primary comparisons, recomputed from the per-seed `raw` records of `results/R3/R3_dose_{har,radioml,battery}_hi.json`, `results/R7/R7_dose_nyu_a1.json` and `results/R6/R6_dose_celeba_hi.json` | stdout |
 
 The exact-rank control is a negative control for the capacity law rather than a

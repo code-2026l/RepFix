@@ -1,0 +1,134 @@
+{
+  "experimental": true,
+  "optimizer": "plain SGD, no momentum or decay",
+  "config": {
+    "out": "results/PARAM_GUARD/calsafety_a300_s1.0.json",
+    "epochs": 60,
+    "warm": 3,
+    "m": 64,
+    "batch": 256,
+    "lr": 0.03,
+    "alpha": 300.0,
+    "floor_fraction": 0.5,
+    "rate": 1.0,
+    "penalty_weight": 1.0,
+    "seeds": "0,1,2",
+    "eps": 0.1,
+    "safety": 1.0,
+    "save_checkpoints": false,
+    "modes": "cal_scale"
+  },
+  "metadata": {
+    "validation_subjects": [
+      23,
+      30,
+      22,
+      7
+    ],
+    "training_subjects": [
+      8,
+      15,
+      3,
+      17,
+      29,
+      16,
+      14,
+      21,
+      5,
+      6,
+      27,
+      11,
+      25,
+      19,
+      26,
+      28,
+      1
+    ],
+    "preprocessing": "released features; additional mean/std fit on training subjects",
+    "selection": "minimum validation primary cross entropy; test only after selection"
+  },
+  "rows": [
+    {
+      "mode": "cal_scale",
+      "seed": 0,
+      "alpha": 300.0,
+      "status": "failed",
+      "error": "nonfinite evaluation: numerical training failure"
+    },
+    {
+      "mode": "cal_scale",
+      "seed": 1,
+      "alpha": 300.0,
+      "safety": 1.0,
+      "selected_epoch": 51,
+      "validation": {
+        "cross_entropy": 0.12862450177269863,
+        "accuracy": 0.9566473988439307,
+        "reconstruction_mse": 0.3998503425238658,
+        "covariance_trace": 282.0261097437966,
+        "participation_rank": 2.4974741538277816
+      },
+      "test": {
+        "cross_entropy": 0.22193551395236333,
+        "accuracy": 0.9273837801153716,
+        "reconstruction_mse": 0.30743614149665477,
+        "covariance_trace": 226.07635896580786,
+        "participation_rank": 2.557197388238181
+      },
+      "anchor_variance": 18.716394424438477,
+      "guard_floor": 9.358197212219238,
+      "probe_rho": {
+        "u": 0.04915434494614601,
+        "all": 0.07267510145902634
+      },
+      "dose_multiplier": 0.045866235704020875,
+      "selected_guard_variance": 140.6171417236328,
+      "training": {
+        "steps": 1440,
+        "corrections": 0,
+        "backtracks": 0,
+        "rejections": 0
+      },
+      "seconds": 6.207118773134425,
+      "status": "completed"
+    },
+    {
+      "mode": "cal_scale",
+      "seed": 2,
+      "alpha": 300.0,
+      "safety": 1.0,
+      "selected_epoch": 51,
+      "validation": {
+        "cross_entropy": 0.12318290718373535,
+        "accuracy": 0.9544797687861272,
+        "reconstruction_mse": 0.40160271491881366,
+        "covariance_trace": 287.306329048276,
+        "participation_rank": 2.1239639865558937
+      },
+      "test": {
+        "cross_entropy": 0.20974620593213048,
+        "accuracy": 0.9277231082456736,
+        "reconstruction_mse": 0.31022100507094447,
+        "covariance_trace": 211.41807050778576,
+        "participation_rank": 2.309113217296723
+      },
+      "anchor_variance": 16.954952239990234,
+      "guard_floor": 8.477476119995117,
+      "probe_rho": {
+        "u": 0.029771940782666206,
+        "all": 0.10312120616436005
+      },
+      "dose_multiplier": 0.032324421496975994,
+      "selected_guard_variance": 118.24273681640625,
+      "training": {
+        "steps": 1440,
+        "corrections": 0,
+        "backtracks": 0,
+        "rejections": 0
+      },
+      "seconds": 6.2365586259402335,
+      "status": "completed"
+    }
+  ],
+  "complete": true
+}

@@ -46,7 +46,7 @@ def variance(model,x):
 
 # Fixed scalar attenuations, to bracket the calibrated one from both sides.
 # `scale_01` is the historical matched baseline (a hard-coded 0.1).
-FIXED_SCALES={'scale_0001':1e-4,'scale_001':0.01,'scale_01':0.1,'scale_03':0.3,'scale_06':0.6}
+FIXED_SCALES={'scale_0001':1e-4,'scale_0003':3e-3,'scale_001':0.01,'scale_003':0.03,'scale_01':0.1,'scale_03':0.3,'scale_06':0.6}
 
 
 def probe_rho(model,guard):
@@ -110,11 +110,13 @@ def run(data,mode,seed,a):
             anchor=float(variance(model,fixed).detach());floor=a.floor_fraction*anchor
             if mode=='cal_scale':
                 # One probe on the healthy anchor fixes the multiplier; the dose
-                # controller is calibrated, not tuned.  q = (1-eps)/(alpha*rho)
-                # makes the effective dose alpha*q = (1-eps)/rho, i.e. a fixed
-                # margin 1-eps below the critical shell.
+                # controller is calibrated, not tuned.  q = safety/(alpha*rho)
+                # makes the effective dose alpha*q = safety/rho, i.e. a fixed
+                # multiple of the critical shell.  safety=1 targets the shell
+                # itself (alpha*rho = 1); the measured degradation onset is
+                # lower, so safety is exposed and scanned rather than assumed.
                 rho=probe_rho(model,guard)
-                q=min(1.,(1.-a.eps)/max(a.alpha*rho['all'],1e-8))
+                q=min(1.,a.safety/max(a.alpha*rho['all'],1e-8))
         order=torch.randperm(len(x),generator=batch_rng)
         for idx in order.split(a.batch):
             xb=x[idx];yb=y[idx];h=model(xb);lp=F.cross_entropy(model.primary(h),yb)
@@ -158,7 +160,7 @@ def run(data,mode,seed,a):
         checkpoint=Path(a.out).with_name(Path(a.out).stem+f'_{mode}_seed{seed}.pt')
         checkpoint.parent.mkdir(parents=True,exist_ok=True)
         torch.save(model.state_dict(),checkpoint)
-    return dict(mode=mode,seed=seed,alpha=a.alpha,selected_epoch=bestepoch,validation=evaluate(model,data['validation']),
+    return dict(mode=mode,seed=seed,alpha=a.alpha,safety=a.safety,selected_epoch=bestepoch,validation=evaluate(model,data['validation']),
                 test=evaluate(model,data['test']),anchor_variance=anchor,guard_floor=floor,
                 probe_rho=rho,dose_multiplier=q,
                 selected_guard_variance=float(variance(model,fixed).detach()),training=stats,seconds=time.monotonic()-start)
@@ -172,6 +174,7 @@ def main():
     ap.add_argument('--floor-fraction',type=float,default=.5);ap.add_argument('--rate',type=float,default=1.)
     ap.add_argument('--penalty-weight',type=float,default=1.);ap.add_argument('--seeds',default='0,1,2')
     ap.add_argument('--eps',type=float,default=.1)
+    ap.add_argument('--safety',type=float,default=1.)
     ap.add_argument('--save-checkpoints',action='store_true')
     ap.add_argument('--modes',default='joint,detach,scale_01,pcgrad,variance_penalty,feature_guard,parameter_guard')
     a=ap.parse_args()
