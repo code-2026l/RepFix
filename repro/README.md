@@ -136,6 +136,28 @@ done
 The `aux` runs of the first loop also carry the two `stfcalg` arms, which is why
 the shipped `XDRCURVE` files record a mode set one longer than the `pca` files.
 
+## Audits behind the theory revision
+
+These are separate from the published sweeps and write next to the runs they
+audit. They are the artifacts the reproducibility statement names.
+
+| Script | What it establishes | Output |
+|---|---|---|
+| `synth_beta_joint.py` | joint capacity fit over the 26 SYN8 cells, pivoted at the width whose toxic rank is common to every schedule | stdout |
+| `analyze_rank_controls.py` | RS1 half-height crossings and width slopes on the shipped crossing rule | `../results/OPERATOR_AUDIT/rs1_summary.json` |
+| `controlled_rank_scan.py` | exact-rank orthonormal control: `A = Q diag(lambda) Q^T` at exactly specified rank under three normalizations. `--self-test` asserts the rank and the amplitude and prints PASS | `../results/CONTROLLED_RANK/` |
+| `run_controlled_rank_grid.py` | the twelve-cell control grid (three widths x two ranks x two normalizations) | `../results/CONTROLLED_RANK/` |
+| `theory_counterexamples.py` | eight executable counterexamples to two overbroad early claims; `--out` is required | `../results/OPERATOR_AUDIT/counterexamples.json` |
+| `reconstruction_basis_audit.py` | reconstruction-gradient energy against deletion rank, principal basis against auxiliary basis | `../results/OPERATOR_AUDIT/har_recon_basis.json` |
+| `battery_validation_protocol.py` | cell-disjoint train/validation/test, preprocessing fitted on training cells, observed-only RUL error reported apart from the censored shortfall | `../results/BAT_VALIDATION_V2/` |
+| `parameter_guard_har.py`, `parameter_variance_guard.py` | exploratory filter candidates, kept as candidates rather than as evidence of method superiority | `../results/PARAM_GUARD/` |
+
+The exact-rank control is a negative control for the capacity law rather than a
+confirmation of it: with the rank and the normalization each held exactly, the
+three-width fits carry one residual degree of freedom and the fitted exponent
+follows the normalization rather than the rank. The cheapest check of the
+construction is `controlled_rank_scan.py --self-test`.
+
 ## Reproduce
 
 Set `REPFIX_DATA_DIR` to your prepared A-share data (the `baseline_fold{N}.npz` fold
