@@ -192,11 +192,22 @@ class CalController:
         return h - ((hc @ U) @ U.t()), 1.0, r
 
 
-def real_aux_probe(model, xb, yb, ab, aux_kind, aux_dim, criterion, regress, R=RANK_MAX):
+def real_aux_probe(model, xb, yb, ab, aux_kind, aux_dim, criterion, regress,
+                   R=RANK_MAX, basis="pca"):
     """Order-parameter family for a REAL auxiliary gradient, on the UNFILTERED
     branch: rho_u = <||P_c g_a||>/<||g_p||> and the residual family rho_res[0..R]
-    after removing the top-r PCA directions of the batch representation.
-    fp32, gradients w.r.t. h only -- training graph untouched."""
+    after removing the top-r directions of the depth-R basis.
+    fp32, gradients w.r.t. h only -- training graph untouched.
+
+    basis='pca': top-R principal directions of the centered representation, the
+    paper's surrogate (Theorem minimalrank is stated for T; the spans coincide
+    only when the auxiliary Hessian is diagonal in the representation's principal
+    basis, which holds for the variance-shrinkage toxifier but not in general).
+    basis='aux': top-R eigenvectors of Sigma_a = E[g_a g_a^T].  The denominator
+    of rho_res does not depend on the basis, this span maximizes captured squared auxiliary-gradient
+    energy. It need not minimize the mean-of-norm-ratios residual used here;
+    minimality for the theoretical toxic operator is a separate statement.  Mirrors `_toxic_basis` in code/cross_domain_mtl.py.
+    """
     dev = "cuda" if torch.cuda.is_available() else "cpu"
     with torch.autocast(device_type=dev, enabled=False), torch.enable_grad():
         h = model(xb).detach().float().requires_grad_(True)
@@ -214,9 +225,18 @@ def real_aux_probe(model, xb, yb, ab, aux_kind, aux_dim, criterion, regress, R=R
     with torch.no_grad():
         hc = h.detach() - h.detach().mean(0, keepdim=True)
         d = hc.shape[1]
-        cov = (hc.t() @ hc) / max(hc.shape[0], 1) + 1e-6 * torch.eye(d, device=hc.device)
-        evals, evecs = torch.linalg.eigh(cov)
-        U = evecs[:, torch.argsort(evals, descending=True)][:, :max(int(R), 1)]
+        if basis == "aux":
+            n = max(int(ga.shape[0]), 1)
+            ga32 = ga.float()
+            Sa = (ga32.t() @ ga32) / n
+            ev_a, U_a = torch.linalg.eigh(0.5 * (Sa + Sa.t()))
+            order = torch.argsort(ev_a, descending=True)
+            # re-orthonormalise the retained span so (I - U U^T) is a projector
+            U, _ = torch.linalg.qr(U_a[:, order][:, :max(int(R), 1)])
+        else:
+            cov = (hc.t() @ hc) / max(hc.shape[0], 1) + 1e-6 * torch.eye(d, device=hc.device)
+            evals, evecs = torch.linalg.eigh(cov)
+            U = evecs[:, torch.argsort(evals, descending=True)][:, :max(int(R), 1)]
         gp_n = gp.norm(dim=1) + 1e-8
         u = hc / hc.norm(dim=1, keepdim=True).clamp_min(1e-8)
         rho_u = float(((((ga * u).sum(-1, keepdim=True)) * u).norm(dim=1) / gp_n).mean().item())
@@ -232,7 +252,8 @@ MODES = ("joint", "stf0", "stfhard", "stfsoft", "stfcal", "stfcalrank")
 
 
 def train_once(domain, D, mode, alpha, m, seed, epochs, lr, batch, rho_c, beta,
-               base_scatter, base_rho, aux_kind, device, cal_warm=3, label_frac=1.0):
+               base_scatter, base_rho, aux_kind, device, cal_warm=3, label_frac=1.0,
+               rank_max=RANK_MAX, basis="pca"):
     cdm.set_seed(seed)
     torch.cuda.manual_seed(seed)
     cdm.enable_max_perf()
@@ -255,7 +276,8 @@ def train_once(domain, D, mode, alpha, m, seed, epochs, lr, batch, rho_c, beta,
     cal = None
     if mode in CAL_MODES:
         n_steps = max(1, math.ceil(Xtr.shape[0] / batch))
-        cal = CalController(alpha, warm_steps=int(cal_warm * n_steps))
+        cal = CalController(alpha, warm_steps=int(cal_warm * n_steps),
+                            rank_max=rank_max)
     n = Xtr.shape[0]
     # --label-frac: semi-supervised regime.  A fixed random fraction of the
     # training set carries a primary-task label; the auxiliary objective is
@@ -300,10 +322,12 @@ def train_once(domain, D, mode, alpha, m, seed, epochs, lr, batch, rho_c, beta,
                             if lab_idx is not None and lab_idx.numel() >= 2 * m:
                                 _pb = real_aux_probe(model, Xtr[lab_idx], ytr[lab_idx],
                                                      atr[lab_idx], aux_kind, D["aux_dim"],
-                                                     criterion, regress)
+                                                     criterion, regress, R=rank_max,
+                                                     basis=basis)
                             else:
                                 _pb = real_aux_probe(model, xb, yb, ab, aux_kind,
-                                                     D["aux_dim"], criterion, regress)
+                                                     D["aux_dim"], criterion, regress,
+                                                     R=rank_max, basis=basis)
                             cal.calibrate(_pb)
                         if not cal.calibrated:
                             with torch.no_grad():
@@ -374,13 +398,13 @@ def train_once(domain, D, mode, alpha, m, seed, epochs, lr, batch, rho_c, beta,
                collapse=collapse, rho_mean=rho)
     if cal is not None:
         row.update(gate=cal.gate_val, margin=cal.margin, rank=cal.r_use,
-                   rho_cal=cal.rho_u, rank_max=RANK_MAX,
+                   rho_cal=cal.rho_u, rank_max=rank_max, cal_basis=basis,
                    cal_warm_epochs=cal_warm)
     return row
 
 
 def run(domain, aux_kind, alpha, m, seeds, epochs, lr, batch, rho_c, beta, cal_warm=3,
-        label_frac=1.0, modes=None):
+        label_frac=1.0, modes=None, rank_max=RANK_MAX, basis="pca"):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     D = load_real_aux(domain, aux_kind)
     modes = tuple(modes) if modes else MODES
@@ -393,7 +417,8 @@ def run(domain, aux_kind, alpha, m, seeds, epochs, lr, batch, rho_c, beta, cal_w
         if label_frac < 1.0:
             anc = train_once(domain, D, "joint", 0.0, m, s, epochs, lr, batch,
                              rho_c, beta, 0.0, None, aux_kind, device,
-                             cal_warm=cal_warm, label_frac=label_frac)
+                             cal_warm=cal_warm, label_frac=label_frac,
+                             rank_max=rank_max, basis=basis)
             base_scatter, base_rho = anc["scatter"], anc["rho_mean"]
         else:
             single = cdm.train_one(domain, "single", 0.0, m, s, epochs, lr, batch,
@@ -402,7 +427,7 @@ def run(domain, aux_kind, alpha, m, seeds, epochs, lr, batch, rho_c, beta, cal_w
         for mode in modes:
             r = train_once(domain, D, mode, alpha, m, s, epochs, lr, batch, rho_c, beta,
                            base_scatter, base_rho, aux_kind, device, cal_warm=cal_warm,
-                           label_frac=label_frac)
+                           label_frac=label_frac, rank_max=rank_max, basis=basis)
             r["base_scatter"] = base_scatter; r["base_rho"] = base_rho
             rows.append(r)
             extra = (f" gate={r.get('gate', float('nan')):.0f}"
@@ -454,18 +479,27 @@ def main():
                          "(semi-supervised regime). 1.0 = released behaviour.")
     ap.add_argument("--modes", default="",
                     help="comma-separated subset of MODES; empty = all")
+    ap.add_argument("--rho-rank-max", type=int, default=RANK_MAX,
+                    help="probe depth R of the calibrated rank rule (default 3, "
+                         "the value every released number was produced with)")
+    ap.add_argument("--cal-basis", default="pca", choices=["pca", "aux"],
+                    help="basis the residual family is read in: 'pca' (released) "
+                         "or 'aux' (auxiliary-gradient eigenvectors)")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     seeds = [int(x) for x in a.seeds.split(",")]
     modes = tuple(x for x in a.modes.split(",") if x) or None
     rows, agg = run(a.domain, a.aux, a.alpha, a.m, seeds, a.epochs, a.lr, a.batch,
                     a.rho_c, a.beta, cal_warm=a.cal_warm_epochs,
-                    label_frac=a.label_frac, modes=modes)
+                    label_frac=a.label_frac, modes=modes,
+                    rank_max=a.rho_rank_max, basis=a.cal_basis)
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     with open(a.out, "w") as f:
         json.dump(dict(domain=a.domain, aux=a.aux, alpha=a.alpha, m=a.m,
                        kind="real_aux", cal_warm_epochs=a.cal_warm_epochs,
-                       label_frac=a.label_frac, modes=list(modes or MODES),
+                       label_frac=a.label_frac, rho_rank_max=a.rho_rank_max,
+                       cal_basis=a.cal_basis,
+                       modes=list(modes or MODES),
                        results=agg, raw=rows), f, indent=2)
     print("wrote", a.out)
 

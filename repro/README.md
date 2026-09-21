@@ -87,6 +87,12 @@ the per-cell mean-of-ratios variant. Both write `results/th_rho*.json`.
 
 ## Cluster sweep launchers
 
+Current research diagnostics and explicitly experimental candidates are documented
+in [ALGORITHM_RESEARCH.md](ALGORITHM_RESEARCH.md). The scripts
+`stf_rms_experiment.py`, `toxic_operator_audit.py`, `controlled_rank_scan.py`, and
+`battery_representation_audit.py` keep their new outputs separate from the
+published runs. Candidate pilot results are not evidence of method superiority.
+
 The `.sh` launchers that drove the multi-job sweeps are not versioned: each one
 embeds the deployment prefix of the machine it was submitted from, and shipping
 that prefix would leak the author's cluster layout. Their command lines are
@@ -99,7 +105,8 @@ ships in `code/`, so each can be replayed from the repository root.
 | `xdrank_sweep.sh` | `code/cross_domain_mtl.py` | Seven `(domain, alpha)` pairs at `--rho-rank-max {3,64}`, ten seeds (CelebA four) | `results/XDRANK/` |
 | `xdbasis_probe.sh` | `code/cross_domain_mtl.py` | Auxiliary-basis runs at `--rho-rank-max 64` on HAR, battery and CelebA, plus the one-cell port check | `results/XDBASIS/` |
 | `ll_sweep.sh` | `code/real_aux_mtl.py` | Semi-supervised label fraction: `--alpha {1,30}` × `--label-frac {0.02,0.05,0.2,1.0}`, ten seeds | `results/LOWLAB/` |
-| `syn8_sweep.sh` | `code/synth_beta_scan.py` | The seven-width synthetic rank-schedule family: `m ∈ {32,...,256}` × nine `beta`, 21-point `alpha` grid, ten seeds, 800 epochs | `repro/results/SYN8/` |
+| `syn8_sweep.sh` | `code/synth_beta_scan.py` | 26 completed cells of the planned 63: beta=0 at m=32/48/64/96/128; beta=0.25/0.5/0.75/1 at m=32/48/64/96; beta=0.125 at m=32/48; beta=0.375/0.625/0.875 at m=32. 21 alpha points, ten seeds, 800 epochs | `repro/results/SYN8/` |
+| real-head basis sweep | `code/real_aux_mtl.py` | HAR reconstruction, alpha 12/30/100 × `--cal-basis {pca,aux}`, `--rho-rank-max 64`, ten seeds | `results/XDRBASIS_REAL/` |
 | `sg_sweep.sh` | `code/battery_bmtl_v3.py` | The MATR flagship at a capped probe depth (`--cal-rank-max 3`) with the rank-rule arms | `results/SG/` |
 | `time_matrix.sh` | `repro/scripts/time_overhead.py` | Rotated wall-clock matrix with `--rotate --wait-idle` | `repro/results/TIME/` |
 
