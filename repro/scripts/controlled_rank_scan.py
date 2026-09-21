@@ -34,6 +34,7 @@ def main():
     ap.add_argument('--seeds', default='0,1,2')
     ap.add_argument('--alphas', default='0,0.001,0.01,0.1,1,10')
     ap.add_argument('--epochs', type=int, default=800)
+    ap.add_argument('--primary-loss', choices=['legacy', 'logistic'], default='legacy')
     ap.add_argument('--self-test', action='store_true')
     ap.add_argument('--out')
     a = ap.parse_args()
@@ -53,6 +54,12 @@ def main():
     if not a.out:
         ap.error('--out required')
     old.RankModel = ControlledRankModel
+    if a.primary_loss == 'logistic':
+        def logistic_rank(scores, targets):
+            differences=scores[:,None]-scores[None,:]
+            ordered=(targets[:,None]>targets[None,:]).to(scores.dtype)
+            return (ordered*torch.nn.functional.softplus(-differences)).sum()/ordered.sum().clamp_min(1)
+        old.rank_margin_loss=logistic_rank
     records = []
     path = Path(a.out)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -62,7 +69,7 @@ def main():
             records.append(row)
             print(row,flush=True)
             path.write_text(json.dumps(dict(experimental=True, m=a.m,r=a.r,
-                normalization=a.normalization, epochs=a.epochs,
+                normalization=a.normalization, epochs=a.epochs,primary_loss=a.primary_loss,
                 hessian='Q diag(lambda) Q^T', complete=False,raw=records),indent=2))
     data=json.loads(path.read_text())
     data['complete']=True
