@@ -195,14 +195,15 @@ class CalController:
 def real_aux_probe(model, xb, yb, ab, aux_kind, aux_dim, criterion, regress,
                    R=RANK_MAX, basis="pca"):
     """Order-parameter family for a REAL auxiliary gradient, on the UNFILTERED
-    branch: rho_u = <||P_c g_a||>/<||g_p||> and the residual family rho_res[0..R]
+    branch: rho_u is the mean per-example regularized projected norm ratio;
+    rho_res[0..R] uses the full residual gradient norm without another P_c,
     after removing the top-r directions of the depth-R basis.
     fp32, gradients w.r.t. h only -- training graph untouched.
 
     basis='pca': top-R principal directions of the centered representation, the
-    paper's surrogate (Theorem minimalrank is stated for T; the spans coincide
-    only when the auxiliary Hessian is diagonal in the representation's principal
-    basis, which holds for the variance-shrinkage toxifier but not in general).
+    paper's surrogate. A PSD compression theorem applies to its specified
+    operator, not automatically to these covariance directions. Even a shared
+    eigenbasis does not establish agreement of the leading-eigenvalue ordering.
     basis='aux': top-R eigenvectors of Sigma_a = E[g_a g_a^T].  The denominator
     of rho_res does not depend on the basis, this span maximizes captured squared auxiliary-gradient
     energy. It need not minimize the mean-of-norm-ratios residual used here;
@@ -222,7 +223,7 @@ def real_aux_probe(model, xb, yb, ab, aux_kind, aux_dim, criterion, regress,
                                  retain_graph=False, allow_unused=True)[0]
     if gp is None or ga is None:
         return None
-    with torch.no_grad():
+    with torch.no_grad(), torch.autocast(device_type=dev, enabled=False):
         hc = h.detach() - h.detach().mean(0, keepdim=True)
         d = hc.shape[1]
         if basis == "aux":

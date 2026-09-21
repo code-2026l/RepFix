@@ -3,10 +3,10 @@
 
 The paper reports, over per-seed values (n = 10 per domain):
 
-  * the joint-vs-STFcal relative-scatter reduction is significant at p < 0.01
-    in every scientific domain (Wilcoxon signed-rank; Cohen d_z > 20);
+  * the joint-vs-STFcal relative-scatter increase is significant at p < 0.01
+    in every scientific domain (Wilcoxon signed-rank; absolute Cohen d_z > 20);
   * battery log-SOH RMSE improves by 0.050 (95% CI [0.033, 0.067], d_z = 1.8);
-  * all five primary comparisons survive Holm correction.
+  * the four scatter comparisons and one battery SOH comparison survive Holm correction.
 
 Every number there is derived from the per-seed records that the unified
 protocol writes into the "raw" list of its output files, so this script reads

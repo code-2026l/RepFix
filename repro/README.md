@@ -151,7 +151,7 @@ audit. They are the artifacts the reproducibility statement names.
 | `reconstruction_basis_audit.py` | reconstruction-gradient energy against deletion rank, principal basis against auxiliary basis | `../results/OPERATOR_AUDIT/har_recon_basis.json` |
 | `battery_validation_protocol.py` | cell-disjoint train/validation/test, preprocessing fitted on training cells, observed-only RUL error reported apart from the censored shortfall | `../results/BAT_VALIDATION_V2/` |
 | `parameter_guard_har.py`, `parameter_variance_guard.py` | exploratory filter candidates, kept as candidates rather than as evidence of method superiority; `--safety` sets the calibrated attenuation target, and `qgrid_a*.json` / `calsafety_a*_s*.json` are the matched-attenuation sweep behind the appendix's matched-attenuation table | `../results/PARAM_GUARD/` |
-| `paired_stats.py` | the paired joint-vs-STFcal tests of Section 5.2: exact two-sided Wilcoxon signed-rank, Cohen `d_z`, the battery SOH-RMSE interval and the Holm correction over the five primary comparisons, recomputed from the per-seed `raw` records of `results/R3/R3_dose_{har,radioml,battery}_hi.json`, `results/R7/R7_dose_nyu_a1.json` and `results/R6/R6_dose_celeba_hi.json` | stdout |
+| `paired_stats.py` | the paired joint-vs-STFcal tests of Section 5.2: exact two-sided Wilcoxon signed-rank, Cohen `d_z`, the battery SOH-RMSE interval and the Holm correction over four scatter comparisons and one battery SOH comparison, recomputed from the per-seed `raw` records of `results/R3/R3_dose_{har,radioml,battery}_hi.json`, `results/R7/R7_dose_nyu_a1.json` and `results/R6/R6_dose_celeba_hi.json` | stdout |
 | `cross_domain_mtl.py --ablate-methods ...`, kernels in `moo_combiners.py` | the ten gradient-manipulation families at each domain's supercritical dose, behind the conflict-baseline table: per-seed `raw` records plus the per-mode aggregate the table prints. The columns sit at different widths --- HAR `m=128` and RadioML `m=64`, battery `m=32` --- which the table caption states. The 129 declared jobs are consolidated into three per-domain files, one record per seed | `repro/results/P02/MOO_har.json`, `MOO_radioml.json`, `MOO_battery.json` |
 
 The exact-rank control is a negative control for the capacity law rather than a
@@ -161,6 +161,46 @@ follows the normalization rather than the rank. The cheapest check of the
 construction is `controlled_rank_scan.py --self-test`.
 
 ## Reproduce
+
+### Current manuscript evidence audit (2026-09-21)
+
+Run from the repository root:
+
+```bash
+python repro/scripts/current_evidence_audit.py
+python repro/scripts/real_basis_evidence_audit.py
+python repro/scripts/finance_fold_audit.py
+python repro/scripts/summarize_filter_semantics.py
+python repro/scripts/filter_semantics_audit.py --self-test
+```
+
+The first two scripts regenerate `paper/battery_evidence_table.tex` and
+`paper/real_basis_evidence_table.tex`; both are required manuscript inputs.
+The JSON audits in `results/OPERATOR_AUDIT/` record source hashes and distinguish
+test covariance from legacy validation coordinate variance, nominal rank from
+gate-active rank, and fold-level comparisons from pooled financial fold-seed
+cells. The corrected battery intervals measure initialization variation on one
+fixed cell split, not new-cell population uncertainty.
+
+`results/FILTER_SEMANTICS/` retains an alpha=12 three-seed pilot and an alpha=100
+ten-seed matched comparison in two disjoint seed shards. Both projection maps
+share the same Jacobian and calibrated basis/rank; only the auxiliary forward
+value differs. Backward-only filtering improves reconstruction error, decreases
+scatter, and does not significantly improve primary accuracy. These are
+exploratory results, not a claim of algorithm superiority. To rerun the fixed
+ten-seed configuration in one file:
+
+```bash
+python repro/scripts/filter_semantics_audit.py --alpha 100 --seeds 0,1,2,3,4,5,6,7,8,9 --out results/FILTER_SEMANTICS/replication_a100_10s.json
+```
+
+The real-head probe now disables autocast for its covariance/residual algebra
+as well as gradient extraction. Previously, an enclosing bf16 training context
+could make the auxiliary-basis eigendecomposition fail on CUDA. The semantic
+self-test checks both bases under enclosing bf16 against fp32, in addition to
+forward values, Jacobians, head gradients and the surviving mean channel.
+
+### Original data-dependent reproduction
 
 Set `REPFIX_DATA_DIR` to your prepared A-share data (the `baseline_fold{N}.npz` fold
 files), then from this directory:
