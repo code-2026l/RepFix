@@ -17,15 +17,19 @@ scripts/
   wf_fixed_aux_bridge.py     fixed-projection bridge on real data
   wf_bridge_deep.py          deepened bridge scan
   wf_collapse_rank_trap.py   prediction-level rank trap
-  plot_unified_v4.py         THE PAPER FIGURES: figures/unified_all.pdf (Fig. 1) and
-                             figures/battery_repair.pdf, from results/ (xcap*, xrep*, R5fin*)
+  plot_final_figures.py      THE PAPER FIGURES: paper/figures/unified_all.pdf (Fig. 1) and
+                             paper/figures/battery_repair.pdf, from the recorded results
+                             (results/BSCALE, results/R7, results/R5fin, repro/results)
+                             Writes paper/figures/; figures/ holds byte-identical copies.
+  plot_unified_v4.py         earlier six-panel set (superseded, 2026-09-22); it writes
+                             figures/ only and is not the manuscript figure
   plot_realdata_collapse.py  legacy real-data collapse figure (superseded, 2026-08-21)
   plot_capacity_law.py       legacy capacity-scaling figure (superseded, 2026-08-21)
   plot_paper_figures.py      legacy multi-panel figure script (superseded, 2026-08-21)
 A_capacity_law_analysis.md   legacy capacity-law note, 2026-08-21 -- superseded, see banner
 B_pipeline_analysis.md       legacy pipeline note,     2026-08-21 -- superseded, see banner
 results/                     experiment JSON outputs
-figures/                     paper figures (PDF/PNG)
+figures/                     published copies of the paper figures (PDF/PNG)
 ```
 
 ## What these produce
@@ -172,10 +176,13 @@ python repro/scripts/real_basis_evidence_audit.py
 python repro/scripts/finance_fold_audit.py
 python repro/scripts/summarize_filter_semantics.py
 python repro/scripts/filter_semantics_audit.py --self-test
+python repro/scripts/plot_final_figures.py
 ```
 
 The first two scripts regenerate `paper/battery_evidence_table.tex` and
 `paper/real_basis_evidence_table.tex`; both are required manuscript inputs.
+The last one rebuilds the two manuscript figures from the recorded results and writes
+them to `paper/figures/`.
 The JSON audits in `results/OPERATOR_AUDIT/` record source hashes and distinguish
 test covariance from legacy validation coordinate variance, nominal rank from
 gate-active rank, and fold-level comparisons from pooled financial fold-seed
