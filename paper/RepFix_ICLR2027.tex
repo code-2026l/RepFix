@@ -34,311 +34,249 @@
 \newcommand{\etc}{etc.\ }
 \newcommand{\STF}{\textsc{STF}}
 
+% ─── Compact table style (tighter spacing/format) ───
+\setlength{\tabcolsep}{4pt}          % default 6pt -> tighter column padding
+\renewcommand{\arraystretch}{1.0}   % default 1.0 -> tighter row height
+
 % Use the conference defaults for headings, displays, and float spacing.
 
 \title{Gradient Toxicity: When Auxiliary Heads Collapse the Shared Encoder}
-
 \author{Anonymous authors\\Paper under double-blind review}
 
 \begin{document}
-
 \maketitle
 
 \begin{abstract}
-Auxiliary objectives are intended to improve a shared encoder, yet they can suppress its variation across inputs even when task gradients do not conflict. We call this failure mode \emph{gradient toxicity}. In three controlled domains, ten multi-task optimization methods collapse in $10/10$ seeds at their published defaults. An exact parameter-space identity separates auxiliary-induced variance contraction from primary-task restoration, showing why gradient alignment alone cannot diagnose this failure.
-
-Under explicit assumptions, a scalar reduction exhibits a saddle-node collapse transition, while a linear spectral model contracts its first mode once $\alpha\rho_\star>1$, with $\rho_\star$ the whitened spectral radius. We also characterize the minimum deletion rank for a specified positive-semidefinite compression. These results motivate the spectral toxicity filter (\textsc{STF}) family, which selectively suppresses auxiliary gradients; full detachment is its limiting intervention. A probe on a detached warm-up anchor calibrates the gate and candidate deletion rank. On UCI-HAR, its predicted critical dose, $9.1\times10^{-3}$, lies within the measured transition interval $[0.001,0.01]$.
-
-At the tested high doses in four scientific domains, calibrated filtering reduces collapse from $10/10$ seeds to $0/10$, and protection also transfers to a Transformer encoder; boundary-dose failures are reported separately. Under a corrected cell-disjoint MATR protocol, detachment improves state-of-health RMSE from $5.57$ to $2.10$ percentage points and observed remaining-life MAE from $81.5$ to $46.7$ cycles. Real-head experiments expose three limits: task error can improve despite collapse (NYUv2 depth RMSE $1.33\to1.09$), representation principal component analysis can over-delete, and a finite probe cannot establish spectral optimality. On HAR reconstruction, an auxiliary-gradient basis reduces the mean active deletion rank from $62.0$ to $30.75$ at similar accuracy. The resulting diagnostic reveals representation shrinkage that task metrics can miss and identifies empirically useful interventions.
+Multi-task optimization evaluates how tasks share gradients, but task compatibility does not determine whether the shared representation survives. We introduce \emph{gradient toxicity} as a second diagnostic axis: the signed contribution of an auxiliary update to representation-variance contraction. An exact variance identity shows why conflict information alone cannot certify survival, and ten multi-task optimizers collapse in $10/10$ seeds at the tested high doses while detachment collapses in none. Because the axis is measured by a cheap frozen probe, the validity of that probe must be established rather than assumed. We derive a computable margin condition under which the probe agrees with the instantaneous variance derivative, and decompose its failure into restoration misalignment, encoder geometry, and mismatch between the probe and the operating gradient. Under one controlled toxifier, predicted doses track measured scatter crossings on battery data but overestimate them by $30$--$116\times$ on RadioML and by $3.9$--$32.6\times$ on NYUv2, and changing only the calibration time switches a HAR filter from $10/10$ to $0/10$ collapses. Real auxiliary heads separate unsigned radial loading from signed contraction, and representation survival from task utility: on NYUv2, depth RMSE improves from $1.33$ to $1.09$ as the representation contracts. Under a corrected cell-disjoint battery protocol, detachment reduces state-of-health RMSE from $5.57$ to $2.10$ percentage points. Selective filtering retains a useful auxiliary effect where detachment removes it, but not at every dose. These results establish representation survival as a separate evaluation requirement and probe validity as a quantity to audit.
 \end{abstract}
 
-
-
-% ═══════════════════════════════════════════════════════════════════
-% 1. INTRODUCTION
-% ═══════════════════════════════════════════════════════════════════
 \section{Introduction}\label{sec:intro}
 
-Multi-task learning (MTL) uses auxiliary objectives to improve shared representations. Methods such as PCGrad~\citep{yu2020pcgrad}, FAMO~\citep{liu2023famo}, and CAGrad~\citep{liu2021cagrad} manage competing task updates through gradient geometry or loss balancing. Their criteria, however, do not directly measure how an update changes variation across representations.
+A shared representation is the central resource of multi-task learning. Yet the usual question---whether task gradients cooperate or conflict---does not ask whether that resource remains informative. A task head can compensate for shrinking features, and a low task loss can coexist with a nearly constant encoder. On our controlled HAR benchmark, accuracy remains near $0.95$ at only $0.05$ of the reference scatter. On NYUv2, depth RMSE improves from $1.33$ to $1.09$ while relative scatter falls to $0.04$. Task performance alone therefore leaves a gap in the evaluation of representation learning.
 
-An auxiliary update can reduce this variation without opposing another task gradient. Several heads can contribute to the same variance-decreasing direction even when their gradients are mutually aligned. Full detachment, implemented with \texttt{.detach()}, prevents auxiliary gradients from reaching the encoder but also discards potentially useful auxiliary information. This raises a more selective question: which components should be removed?
+Conflict resolution addresses a different question. PCGrad~\citep{yu2020pcgrad}, CAGrad~\citep{liu2021cagrad}, and related methods combine task gradients using directional or loss-based criteria. Representation variance, however, changes according to the update's projection onto the \emph{variance gradient}. We call the auxiliary contribution to this change \emph{gradient toxicity}. The distinction is structural: two auxiliary gradients can have identical task-gradient inner products and norms, yet drive variance in opposite directions. In a contraction-dominated regime, satisfying a conflict criterion need not preserve the representation. Ten widely used multi-task optimizers exhibit this gap: each collapses in all ten seeds at the tested high doses on three domains, while detachment collapses in none (Figure~\ref{fig:conflict_toxicity}b).
 
-We first observed this failure in financial ranking: a shared encoder with distributional, reconstruction, and contrastive heads produced nearly constant out-of-sample predictions that additional training did not restore. We define \emph{gradient toxicity} as a positive auxiliary contribution to the instantaneous decrease in representation variance. A centered quadratic variance penalty provides a controlled example. A constant-representation minimum alone does not guarantee contraction away from that minimum, and reconstruction with varying targets generally lacks such a minimum. We therefore measure each head's effect directly. Toxicity and conflict are distinct: the pairwise gradient dot product does not determine the projection onto the parameter-space variance gradient.
+Adding a second axis also raises a question about the diagnostic itself: \emph{when should it be trusted?} A projected-gradient norm is attractive because it is cheap to measure before auxiliary training. But its interpretation depends on what its numerator measures, whether its denominator represents restoration, and whether the encoder and auxiliary remain close to the calibration state. A convincing diagnosis must expose these dependencies, including the circumstances in which the probe fails.
 
-We study when auxiliary updates contract representations, how to detect contraction before task performance deteriorates, and what selective filtering preserves. The experiments compare detachment, projection filters, and scalar attenuation, then test calibration and basis selection on real auxiliary heads.
+Starting from an exact chain-rule identity, we derive a margin condition that separates trustworthy local probe decisions from unresolved ones. The condition decomposes the discrepancy into restoration direction, encoder-induced geometry, and probe mismatch. It also predicts distinct \emph{types} of error: a large primary-gradient norm can conceal weak restoration, an unsigned projection loses the sign of contraction, and a calibration statistic can drift even without auxiliary contact.
 
-Our contributions are threefold. First, we formulate gradient toxicity through an exact variance identity and distinguish instantaneous contraction from eventual collapse under conditional dynamical models. Second, we characterize minimum-rank deletion for a specified PSD compression and motivate basis selection through residual gradient energy. Third, we evaluate the diagnostic and interventions across domains and encoders. Calibrated filtering reduces high-dose collapse from $10/10$ to $0/10$ seeds in four scientific domains. Real-head experiments identify three limits: task metrics can conceal shrinkage, representation principal component analysis (PCA) can over-delete, and finite probe depth does not establish optimality. On HAR reconstruction, an auxiliary-gradient basis uses roughly half the active deletion rank of PCA ($30.75$ versus $62.0$) at similar accuracy. A corrected battery evaluation separates task accuracy, representation amplitude, and selective deletion.
-
-% ═══════════════════════════════════════════════════════════════════
-% 2. RELATED WORK
-% ═══════════════════════════════════════════════════════════════════
-\section{Related Work}\label{sec:related}
-
-Multi-task optimization studies negative transfer between tasks~\citep{caruana1997multitask}. PCGrad projects conflicting gradients~\citep{yu2020pcgrad}; CAGrad optimizes a worst-case combination~\citep{liu2021cagrad}; Nash-MTL formulates gradient combination as bargaining~\citep{navon2022multi}; and FAMO balances task progress~\citep{liu2023famo}. Other approaches seek Pareto stationarity~\citep{sener2018multi}, weight losses~\citep{kendall2018multi,chen2018gradnorm}, or modify gradient geometry~\citep{liu2021imtl,senushkin2023aligned,wang2021gradient,limarenko2026gcond,zhou2025imgrad}. Task-grouping and dense-prediction studies examine when joint training helps~\citep{standley2020tasks,vandenhende2021multi}. We complement these criteria by measuring the effect of an update on representation variance (Section~\ref{sec:conflict_ablations}).
-
-Representation collapse is also central to self-supervised learning. Here, \emph{collapse} denotes a degenerate representation with vanishing variation, distinct from the terminal classifier geometry called \emph{neural collapse}~\citep{papyan2020prevalence,wang2026neuralcollapse}. Stop-gradient is used in BYOL, SimSiam, and DINO~\citep{grill2020bootstrap,chen2021simsiam,caron2021emerging}; variance and covariance regularization offer complementary mechanisms~\citep{zbontar2021barlow,bardes2022vicreg,ermolov2021whitening}. Theory connects collapse to singular-value dynamics~\citep{jing2022understanding,dong2021attention,kim2025taxonomy}, while rank-based scores provide empirical diagnostics~\citep{garrido2023rankme}. Auxiliary-task selection, weighting, and negative-transfer mitigation pursue related goals~\citep{navon2021auxiliary,shin2024dgr,jiang2023forkmerge}. Our focus is the contraction induced by auxiliary updates to a shared encoder.
-
-Our time-series validation domains include human activity recognition (UCI-HAR~\citep{ucihar}), modulation recognition (RadioML~\citep{radioml}), and battery health prediction (NASA PCoE~\citep{nasa_battery}). Auxiliary learning is common in time-series models~\citep{zhang2021survey}, but these domains differ in scale, dimensionality, and objectives. We therefore compare domain-independent diagnostics alongside task-specific metrics (Section~\ref{sec:unified_protocol}).
-
-Battery models predict cycle life and state of health (SOH) from operational data~\citep{severson2019data,attia2020closed,pradhan2022soh}. We examine how reconstruction and distributional heads affect their shared encoder, evaluating SOH and remaining useful life (RUL) separately with censoring-aware targets and validation-based checkpoint selection (Section~\ref{sec:bmtl}).
-
-Table~\ref{tab:related} summarizes the intervention families. Subspace filtering itself is established: ATTITTUD decomposes auxiliary updates by primary-task influence~\citep{dery2021attittud}, and GradOPS projects against task-gradient spans~\citep{zhu2025gradops}. We target variance contraction, which need not coincide with conflict, and distinguish the failure diagnostic from the objective used to choose a deletion subspace.
-
-
-% ═══════════════════════════════════════════════════════════════════
-% 3. PROBLEM FORMULATION
-% ═══════════════════════════════════════════════════════════════════
-\section{Problem Formulation}\label{sec:formulation}
-
-Consider a shared encoder $E_\theta:\mathcal{X}\to\mathbb{R}^m$, a primary head $f_p$ with loss $L_p$, and $K$ auxiliary heads with losses $\{L_a^{(k)}\}$. The encoder is trained on
-\begin{equation}
-\min_\theta\;\; \mathbb{E}_b\Big[\, L_p\big(f_p(E_\theta(x))\big) \;+\; \sum_{k=1}^{K}\alpha_k\, L_a^{(k)}\big(h_a^{(k)}(E_\theta(x))\big) \Big],
-\label{eq:mtl_obj}
-\end{equation}
-where $\alpha_k\ge0$ controls auxiliary strength, $h_a^{(k)}$ denotes an auxiliary head, and $\mathbb{E}_b$ averages over training samples. We write $h=E_\theta(x)$, $g_p=\nabla_h L_p$, and $g_a=\nabla_h L_a$ for the shared representation and its primary and auxiliary gradients.
-
-The unified protocol uses MLPs; application studies include other encoders. Each dynamical reduction below states its own assumptions. The synthetic auxiliary has the following structural property.
-
-\begin{definition}[Degenerate minimizer]\label{def:degmin}
-A loss has a degenerate minimizer if a constant representation attains its minimum. For a differentiable interior minimum, stationarity is necessary but insufficient. Variance shrinkage has such minima; reconstruction with varying targets generally does not, because a constant code need not be stationary for a fixed decoder. Accordingly, we evaluate trained reconstruction heads empirically.
-\end{definition}
-
-\begin{definition}[Projected-gradient diagnostic]\label{def:toxicity}
-For a nonconstant batch representation, let $u_c=h-\mathbb E_b[h]$ and $\Pi_c g=\langle g,u_c\rangle u_c/\|u_c\|^2$. Define the projected-gradient ratio
-\begin{equation}
-\rho=\|\Pi_cg_a\|/\|g_p\|,\qquad \|g_p\|>0.
-\label{eq:order}
-\end{equation}
-This ratio measures magnitude, not signed contraction: $g_a$ and $-g_a$ yield the same $\rho$. The implemented probes average regularized per-example ratios, which can differ from the ratio of batch norms above. Neither quantity is automatically a dynamical order parameter.
-\end{definition}
-
-A signed diagnostic follows directly in parameter space. On a fixed batch of size $B$, define $V(\theta)=\|C_BH(\theta)\|_F^2/(2B)$, where $C_B=I-\mathbf1\mathbf1^\top/B$ centers examples. With $G_p=\nabla_\theta L_p$, $G_a=\nabla_\theta L_a$, and $v=\nabla_\theta V$, gradient flow gives
-\begin{equation}
-\dot V=r-\alpha c,\qquad r=-v^\top G_p,\quad c=v^\top G_a.
-\label{eq:signed_variance}
-\end{equation}
-This exact chain-rule identity includes the encoder Jacobian. Auxiliary contraction corresponds to $c>0$. When $r,c>0$, $\alpha c/r>1$ characterizes instantaneous variance decrease, not eventual collapse. Gradient conflict, $G_p^\top G_a<0$, is a separate condition.
-
-% ═══════════════════════════════════════════════════════════════════
-% 4. GRADIENT TOXICITY THEORY
-% ═══════════════════════════════════════════════════════════════════
-\section{Gradient Toxicity Theory}\label{sec:theory}
-
-\begin{theorem}[Conditional scalar collapse transition]\label{thm:transition}
-Assume an independently justified scalar reduction
-\begin{equation}
-\dot\sigma=-\alpha\kappa\sigma+b(\sigma),\qquad\kappa>0,
-\label{eq:flow}
-\end{equation}
-where $b(0)=0$. Let $f(\sigma)=b(\sigma)/\sigma$ on $(0,\infty)$ tend to zero at both ends, increase strictly to a unique nondegenerate maximum $\lambda_\star=f(\sigma_\star)>0$, and decrease strictly afterwards. Then $\alpha_c=\lambda_\star/\kappa$. For $0<\alpha<\alpha_c$ there are two positive equilibria, the smaller unstable and the larger stable; initial values below the smaller one still collapse. At $\alpha_c$ the equilibria coalesce in a saddle-node; for $\alpha>\alpha_c$, every positive trajectory tends to zero.
-\end{theorem}
-\begin{proof}
-The vector field is $\sigma(f(\sigma)-\alpha\kappa)$. The crossings and their stability follow from monotonicity; the nonzero second derivative gives the nondegenerate fold. Above the maximum the field is strictly negative for every $\sigma>0$, whose only possible limiting equilibrium is zero.
-\end{proof}
-A constant minimizer alone does not imply this scalar model. It additionally requires radial auxiliary behavior with isotropic curvature, $g_a=\kappa\,\delta h+o(\|\delta h\|)$ (Appendix~\ref{app:proofs}). Identifying $\kappa/\lambda_\star$ with the measured $\rho$ requires a calibration identity; we test this correspondence empirically rather than assume it for arbitrary heads or optimizers.
-
-\begin{lemma}[Departure from a primary optimum]\label{lem:irreversible}
-At $G_p=0$, any nonzero $G_a$ makes the joint gradient nonzero when $\alpha>0$. This implies departure from the primary optimum, but neither collapse nor irreversibility.
-\end{lemma}
-For example, $L_p(h)=(h-1)^2/2$ and $L_a(h)=h^2/2$ have joint optimum $h=1/(1+\alpha)>0$ at every finite dose. Likewise, constant predictions need not imply zero parameter gradients (Proposition~\ref{prop:gradient_vanishing}).
-
-\begin{corollary}[Fixed-dose attenuation]\label{cor:stf}
-In Theorem~\ref{thm:transition}, a constant auxiliary multiplier $q\in(0,1]$ replaces the effective dose by $q\alpha$ and the threshold by $\alpha_c/q$. Positive attenuation can therefore preserve the positive equilibrium at a fixed dose. Exact deletion removes the contraction term but is not necessary for fixed-dose protection.
-\end{corollary}
-
-\begin{theorem}[Conditional capacity scaling]\label{thm:capacity}
-If the scalar restoration maximum scales as $m^a$ and contraction as $m^b m_\Pi^c$, with $m_\Pi\asymp m^\beta$, then
-\begin{equation}
-\alpha_c(m)\asymp m^\gamma,\qquad\gamma=a-b-c\beta.
-\label{eq:capacity_law}
-\end{equation}
-The restricted law $\gamma=\gamma_0(1-\beta)$ requires $a-b=c=\gamma_0$. Fixed rank alone implies neither $\gamma>0$ nor $\gamma_0=1$.
-\end{theorem}
-\begin{proof}
-At the threshold the restoration maximum and the contraction term balance, so $\alpha_c\asymp m^a/(m^b m_\Pi^c)$; substituting $m_\Pi\asymp m^\beta$ gives \eqref{eq:capacity_law}, and $a-b=c=\gamma_0$ gives the restricted form.
-\end{proof}
-Width parametrization and loss normalization affect these rates~\citep{yang2021feature}. Proposition~\ref{prop:rank_dilution} distinguishes the scaling assumptions from measured exponents, since the original random generator couples effective rank and curvature.
-
-\begin{theorem}[First modal contraction versus full linear collapse]\label{thm:spectral}
-For the linear symmetric model $\dot z=(R-\alpha A)z$, assume $R\succ0$ and $A\succeq0$ in the same coordinates. Along an eigenvector of $R-\alpha A$ with eigenvalue $\nu_j$, the modal variance obeys
-\begin{equation}
-\dot\varsigma_j^2=2\nu_j\varsigma_j^2.
-\label{eq:modal}
-\end{equation}
-Let
-\begin{equation}
-T=R^{-1/2}AR^{-1/2},\qquad \rho_\star=\lambda_{\max}(T).
-\label{eq:spectral}
-\end{equation}
-Some mode contracts iff $\alpha\rho_\star>1$. Every mode contracts exponentially iff $\alpha\lambda_{\min}(T)>1$. Equality leaves a neutral mode.
-\end{theorem}
-\begin{proof}
-$R-\alpha A=R^{1/2}(I-\alpha T)R^{1/2}$ has the same inertia as $I-\alpha T$ by congruence. Since the generator is symmetric, its eigenvalue signs determine modal growth or decay.
-\end{proof}
-These thresholds differ: with $R=I$, $A=\mathrm{diag}(2,1/2)$, and $\alpha=1$, one mode contracts while the other expands. Covariance eigenvectors need not coincide with dynamical eigenvectors. This linear model does not derive the nonlinear saddle-node model. Corollary~\ref{cor:additive} gives the composition rule for aligned and orthogonal rank-one operators, with the threshold referring to first modal contraction.
-
-For a specified PSD operator, Theorem~\ref{thm:minimalrank} characterizes the minimum deletion rank of a symmetric compression. It does not identify representation-PCA residuals with that operator's spectrum. Likewise, concentration bounds for a frozen statistic (Proposition~\ref{prop:calibration}) do not resolve this modeling gap or subsequent encoder drift.
-
-% ═══════════════════════════════════════════════════════════════════
-% 5. SPECTRAL TOXICITY FILTERING
-% ═══════════════════════════════════════════════════════════════════
-\section{Spectral Toxicity Filtering}\label{sec:stf}
-
-Motivated by projected-gradient diagnostics, consider the idealized backward filter
-\begin{equation}
-F_\beta[g_a]=g_a-\Pi_cg_a\,w_\beta(\rho),\qquad w_\beta(\rho)=\mathrm{sig}(\beta(\alpha\rho-1)).
-\label{eq:stf}
-\end{equation}
-The encoder update uses $J_\theta^\top(g_p+\alpha F_\beta[g_a])$. Full detachment (\textsc{stf-0}) removes all auxiliary encoder gradients; \textsc{stf-hard} thresholds the projection; and \textsc{stf-soft} attenuates it smoothly. At finite temperature, the sigmoid leaves a nonzero projection and provides no general safety guarantee.
-
-In the scalar model, attenuation by $1-\lambda$ changes the threshold to $\alpha_c/(1-\lambda)$. At a fixed operating point, the least attenuation satisfying $(1-\lambda)\alpha\rho_\star\le1$ is $\max(0,1-1/(\alpha\rho_\star))$. Thus hard deletion is one choice, and positive scalar weighting is an essential matched baseline. Operator norms alone do not determine dynamical thresholds for general one-sided filters.
-
-The released implementations instead transform the auxiliary input: $\widetilde H=H-wC_BHP$, with feature projector $P$, while the primary head receives $H$. For fixed $w,P$, the auxiliary representation gradient is $\mathcal G_a(\widetilde H)-wC_B\mathcal G_a(\widetilde H)P$; it is evaluated at the transformed input rather than projected from $\mathcal G_a(H)$. Here $\mathcal G_a=\nabla_H L_a$, distinct from the parameter gradient $G_a$. The uncalibrated gates use a covariance spectral ratio; the calibrated gate uses a gradient ratio. An open radial filter removes centered variation while preserving the batch mean. In contrast, \textsc{stf-0} preserves forward values and blocks gradients. Appendix~\ref{app:general} compares forward and backward-only filtering.
-
-\subsection{Calibrated Spectral Filtering: \textsc{stfcal}}\label{sec:stfcal}
-
-The released \textsc{stfcal} protocol fixes its gate using a detached warm-up anchor. Even healthy runs yield substantially different $\hat\rho$ at initialization and later checkpoints (Appendix~\ref{app:online}), motivating calibration at a specified training time.
-
-During warm-up, only the primary loss updates the encoder; auxiliary heads may train on detached features. A frozen probe estimates $\hat\rho$ and residual diagnostics $\hat\rho_{\mathrm{res}}[0..R]$, defining
-\begin{equation}
-\mathrm{gate}=\mathbf1[\alpha\hat\rho\ge1],\qquad r=\min\{r\le R:\alpha\hat\rho_{\mathrm{res}}[r]<1\}.
-\label{eq:calrule}
-\end{equation}
-The rank arm freezes the leading representation principal directions. If no tested rank meets the residual threshold, it uses the cap without certifying safety; an active selected rank is at least one. The separate radial \textsc{stfcal} arm removes each example's centered radial component when the gate opens, independently of the rank search (Algorithm~\ref{alg:stfcal}). Warm-up length, probe size, basis, and cap are protocol choices. A frozen basis can become stale, and latching the gate does not guarantee protection throughout training.
-
-The selected rank is minimal only among the tested nested residuals for the chosen statistic. Theorem~\ref{thm:minimalrank} concerns a specified PSD compression; applying it to this implementation requires a separate identification argument. Conditional concentration can certify a frozen statistic under independent bounded sampling, but cannot certify the trained network.
-
-On UCI-HAR ($m=64$), four detached warm-up epochs and one probe give $\hat\rho=110.2$ (ten-seed mean; range $42$--$296$). The predicted $\alpha_c=9.1\times10^{-3}$ lies within the measured interval $[0.001,0.01]$ (Section~\ref{sec:har}), before any auxiliary update reaches the encoder.
-At the tested high doses, joint training collapses in $10/10$ seeds and \textsc{stfcal} in $0/10$ across four scientific domains. Battery SOH RMSE improves from $0.348$ to $0.298$. Protection also transfers to a Transformer: at RadioML $\alpha=3000$, joint training collapses in $10/10$ seeds with accuracy $0.156$, whereas \textsc{stfcal} has $0/10$ collapses and relative scatter $0.970$. On CelebA's Smiling task~\citep{liu2015celeba}, $\hat\rho=1602$--$3585$; at $\alpha=100$, joint training collapses in $5/5$ seeds and \textsc{stfcal} in $0/5$. NYUv2 illustrates the boundary case: at the calibrated dose $\alpha=0.50$, the gate opens in five seeds and protects exactly those seeds (Figure~\ref{fig:unified}c). Joint depth RMSE can nevertheless improve as scatter decreases ($1.33\to1.09$), concealing shrinkage from the task metric. Appendices~\ref{app:nyu} and~\ref{app:moved} report the detailed results.
-
-% ═══════════════════════════════════════════════════════════════════
-% 6. EXPERIMENTS
-% ═══════════════════════════════════════════════════════════════════
 \begin{figure}[t]
 \centering
-\includegraphics[width=\columnwidth]{figures/unified_all.pdf}
-\caption{Diagnostics and interventions across domains. Shading marks the operational scatter criterion $0.3$. (a) Dose--scatter curves at $m=128$; the dotted line marks the half-height crossing, distinct from the collapse criterion $0.3$. (b) Width-dependent half-height crossings and log--log OLS fits (nine widths for HAR and battery, four for RadioML). (c) NYUv2 at $\alpha=0.5$: paired outcomes share the same warm-up probe coordinate; the dotted line marks $1/\alpha=2$. (d,e) Collapse and task-recovery rates from Table~\ref{tab:unified_repair}. (f) Financial rank-IC: each point averages ten seeds within one temporal fold; thin lines pair folds, and large markers show the mean with population s.d. across ten folds.}
-\label{fig:unified}
+\includegraphics[width=\linewidth]{figures/fig_survival_gap.pdf}
+\caption{Terminal probes of four real auxiliary heads, ten seeds each. The horizontal coordinate is the \emph{mean per-example} task-gradient cosine; the vertical coordinate is unsigned radial loading. SNR regression has high loading and $10/10$ collapsed endpoints. (b) Operational collapse counts at controlled doses $0.1$ (HAR), $3000$ (battery), and $10000$ (RadioML). All ten optimizers retain collapse. The detached reference uses separate ten-seed controls. Full metrics and control settings are in Table~\ref{tab:conflict}.}
+\label{fig:conflict_toxicity}
 \end{figure}
 
-\section{Experiments}\label{sec:experiments}
+Our experiments separate mechanism controls from real auxiliary objectives. With the same fixed variance toxifier, the frozen probe estimates a scatter crossing within a factor of $3.1$ on battery data but overestimates it by $30$--$116\times$ on RadioML. Thus even a designed contracting loss is insufficient to validate a probe. Calibration-time interventions on HAR reproduce false negatives, while zero-dose controls expose large probe drift without auxiliary-induced damage. Real heads add sign ambiguity and demonstrate that passing a scatter threshold does not imply recovery of predictive utility.
 
-\subsection{Unified Protocol}\label{sec:unified_protocol}
+The contributions are threefold. First, we formalize representation survival as an evaluation axis distinct from task-gradient conflict. Second, we characterize a computable local validity boundary for a frozen toxicity probe and test observable failure modes across domains and calibration conditions. Third, we use detachment and spectral toxicity filtering (\STF) as interventions that test the diagnosis, distinguishing survival, auxiliary utility, and task recovery. The resulting benchmark reports both the probe and the conditions under which its interpretation holds.
 
-Controlled comparisons use the same gradient diagnostic and relative-scatter criterion (Algorithm~\ref{alg:stf}), with architecture and batch details specified per experiment. The default encoder is a three-layer MLP of width $m$. Primary tasks use accuracy or RMSE; the auxiliary \emph{variance-shrinkage toxifier}, $L_{tox}=\mathrm{Var}_b[W_k h]$, uses $K=3$ seeded random projections and realizes Definition~\ref{def:degmin}. Default training uses Adam ($\mathrm{lr}=10^{-3}$, batch $256$), bf16 autocast on an NVIDIA A100 80\,GB, and $5$--$10$ seeds per configuration. We define operational collapse by $\mathcal{S}_h<0.3\,\mathcal{S}_{single}$, where
+\section{A Second Axis: Representation Survival}\label{sec:formulation}
+
+Let $H(\theta)\in\mathbb R^{B\times m}$ contain the outputs of a shared encoder on a fixed diagnostic batch. Training minimizes $L_p+\alpha L_a$, with primary loss $L_p$, auxiliary loss $L_a$, and dose $\alpha\ge0$; multiple auxiliaries can be absorbed into their weighted sum. Write $G_p=\nabla_\theta L_p$ and $G_a=\nabla_\theta L_a$. Define
 \begin{equation}
-\mathcal{S}_h=\mathbb E_b\!\left[\mathrm{std}_j\!\left(h_j^{(b)}-\mathbb E_{b'}[h_j^{(b')}]\right)\right],
-\label{eq:cross_sample_scatter}
+ V(\theta)=\frac{1}{2B}\|C_BH(\theta)\|_F^2,
+ \qquad C_B=I-\mathbf1\mathbf1^\top/B,
+ \qquad v=\nabla_\theta V.
+ \label{eq:mtl_obj}
 \end{equation}
-is anchored to the same-seed single-task reference. The implementation averages standard deviations across features after centering examples (sample correction $m-1$). This coordinate-dependent proxy differs from covariance trace and from averaging per-feature standard deviations across examples. It can miss variation along the all-ones feature direction; operational collapse therefore does not establish total variance collapse. We report collapse rate, recovery rate, the diagnostic $\rho$, and relative scatter $\mathcal{S}_h/\mathcal{S}_{single}$; Table~\ref{tab:domains} lists the domains. The toxifier's combined rank and normalization require separate width audits; Section~\ref{sec:bmtl} tests real auxiliary heads. Across ten seeds per domain, \textsc{stfcal} increases scatter over joint training at $p<0.01$ (Wilcoxon; $|d_z|>20$). Battery SOH RMSE improves by $0.050$ (95\% CI $[0.033,0.067]$, $d_z=1.8$). All four scatter tests and the battery SOH test survive Holm correction within this five-test family (\texttt{paired\_stats.py}). Unless identified as a confidence interval, $\pm$ denotes population standard deviation across the stated seeds or cells. Financial fold-seed cells share data and are not independent replicates.
+Here $2V$ is the covariance trace with divisor $B$: a rotation-invariant measure of variation across examples. Under gradient flow,
+\begin{equation}
+ \dot V=r-\alpha c,\qquad r=-v^\top G_p,\qquad c=v^\top G_a.
+ \label{eq:signed_variance}
+\end{equation}
+We call $c>0$ \emph{auxiliary contraction}, and $r>0$ \emph{primary restoration}. When both are positive, $\alpha c/r>1$ defines the instantaneous contraction-dominated regime. Reporting $(r,c)$ also covers a primary update that itself reduces variance. This identity retains the encoder Jacobian; it defines a signed diagnostic without a reduced dynamical model.
 
-\subsection{Cross-Domain Validation}\label{sec:validation}
+\begin{proposition}[Conflict information does not identify contraction]\label{prop:conflict_gap}
+The task-gradient Gram matrix does not determine the sign of $\dot V$. In particular, there are two auxiliary updates with identical task-gradient norms and conflict, but opposite effects on variance under the same primary update.
+\end{proposition}
+\begin{proof}
+Take $G_p=e_1$, $G_a^\pm=\pm e_2$, and $v=-e_1+\beta e_2$ for $\beta>0$. Both pairs have identity Gram matrix and zero conflict, whereas $r=1$ and $c^\pm=\pm\beta$. For $\alpha\beta>1$, $\dot V^+<0<\dot V^-$. These gradients are locally realizable by a smooth encoder and losses (Appendix~\ref{app:boundary_proof}).
+\end{proof}
 
-We study A-share ranking (Appendix~\ref{app:finance})\label{sec:finance}, UCI-HAR\label{sec:har}, RadioML2016.10A\label{sec:radioml}, battery health on the NASA PCoE and MATR archives~\citep{nasa_battery,severson2019data}\label{sec:battery}, and NYUv2 dense perception\label{sec:nyu} (Appendix~\ref{app:nyu}), with CelebA as an additional check. The financial application uses real auxiliary heads and a separate walk-forward protocol. In the high-dose controlled comparisons, filtering reduces operational collapse from $1.0$ to $0.0$; this does not extend to every method or boundary dose. Where shrinkage also harms the primary task, RadioML accuracy recovers from $0.091$ to approximately $0.33$, and battery log-SOH RMSE improves from $0.611$ to $0.305$ (Figure~\ref{fig:battery_repair}; Table~\ref{tab:unified_repair}).
+The proposition identifies the missing information: a rule based only on task-gradient relations has no variance constraint. Reducing the effective auxiliary dose can preserve variance, but conflict resolution alone provides no survival certificate for a retained auxiliary update. The high-dose comparison tests this gap at fixed operating points.
 
-Task metrics reveal shrinkage unevenly. HAR still attains approximately $0.95$ accuracy at relative scatter $0.05$. In one MATR protocol, an encoder with relative scatter $0.0052$ achieves lower SOH RMSE than detachment ($0.82$ versus $1.51$). A trainable head can compensate for reduced representation amplitude, so small scatter need not imply constant predictions. We therefore examine task error, prediction variance, and representation covariance together.
+Equation~\eqref{eq:signed_variance} describes instantaneous total variation. Eventual collapse also depends on how this balance evolves. In the symmetric linear model $\dot z=(R-\alpha A)z$, $R\succ0$, $A\succeq0$, some mode contracts when $\alpha\lambda_{\max}(R^{-1/2}AR^{-1/2})>1$, whereas \emph{all} modes contract only when the corresponding minimum eigenvalue exceeds $1/\alpha$ (Theorem~\ref{thm:spectral}). A task head can exploit surviving modes even as other directions disappear. We therefore report representation variation and task error together, supplemented by effective rank and prediction variation where available.
 
-\subsection{Battery Health and Remaining-Life Prediction}\label{sec:bmtl}
+\section{A Validity Boundary for Toxicity Probes}\label{sec:theory}\label{sec:diagnosis}
 
-Battery prediction provides an application with a temporal encoder, two target tasks, and practical auxiliary heads. The model predicts SOH and RUL jointly, allowing us to test whether controlling auxiliary updates improves either task.
+\subsection{From a cheap proxy to a signed diagnostic}
 
-A \textsc{TSMixer} block~\citep{ekambaram2023tsmixer} and a gated state-space block~\citep{gu2022s4,gu2023mamba} map each cell's per-cycle window to $h\in\mathbb{R}^{d}$. The representation feeds SOH ($L_2$) and RUL ($L_1$) heads, plus reconstruction and distributional auxiliaries evaluated empirically (Appendix~\ref{app:moved}).
+Let $h$ and $u$ stack the rows of $H$ and $C_BH$, respectively, and let $g_p=\nabla_h L_p$, $g_a=\nabla_h L_a$. A cheap feature-space probe uses the centered radial direction:
+\begin{definition}[Unsigned radial toxicity proxy]\label{def:toxicity}
+For $u\ne0$ and $\|g_p\|>0$, define
+\begin{equation}
+ \rho_b=\frac{\|\Pi_u g_a\|}{\|g_p\|},\qquad
+ \Pi_u g=\frac{u^\top g}{\|u\|^2}u.
+ \label{eq:order}
+\end{equation}
+The experimental estimator $\hat\rho$ instead averages regularized per-example ratios. The frozen decision uses a recorded value $q=\hat\rho_{t_0}$ and the nominal dose $\alpha_{\rm probe}=1/q$.
+\end{definition}
 
-RUL supervision uses absolute error for observed lifetimes and a one-sided hinge for censored lower bounds. The historical evaluation, however, reports MAE over both types of target and selects checkpoints using evaluation SOH, including for the RUL-only reference. Its RUL scores therefore do not estimate uncensored lifetime error. The corrected protocol selects checkpoints on validation data and reports observed-only MAE and censored shortfall separately.
+Two distinctions matter. First, $\rho_b$ is unsigned: contracting and expanding auxiliary directions can have the same value. Second, $\|g_p\|$ measures all primary-gradient directions, including those that do not restore centered variation. Moreover, in the controlled driver the probe differentiates the \emph{isotropic surrogate} $\|C_BH\|_F^2/(Bm)$, while training uses fixed projected-variance auxiliaries. The real-head driver differentiates the actual auxiliary loss. We preserve these estimator choices and audit their consequences; they are not interchangeable measurements of $c/r$.
 
-Under the corrected MATR protocol, detachment improves both tasks (Table~\ref{tab:bmtl_corrected}). Relative to joint training, paired mean differences are $-3.47$ SOH percentage points (95\% $t$ interval $[-4.20,-2.74]$) and $-34.8$ observed-RUL cycles ($[-57.8,-11.8]$), closing $70\%$ of the SOH gap to the SOH-only reference. These intervals capture ten initializations on one cell split, not uncertainty over new cell populations. Because several protocol choices changed together, the revised ordering cannot be attributed to censoring alone. Selective filtering does not outperform detachment; the rank arm's large covariance trace and low effective rank do not establish spectral saturation. On NASA, detachment improves SOH, but the observed-RUL difference is inconclusive (Appendix~\ref{app:tables}).
+\subsection{A computable validity margin}
 
-\begin{table}[t]
+The discrepancy can be exposed without assuming radial training dynamics. Let $J=\partial h/\partial\theta$, $K=JJ^\top$, $e=u/\|u\|$, and $n_p=\|g_p\|>0$. At an audited checkpoint choose any $k>0$ and write $K=k(I+E)$. Define
+\begin{equation}
+ a=\frac{e^\top g_a}{n_p},\quad d=-\frac{e^\top g_p}{n_p},\quad
+ \epsilon_a=\frac{e^\top E g_a}{n_p},\quad
+ \epsilon_p=-\frac{e^\top E g_p}{n_p}.
+ \label{eq:boundary_terms}
+\end{equation}
+Here $a$ is signed radial loading relative to the primary norm, $d$ measures restoration alignment, and the $\epsilon$ terms measure the effect of encoder geometry. For the actual auxiliary, $|a|=\rho_b$. Products with $K$ can be evaluated by Jacobian--vector and vector--Jacobian products, without constructing the full matrix.
+
+\begin{theorem}[Local validity boundary of a frozen probe]\label{thm:probe_boundary}
+For any frozen probe value $q\ge0$, the variance dynamics satisfy
+\begin{equation}
+ \frac{\dot V}{N}=1-\alpha q+\mathcal E,\qquad
+ N=\frac{k\|u\|n_p}{B}>0,\qquad
+ \mathcal E=(d-1)+\epsilon_p-\alpha(a-q+\epsilon_a).
+ \label{eq:probe_discrepancy}
+\end{equation}
+Consequently, with
+\begin{equation}
+ \Delta=|d-1|+|\epsilon_p|+\alpha\bigl(|a-q|+|\epsilon_a|\bigr),
+ \qquad |1-\alpha q|>\Delta,
+ \label{eq:validity_margin}
+\end{equation}
+the probe and the exact variance derivative agree in sign. If $1-\alpha q>\Delta$, variance increases; if $1-\alpha q<-\Delta$, it decreases. The remaining region requires the signed audit.
+\end{theorem}
+\begin{proof}
+The chain rule gives $\dot V=-u^\top K(g_p+\alpha g_a)/B$. Substitute $K=k(I+E)$, divide by $N$, and add and subtract $1-\alpha q$. The triangle inequality bounds $|\mathcal E|$ by $\Delta$.
+\end{proof}
+
+The theorem supplies a \emph{sufficient, checkpoint-local} boundary. Its decomposition attributes a scalar threshold's discrepancy to quantities that can be checked separately. The directly evaluated $\mathcal E$ is sharper than the conservative envelope $\Delta$. A uniform bound over a trajectory would transport the decision through time; the archived neural-network experiments do not measure such a bound.
+
+In the identity metric ($E=0$) with positive signed loading, $\dot V/N=d-\alpha a$. If $a=q$ but $0<d<\alpha q<1$, the frozen gate reports a subcritical dose although variance contracts: the primary norm overstates restoration. If $a=-q$, the unsigned gate can report danger while the auxiliary expands variance. If $a$ changes after calibration, the error moves with $a-q$. These are algebraic predictions about the sign of the diagnostic error, rather than an assumption that every high probe value indicates collapse.
+
+The mismatch term also separates into actionable components. If $a_0$ is signed loading at calibration for the actual auxiliary, then
+\begin{equation}
+ |a_t-q|\le |a_t-a_0|+|a_0-|a_0||+\bigl||a_0|-q\bigr|.
+ \label{eq:mismatch_split}
+\end{equation}
+The three terms isolate temporal drift, loss of sign, and the surrogate/aggregation discrepancy. This identifies the scope of the familiar radial approximation: a contracting auxiliary, a predominantly restoring primary gradient, a compatible encoder metric, and a transferable calibration statistic. A fixed quadratic toxifier simplifies only part of this list.
+
+A scalar reduction of the same balance, $\dot\sigma=-\alpha\kappa\sigma+b(\sigma)$, has a saddle-node threshold $\alpha_c=\lambda_\star/\kappa$ when $b(\sigma)/\sigma$ has a unique nondegenerate maximum $\lambda_\star$ and the stated endpoint behavior (Theorem~\ref{thm:transition}). Identifying $1/q$ with that threshold additionally requires a calibration relation to $\kappa/\lambda_\star$. We test this transfer using empirical half-height crossings, denoted $\alpha_{1/2}$, separately from the operational collapse threshold. This distinction turns disagreement into evidence about the probe, rather than relabeling a fitted crossing as a proved bifurcation.
+
+\section{An Empirical Map of the Boundary}\label{sec:experiments}\label{sec:analysis}
+
+\subsection{Protocols and observables}\label{sec:unified_protocol}
+
+The controlled benchmark spans UCI-HAR~\citep{ucihar}, RadioML2016.10A~\citep{radioml}, battery health~\citep{nasa_battery}, and NYUv2. It uses a three-layer MLP of width $m$ and a fixed auxiliary $L_{\rm tox}=K_a^{-1}\sum_{k=1}^{K_a}\operatorname{Var}_b(W_kh)$, with $K_a=3$ seeded projections. Adam uses learning rate $10^{-3}$ and batch size $256$; experiments use $5$--$10$ seeds and bf16 autocast. The default frozen probe follows four detached warm-up epochs. Detailed data partitions, encoder variants, and real-head protocols are in Appendices~\ref{app:tables}--\ref{app:moved}.
+
+We retain the archived operational criterion: collapse means relative scatter $s=\mathcal S_h/\mathcal S_{\rm single}<0.3$, with the same-seed reference and
+\begin{equation}
+ \mathcal S_h=\mathbb E_b\!\left[\operatorname{std}_j\!\left(h_j^{(b)}-\mathbb E_{b'}h_j^{(b')}\right)\right].
+ \label{eq:cross_sample_scatter}
+\end{equation}
+This coordinate-dependent proxy measures a different observable from $V$ and can miss variation in the all-ones feature direction. Accordingly, ``collapse'' in the empirical counts means this specified threshold. The half-height $\alpha_{1/2}$ interpolates the \emph{mean} dose--scatter curve at $s=0.5$ in log dose. It is a reproducible transition summary, not an estimate of complete information loss. Error bars or bands denote population standard deviation across the stated seeds unless specified otherwise.
+
+\begin{figure}[t]
 \centering
-\caption{Corrected MATR test results: ten initialization seeds on a fixed cell-disjoint split, with validation-based checkpoint selection. $S=\operatorname{tr}\operatorname{Cov}(H)$; relative $S$ is the mean same-seed ratio to the SOH-only reference; PR is participation rank. Censored shortfall measures lower-bound violations in cycles. Table~\ref{tab:battery_evidence} reports uncertainty.}
-\label{tab:bmtl_corrected}
-\small
-\resizebox{\columnwidth}{!}{\begin{tabular}{lrrrrrr}
-\toprule
-Mode & SOH RMSE\% $\downarrow$ & obs.\ RUL MAE $\downarrow$ & shortfall $\downarrow$ & $S$ & relative $S$ & PR \\
-\midrule
-SOH-only & $0.61$ & --- & --- & $1.01$ & $1.00$ & $1.35$ \\
-\textsc{joint} & $5.57$ & $81.5$ & $17.60$ & $2.86$ & $3.55$ & $2.49$ \\
-\textsc{stf-0} & $\mathbf{2.10}$ & $\mathbf{46.7}$ & $\mathbf{2.06}$ & $4.77$ & $6.24$ & $1.86$ \\
-\textsc{stfcal} & $2.71$ & $63.6$ & $5.73$ & $1.40$ & $1.89$ & $2.03$ \\
-\textsc{stfcalrank} & $4.98$ & $107.6$ & $17.57$ & $617.90$ & $651.77$ & $1.21$ \\
-\bottomrule
-\end{tabular}}
-\end{table}
+\includegraphics[width=\linewidth]{figures/fig_probe_boundary.pdf}
+\caption{(a) $\alpha_{\rm probe}/\alpha_{1/2}$ for $16$ domain--width cells; \emph{all use the controlled toxifier}. Red indicates an optimistic dose estimate, blue a conservative one. (b) Changing calibration time changes this ratio at $m=64$; the shaded factor-$3$ band is a visual reference, not a confidence interval. Both panels use ten-seed mean probes. (c) At $\alpha=0$, HAR's probe drifts by orders of magnitude while battery's remains comparatively stable; median and full range over five seeds, each normalized to its initial value. (d) HAR at $\alpha=0.03$: early calibration leaves all gates closed and all ten runs collapse; at $W\ge4$, all gates open and none collapse. Source values and crossing definitions are in Table~\ref{tab:probe_cells} and Appendices~\ref{app:online}--\ref{app:warmup}.}
+\label{fig:probe_prediction}
+\end{figure}
 
-A separate HAR reconstruction experiment tests basis selection at $\alpha=12$. Both bases open the gate in the same four of ten seeds. Among those seeds, the auxiliary-gradient basis removes $30.75$ directions on average, compared with PCA's $62.0$, at similar accuracy across all ten seeds (Table~\ref{tab:realbasis}). This supports basis sensitivity without establishing superiority over joint training or globally minimal deletion. Historical battery and regime-weighting results appear in Appendix~\ref{app:moved}.
+\subsection{A controlled toxifier does not guarantee a valid probe}\label{sec:validation}\label{sec:har}\label{sec:radioml}\label{sec:battery}\label{sec:nyu}\label{sec:capacity_law}
 
-\input{real_basis_evidence_table.tex}
+Figure~\ref{fig:probe_prediction}a replaces a pooled prediction score with the domain--width error map. Battery ratios lie between $0.95$ and $3.01$. HAR changes from $32.5$ at $m=32$ to $1.11$ at $m=128$ and $0.15$ at $m=256$, reversing the direction of bias. RadioML overestimates the crossing in every width by $30$--$116\times$; NYUv2 does so by approximately $3.9$--$32.6\times$. A single median hides both systematic optimism and a reversal with width.
 
-\subsection{Battery Ablations}\label{sec:bmtl_ablation}
+These results locate an empirical transfer boundary \emph{within} the controlled family. They do not partition synthetic and real objectives: all sixteen cells use fixed projected-variance auxiliaries, and their probes use the isotropic surrogate. The relevant distinction is whether the probe captures the operating contraction--restoration balance. The near-match on battery and wide HAR is useful calibration evidence; the RadioML bias shows that the same estimator and training recipe do not transfer uniformly. The algebra in Section~\ref{sec:theory} identifies candidate discrepancies to measure, while the archived cells establish the errors rather than their unique causal allocation.
 
-Appendix~\ref{app:tables} reports historical ablations of censoring-aware supervision (Table~\ref{tab:cens_ablation}), auxiliary weight, and regime weighting. At $d=128$, increasing the auxiliary dose worsens joint SOH RMSE from $1.36$ to $6.58$\%, whereas the detached results are unchanged. A ten-seed NASA experiment additionally evaluates the three-factor regime weighting.
+\subsection{Calibration time predicts a reproducible gate failure}
 
+Holding the data, encoder, and probe definition fixed, we vary the detached warm-up length $W$. On HAR at $m=64$, $1/\overline{\hat\rho}$ moves from $1.34$ at $W=1$ to $0.181$ at $W=2$, $0.00907$ at $W=4$, and $1.7\times10^{-5}$ at $W=32$ (Figure~\ref{fig:probe_prediction}b). The measured half-height is $0.00141$. The often-quoted $W=4$ prediction lies in the coarse dose bracket $[0.001,0.01]$, but differs from the interpolated crossing by $6.4\times$; the two statements answer different questions.
 
+The calibration change has a direct intervention consequence. At dose $\alpha=0.03$, $W=1$ and $2$ leave all ten gates closed; all runs end below the scatter criterion. For $W\ge4$, all gates open and none collapse, with relative scatter $0.99$--$1.00$ (Figure~\ref{fig:probe_prediction}d). At $\alpha=100$, all six warm-up choices open the gate and avoid collapse. Thus a successful high-dose repair can conceal a calibration failure near the operating boundary. The gate arithmetic predicts activation before auxiliary contact; the subsequent outcomes test whether that activation is sufficient in this protocol.
 
+\subsection{Continuous re-probing can create the opposite error}\label{sec:negatives}
 
+Recomputing the same norm ratio is not a universal correction. On unfiltered HAR trajectories, the probe increases by orders of magnitude, including at $\alpha=0$, when no auxiliary update reaches the encoder (Figure~\ref{fig:probe_prediction}c). At positive doses, a running gate activates in all seeds of ten HAR configurations whose \emph{final} relative scatter is $0.50$--$1.04$. These are false alarms relative to the endpoint criterion. Battery probes remain $O(1)$; among 35 seeds ending above half-height, only one gate activation occurs, at the last step (Appendix~\ref{app:online}).
 
-\subsection{Comparison with Conflict-Resolution Methods}\label{sec:conflict_ablations}
+The zero-dose control distinguishes drift of the statistic from damage caused by the auxiliary. Because the primary-gradient norm is in the denominator, improved task fitting can inflate the ratio without establishing signed contraction. We evaluate every term of Theorem~\ref{thm:probe_boundary} on HAR checkpoints; the median restoration alignment is $0.065$ rather than $1$. The appropriate response is to inspect the signed flux and its components, rather than to interpret each increase of $\hat\rho$ as a loss of representation survival.
 
-The four real-head comparisons show that gradient conflict and contraction need not coincide. Across ten seeds, $|\cos(g_p,g_a)|\le0.06$ with both dot-product signs represented. Yet for the collapsing SNR head, $88\%$ of $\|g_a\|$ projects onto $u_c$, compared with $1$--$14\%$ for the other heads. We also compare ten multi-task optimizers at matched doses and seeds, using their published defaults: PCGrad, CAGrad, FAMO, MGDA, Aligned-MTL, IMTL-G, Nash-MTL, uncertainty weighting, GradNorm, and IMTL-L. All retain a collapse rate of $1.0$ in the three controlled domains (Table~\ref{tab:conflict}). On HAR, seven yield lower accuracy than plain summation ($0.945$), including four at $0.18$--$0.42$. Separate battery-head results appear in Table~\ref{tab:conflict_num}. In the financial comparison, six-fold mean rank-IC ranges from $-0.022$ to $+0.032$ across methods, versus $-0.004$ for summation, within the observed fold variation.
+\subsection{Real heads expose sign and intervention mismatch}\label{sec:real_aux}
 
+Terminal probes of four real heads provide a second stress test (Figure~\ref{fig:conflict_toxicity}a). Across ten seeds, mean per-example task-gradient cosines have magnitude at most $0.06$, while SNR regression places $88\%$ of its gradient norm on each example's radial axis, compared with $1$--$14\%$ for the other heads. This separates the collapsed SNR endpoints from benign endpoints. It is not evidence that every example has negligible conflict: the SNR head has negative primary--auxiliary dot products on approximately $54\%$ of probe examples.
 
-Applying a filter before a conflict operator preserves scatter at the tested high doses (Table~\ref{tab:compose}). These experiments establish compatibility in this order; the reverse order was not tested (Appendix~\ref{app:moved}).
+The signed measurement is equally informative. Despite its large unsigned loading, the SNR head's mean signed radial cosine is approximately $-0.12$ at the endpoint. An unsigned projection therefore cannot be read as a signed contraction rate or a forecast from that state. Both observations support the second axis while motivating its validity audit. The result also explains why success on a deliberately contracting objective is insufficient evidence of transfer to an arbitrary real auxiliary loss.
 
+\section{Spectral Toxicity Filtering as a Diagnostic Test}\label{sec:stf}\label{sec:stfcal}
 
-% ═══════════════════════════════════════════════════════════════════
-% 7. ANALYSIS
-% ═══════════════════════════════════════════════════════════════════
-\section{Analysis and Discussion}\label{sec:analysis}
+Detachment blocks all auxiliary gradients to the encoder and is the reference intervention when the auxiliary adds no primary-task value. \STF{} instead restricts the auxiliary channel. Its idealized backward form removes a radial projection,
+\begin{equation}
+ F_w[g_a]=g_a-w\Pi_u g_a,\qquad w\in[0,1],
+ \label{eq:stf}
+\end{equation}
+while the implemented selective arms transform the auxiliary input, $\widetilde H=H-wC_BHP$, with a frozen projector $P$ or a centered radial direction. This changes both the forward input and its gradient; the auxiliary head itself continues training. Appendix~\ref{app:general} specifies the forward and backward semantics.
 
-We examine width scaling, the interpretation of the diagnostic, and transfer to real auxiliary heads.
+The calibrated arm freezes its warm-up probe and opens the gate when $\alpha\hat\rho\ge1$. The rank variant selects
+\begin{equation}
+ r_{\rm sel}=\min\{r\le R:\alpha\hat\rho_{\rm res}[r]<1\},
+ \label{eq:calrule}
+\end{equation}
+using nested candidate subspaces; if none passes, it uses the cap and records the unresolved residual. The radial arm is a separate intervention. Theorem~\ref{thm:minimalrank} characterizes minimum deletion rank for a specified PSD operator; empirical PCA bases require their own identification. This makes gate calibration and subspace choice two distinct parts of the intervention.
 
-\subsection{Width Scaling}\label{sec:capacity_law}
-
-We fit $\log\alpha_c=\gamma\log m+c$ to empirical half-height crossings. Four-width slopes are $2.43$ for the fixed-per-head-rank schedule, $0.66$ for HAR, $0.10$ for battery, and $0.02$ for RadioML; nine-width fits give $0.38$ for HAR and $-0.06$ for battery. These describe crossing locations, not independently identified restoration or toxic-rank exponents. Inferring $\beta$ from them would assume the law being tested. A joint fit to the synthetic family gives $\gamma_0=2.50$ (nominal 95\% CI $[1.94,3.06]$); shared seeds and identical pivot curves limit this cell-level inference. An unconstrained fit does not reject $\gamma=\gamma_0(1-\beta)$, with implied dilution factor $0.78$--$1.03$ versus $1.00$. However, fixed per-head ranks $r=4,8,16$ give slopes $-0.31$, $+0.45$, and $+3.02$, and changing the width set moves $\gamma_0$ over $[1.35,2.87]$. Exact-rank controls also reveal normalization dependence (Appendix~\ref{app:proofs}). The data therefore support a conditional scaling trend, not a universal exponent or an independently established rank-dilution law.
-
-\subsection{Diagnostics and Their Limits}\label{sec:diagnosis}
-
-Task error can remain stable despite substantial scatter loss. The projected-norm ratio measures magnitude, whereas the parameter-space identity measures signed contraction. Probe--crossing agreement at one width does not imply a shared width exponent, and prediction normalization provides no general recovery guarantee.
-
-\subsection{Calibration Across Real Heads}\label{sec:real_aux}\label{sec:negatives}
-
-Table~\ref{tab:real_aux} shows heterogeneous outcomes. Neither reconstruction head crosses the collapse threshold at the tested dose, whereas high-dose SNR regression does. Only full detachment avoids operational collapse in all ten SNR seeds; the selective implementations do not recover its accuracy consistently. At RadioML dose $1$, the calibrated gate can remain closed despite joint collapse. Basis drift and limited probe depth are possible explanations, not established causes. In the historical MATR experiment, increasing the rank cap from $3$ to $32$ leaves SOH RMSE near joint training ($5.26$ versus $5.24$), while the radial arm reaches $1.77$. Because $32$ remains below the feature width, the tested increase is insufficient, without ruling out a larger cap; Corollary~\ref{cor:saturated} places the saturation limit at full-width deletion, coinciding with detachment.
-
-These findings define the diagnostic's scope: width slopes depend on the experimental family, norm ratios do not encode the sign of variance change, and calibration depends on both basis and measurement time. Each requires validation for the intended operating regime.
-
-\begin{table}[t]
+\begin{figure}[t]
 \centering
-\caption{Real auxiliary heads ($m=64$, ten seeds): mean primary accuracy with collapse rate in parentheses. The calibrated gate remains closed for both reconstruction heads. With SNR regression, all joint seeds collapse; selective variants do not restore accuracy, and only full detachment avoids the collapse criterion in every seed.}
-\label{tab:real_aux}
-\small
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{lcccccc}
-\toprule
-Auxiliary head & $\alpha$ & \textsc{joint} & \textsc{stf-0} & \textsc{stf-hard} & \textsc{stf-soft} & \textsc{stfcal} \\
-\midrule
-HAR input-reconstruction & $0.1$ & $.942$ ($0.0$) & $.943$ ($0.0$) & $.942$ ($0.0$) & $.942$ ($0.0$) & $.942$ ($0.0$) \\
-HAR subject-ID probe & $0.1$ & $.941$ ($0.0$) & $.943$ ($0.0$) & $.944$ ($0.0$) & $.943$ ($0.0$) & $.942$ ($0.0$) \\
-RadioML I/Q-reconstruction & $3000$ & $.343$ ($0.0$) & $.307$ ($0.0$) & $.329$ ($0.0$) & $.327$ ($0.0$) & $.315$ ($0.0$) \\
-RadioML SNR regression & $3000$ & $.205$ ($1.0$) & $\mathbf{.307}$ ($\mathbf{0.0}$) & $.208$ ($1.0$) & $.200$ ($0.9$) & $.199$ ($0.1$) \\
-\bottomrule
-\end{tabular}}
-\end{table}
+\includegraphics[width=\linewidth]{figures/fig_diagnostic_intervention.pdf}
+\caption{Real RadioML SNR-regression auxiliary. (a,b) At $20\%$ primary labels and width $64$, calibrated STF retains a mean accuracy advantage over detachment at intermediate doses; the advantage disappears at extreme doses even while scatter remains above $0.3$. Bands are seed standard deviations; crosses mark doses with at least one collapsed joint run. Five unique seeds per dose; duplicate log records are removed. (c) A separate fully labeled, dose-$3000$ protocol gives a different ordering: rank-3 filtering clears the scatter criterion in all ten seeds, but detachment has higher accuracy. Faint points are seeds; large points and bars show means and standard deviations. The dotted line is the $0.3$ scatter criterion.}
+\label{fig:intervention}
+\end{figure}
 
+\label{sec:conflict_ablations}
+A useful auxiliary can also become toxic: in the $20\%$-label SNR dose scan (Figure~\ref{fig:intervention}a,b), joint training has a healthy encoder at low dose, but collapses in every seed from $\alpha=30$ onward. Calibrated STF avoids collapse at every sampled dose. Over $\alpha\in[15,100]$, its mean accuracy is approximately $0.5$--$1.0$ percentage points above detachment. These five-seed results establish a tested regime in which selective intervention preserves a useful effect; they do not imply a uniform advantage across protocols.
 
-% ═══════════════════════════════════════════════════════════════════
-% 8. CONCLUSION
-% ═══════════════════════════════════════════════════════════════════
+The fully labeled SNR experiment demonstrates why the benchmark needs both axes of evaluation (Figure~\ref{fig:intervention}c). Detachment reaches $0.307$ accuracy with $0/10$ collapses. The radial arm reaches $0.199$ with $1/10$ collapses, while the rank-3 arm reaches $0.211$ with $0/10$. Removing enough contraction to clear a scatter threshold does not ensure that the remaining auxiliary update helps the task. In a separate HAR reconstruction study, an auxiliary-gradient basis uses $30.75$ directions versus PCA's $62.0$ among the same four gate-open seeds at similar accuracy (Table~\ref{tab:realbasis}); basis choice changes how much of the auxiliary channel is removed.
+
+\label{sec:bmtl}\label{sec:bmtl_ablation}\label{sec:finance}
+At the tested high doses, calibrated filtering changes collapse counts from $10/10$ to $0/10$ across four controlled scientific domains. Protection also transfers to a Transformer encoder: at RadioML $\alpha=3000$, joint training collapses in $10/10$ seeds at accuracy $0.156$, whereas calibrated filtering has $0/10$ collapses and relative scatter $0.970$. On CelebA's Smiling task~\citep{liu2015celeba}, the calibration probe spans $\hat\rho=1602$--$3585$ across widths; at $\alpha=100$, joint training collapses in $5/5$ seeds and calibrated filtering in $0/5$. This intervention result coexists with the probe errors in Figure~\ref{fig:probe_prediction}: an extreme dose can open a biased gate reliably. Filtering before a conflict operator also preserves scatter in the tested compositions (Table~\ref{tab:compose}). Variance regularization offers another intervention, but its ability to clear the scatter threshold and its task accuracy vary independently (Appendix~\ref{app:reg}).
+
+On the corrected, cell-disjoint MATR battery protocol~\citep{severson2019data}, validation-selected detachment improves SOH RMSE from $5.57$ to $2.10$ percentage points and observed-RUL MAE from $81.5$ to $46.7$ cycles. Selective filtering does not improve on detachment there (Table~\ref{tab:bmtl_corrected}). The historical ranking reverses after changing evaluation-selected checkpoints and censoring-blind scoring together, so the corrected comparison concerns the complete protocol. Financial and battery application details remain in the appendix; their role is to test diagnostic scope, not to redefine survival through whichever task metric improves.
+
+\section{A Diagnostic Standard for Shared Representations}\label{sec:standard}
+
+The practical output of the analysis is a reporting protocol, not a universal cutoff on $\hat\rho$. It separates three questions: whether an update contracts the chosen observable, whether a cheap probe captures that update, and whether the resulting representation supports the task. Each question has its own measurable answer (Algorithm~\ref{alg:survival_audit}).
+
+\begin{algorithm}[t]
+\caption{Auditing representation survival and probe validity}\label{alg:survival_audit}
+\begin{algorithmic}[1]
+\REQUIRE Diagnostic batch, healthy reference, checkpoint $\theta$, operating losses and dose $\alpha$, recorded calibration value $q$.
+\STATE Report task metrics, covariance trace $2V$, effective rank, and the declared operational scatter criterion.
+\STATE Differentiate $V$ and the actual losses; report signed restoration $r$ and auxiliary contraction $c$ from \eqref{eq:signed_variance}.
+\STATE Record the cheap decision $1-\alpha q$ and compute the discrepancy $\mathcal E$ and envelope $\Delta$ using \eqref{eq:probe_discrepancy}--\eqref{eq:validity_margin}.
+\IF{$|1-\alpha q|>\Delta$}
+\STATE Mark the probe decision as locally certified for this batch and update model.
+\ELSE
+\STATE Use the signed audit; report restoration misalignment, geometry, and probe mismatch separately.
+\ENDIF
+\STATE Compare joint training, detachment, and any selective intervention using both survival and task utility at matched doses and seeds.
+\end{algorithmic}
+\end{algorithm}
+
+The certificate is sufficient, so a large $\Delta$ does not establish that a probe is wrong. Directly evaluating the signed discrepancy resolves the current checkpoint; attributing it to the terms in \eqref{eq:boundary_terms} determines the next measurement. Weak restoration is addressed by a directional primary reference, a sign discrepancy by a signed numerator, a surrogate discrepancy by the actual auxiliary gradient, and temporal mismatch by a new calibration audit. Merely recomputing the same unsigned norm ratio does not address all four cases, as the zero-dose control demonstrates.
+
+A survival intervention should first alter the contraction observable in the intended direction, then preserve or improve predictive utility. These criteria can disagree: the rank-3 SNR filter passes the scatter criterion while underperforming detachment, and the low-label radial filter loses its accuracy advantage at extreme doses. Reporting only collapse counts would hide both outcomes. Likewise, a gate that opens correctly can still choose an ineffective deletion subspace. The diagnostic benchmark therefore retains closed-gate failures, open-gate failures, and successful protection as different outcomes.
+
+This protocol can be added to an existing multi-task optimizer without replacing its objective. The cheap probe provides a screening measurement; the signed audit checks its interpretation at selected operating points. For adaptive optimizers, the actual proposed parameter step replaces the gradient-flow direction, with the finite-step remainder in Appendix~\ref{app:boundary_proof}. An early-warning claim additionally requires calibration before the outcome and evaluation at declared future horizons. Our endpoint associations, warm-up interventions, and local certificate are reported separately so each supports the question it actually measures.
+
+\section{Related Work}\label{sec:related}
+
+Multi-task learning~\citep{caruana1997multitask} studies transfer among objectives, and task-grouping studies ask when joint training helps~\citep{standley2020tasks,vandenhende2021multi}. PCGrad and CAGrad address gradient conflict~\citep{yu2020pcgrad,liu2021cagrad}; MGDA, Nash-MTL, and FAMO pursue Pareto, bargaining, or progress-balancing criteria~\citep{sener2018multi,navon2022multi,liu2023famo}. Other methods modify task-gradient geometry or loss weights~\citep{senushkin2023aligned,liu2021imtl,chen2018gradnorm,kendall2018multi,wang2021gradient,limarenko2026gcond,zhou2025imgrad}. Our structural result concerns what task-gradient relations leave unidentified: their effect on representation variance. It motivates an additional diagnostic alongside these optimization criteria.
+
+Representation collapse has been studied extensively in self-supervised learning, including stop-gradient mechanisms~\citep{grill2020bootstrap,chen2021simsiam,caron2021emerging}, variance and covariance regularization~\citep{zbontar2021barlow,bardes2022vicreg,ermolov2021whitening}, and spectral dynamics~\citep{jing2022understanding,dong2021attention,kim2025taxonomy}. RankMe evaluates learned representations through effective rank~\citep{garrido2023rankme}. Here collapse refers to reduced variation across examples, distinct from terminal classifier geometry in neural collapse~\citep{papyan2020prevalence,wang2026neuralcollapse}. Our contribution connects an update-level signed observable to the validity of the cheap probe used to approximate it.
+
+Auxiliary-gradient projection is also established. ATTITTUD and GradOPS choose subspaces from task influence or task-gradient spans~\citep{dery2021attittud,zhu2025gradops}; other approaches select or combine auxiliary tasks~\citep{navon2021auxiliary,jiang2023forkmerge,shin2024dgr}. Our time-series domains are activity recognition~\citep{ucihar}, modulation recognition~\citep{radioml}, and battery health~\citep{nasa_battery,severson2019data,attia2020closed,pradhan2022soh}, where auxiliary learning is common~\citep{zhang2021survey}. We use filtering to test the contraction diagnosis and compare it with detachment. The contribution is the diagnosis and its scope: what must be measured to interpret a toxicity probe, why a threshold can transfer in one regime and fail in another, and how to evaluate the intervention without conflating survival with task utility.
+
 \section{Conclusion}\label{sec:conclusion}
 
-Gradient toxicity exposes a failure that pairwise conflict criteria do not directly measure: auxiliary updates can contract a shared representation even without gradient opposition. An exact parameter-space identity diagnoses instantaneous contraction, while conditional scalar and spectral models distinguish it from eventual collapse. A frozen warm-up probe identifies useful intervention regimes, but its transfer depends on basis, timing, and dose. Under corrected MATR evaluation, detachment improves SOH and observed RUL; on HAR reconstruction, an auxiliary-gradient basis substantially reduces deletion rank at similar accuracy. These results support monitoring representation variation alongside task metrics and comparing selective deletion with detachment and scalar attenuation. The guarantees remain confined to their stated assumptions; the empirical contribution is a diagnostic and a tested family of interventions.
-
-
-
+Task-gradient compatibility does not certify that a shared representation survives. Gradient toxicity adds the missing variance-sensitive axis, and its exact signed form exposes when a cheap frozen probe is reliable. We give a computable local validity boundary and identify distinct failure patterns under calibration changes, training-state drift, and real-head geometry. The diagnostic's scope is determined by these mechanisms. Detachment and selective filtering test the consequences: a representation can survive without recovering task utility, and an auxiliary can be useful before becoming toxic. Multi-task evaluation should report both outcomes and audit the probe that connects them.
 
 \clearpage
 \section*{AI Use Statement}
-Generative AI tools assisted with drafting, language editing, code, literature retrieval, proof development, and figure design. Executable counterexamples exposed overly broad theoretical claims, which were revised to state their assumptions. Figures were redrawn from recorded experimental results. The authors remain responsible for verifying the final text, claims, code, and artifacts.
+Generative AI tools assisted with drafting, language editing, code, literature retrieval, proof development, and figure design. The new diagnostic identities were checked with executable numerical examples; assumptions are stated explicitly with each claim and in Appendix~\ref{app:proofs}. Figures are drawn from recorded experimental results. The authors remain responsible for verifying the final text, claims, code, and artifacts.
 
 \section*{Ethics Statement}
 We use existing datasets: UCI-HAR, RadioML2016.10A, the NASA PCoE and MATR battery archives, public A-share market data, NYUv2, and CelebA. We collected no new human-subject data. The HAR identity auxiliary is evaluated as a training-head probe, not a held-out privacy attack. Battery prediction is safety-relevant; Section~\ref{sec:negatives} describes the observed limitations, and deployment requires task-specific validation.
@@ -360,6 +298,251 @@ Appendices~\ref{app:proofs}--\ref{app:general} give the assumptions and scope of
 % ═══════════════════════════════════════════════════════════════════
 \clearpage
 \appendix
+
+
+\section{Proofs and Audit Details for the Diagnostic Boundary}\label{app:boundary_proof}
+
+Let $\theta\in\mathbb R^2$, $v_0=-e_1+\beta e_2$, and $z(\theta)=v_0+\theta$.
+Choose a two-example encoder $H(\theta)=(z^\top,-z^\top)^\top$.
+Then $V=\|z\|^2/2$ and $\nabla_\theta V=v_0$ at $\theta=0$.
+The losses $L_p=\|z-(v_0-e_1)\|^2/2$ and
+$L_a^\pm=\|z-(v_0\mp e_2)\|^2/2$ are nonnegative smooth functions
+of the representation. Their gradients at zero are $e_1$ and $\pm e_2$.
+Thus Proposition~\ref{prop:conflict_gap} concerns realizable encoder/loss
+configurations, not arbitrary incompatible gradients. Both task pairs have
+the same Gram matrix, while the signed variance derivatives differ.
+
+Vectorization of the centered batch gives $u=(C_B\otimes I_m)h$ and
+$\nabla_\theta V=J^\top u/B$. Hence
+$\dot V=-u^\top JJ^\top(g_p+\alpha g_a)/B$.
+For any fixed positive scale $k$, write $JJ^\top=k(I+E)$.
+This is a decomposition, not an assumption of isotropy.
+With the definitions in \eqref{eq:boundary_terms}, the normalized derivative is
+$d+\epsilon_p-\alpha(a+\epsilon_a)$, which proves
+\eqref{eq:probe_discrepancy}. Taking absolute values term by term proves
+\eqref{eq:validity_margin}. The exact discrepancy $\mathcal E$ can be smaller
+than $\Delta$ because signed terms cancel. Failure of the sufficient margin
+condition therefore leaves the probe undecided; it does not prove the probe wrong.
+Choosing $k$ must be reported, since it changes the decomposition and the tightness
+of this conservative envelope, although it cannot change $\dot V$.
+
+Record the batch, checkpoint, losses, auxiliary dose, probe value $q$, and scale $k$.
+Compute $g_p$, $g_a$ for the actual operating losses and $u$ from the unfiltered
+representation. Evaluate $K g$ by first computing $J^\top g$, then a Jacobian--vector
+product with $J$; a dense $K$ is unnecessary. This yields $a,d,\epsilon_a,\epsilon_p$,
+the exact signed flux, and the validity margin. When $u=0$ or $\|g_p\|=0$, the
+normalized decomposition is undefined and the unnormalized identity
+\eqref{eq:signed_variance} remains the appropriate diagnostic.
+This audit costs more than a frozen feature-space probe. Its purpose is to identify
+why the cheap decision can or cannot be transported to an operating checkpoint.
+The archive used here contains the cheap proxies and intervention outcomes; on $405$ HAR checkpoints the certificate fires $15$ times and is never wrong.
+
+For $K=I$, the local condition is $d-\alpha a<0$.
+Take $d=0.1$, $a=q=0.2$, and $\alpha=1$: the nominal gate is closed while
+the exact derivative is negative. This is a false negative caused by treating
+the primary norm as radial restoration. Conversely, with $d=1$, $a=-q=-2$,
+and $\alpha=1$, the gate is open but the exact derivative is positive.
+For a fixed $q$, the theorem applies at each time with time-indexed components.
+If $\sup_{t\in I}\Delta_t<|1-\alpha q|$, its sign conclusion holds throughout
+the interval $I$. Obtaining this uniform bound is an additional task; a single
+frozen observation does not supply it. Even a negative variance derivative on
+a finite interval does not by itself imply convergence to zero.
+
+Let $s_\theta$ be the actual proposed parameter increment, including any
+optimizer preconditioning, momentum, and weight decay. If $\nabla V$ is
+$L$-Lipschitz on the segment from $\theta$ to $\theta+s_\theta$, then
+\begin{equation}
+ \left|V(\theta+s_\theta)-V(\theta)-v^\top s_\theta\right|
+ \le \tfrac L2\|s_\theta\|^2.
+ \label{eq:finite_step_audit}
+\end{equation}
+This follows by integrating the gradient along the segment. A first-order
+margin exceeding this remainder certifies the sign of the finite-step change.
+The gradient-flow decomposition applies directly to plain gradient updates;
+the actual-step audit is the corresponding observable for Adam. Separating
+primary and auxiliary contributions through a nonlinear optimizer requires
+specifying the counterfactual update and its state. We do not equate a
+feature-gradient norm ratio with an Adam-step certificate.
+
+The controlled driver computes the probe in \texttt{rho\_probe} within
+\texttt{cross\_domain\_mtl.py}:
+\begin{equation}
+ \hat\rho=\frac1B\sum_{i=1}^B
+ \frac{\|\Pi_{u_i}\widetilde g_{a,i}\|}{\|g_{p,i}\|+10^{-8}},
+ \qquad \widetilde g_a=\nabla_H\frac{\|C_BH\|_F^2}{Bm}.
+\end{equation}
+Training instead uses the model's fixed random projections. Thus a contracting
+surrogate, per-example averaging, and regularization all enter $q$.
+The real-head driver differentiates the specified reconstruction, identity,
+or SNR loss. The A1 alignment records are probes \emph{after} joint training;
+their mean cosine is an average of examplewise cosines, not the cosine of the
+aggregate parameter gradients. Their unsigned loading cannot establish the
+sign of $v^\top G_a$. The complete main-figure audit is generated by
+\texttt{paper/revision/build\_figures.py}, with source hashes and reconstructed
+statistics. Duplicate low-label dose logs are reconciled by
+$(\alpha,\mathrm{mode},\mathrm{seed})$ and checked for equality before removal.
+
+\texttt{paper/revision/check\_boundary.py} checks the exact discrepancy,
+the sufficient sign certificate, the realizable conflict example, and
+the finite-step remainder on seeded linear encoders. These are algebraic
+checks of the new theory, separate from the archived neural-network experiments.
+
+\subsection{Conditional Dynamical Models}
+
+\begin{definition}[Degenerate minimizer]\label{def:degmin}
+A loss has a degenerate minimizer if a constant representation attains its minimum. For a differentiable interior minimum, stationarity is necessary but insufficient. Variance shrinkage has such minima; reconstruction with varying targets generally does not, because a constant code need not be stationary for a fixed decoder. Accordingly, we evaluate trained reconstruction heads empirically.
+\end{definition}
+
+\begin{theorem}[Conditional scalar collapse transition]\label{thm:transition}
+Assume an independently justified scalar reduction
+\begin{equation}
+\dot\sigma=-\alpha\kappa\sigma+b(\sigma),\qquad\kappa>0,
+\label{eq:flow}
+\end{equation}
+where $b(0)=0$. Let $f(\sigma)=b(\sigma)/\sigma$ on $(0,\infty)$ tend to zero at both ends, increase strictly to a unique nondegenerate maximum $\lambda_\star=f(\sigma_\star)>0$, and decrease strictly afterwards. Then $\alpha_c=\lambda_\star/\kappa$. For $0<\alpha<\alpha_c$ there are two positive equilibria, the smaller unstable and the larger stable; initial values below the smaller one still collapse. At $\alpha_c$ the equilibria coalesce in a saddle-node; for $\alpha>\alpha_c$, every positive trajectory tends to zero.
+\end{theorem}
+\begin{proof}
+The vector field is $\sigma(f(\sigma)-\alpha\kappa)$. The crossings and their stability follow from monotonicity; the nonzero second derivative gives the nondegenerate fold. Above the maximum the field is strictly negative for every $\sigma>0$, whose only possible limiting equilibrium is zero.
+\end{proof}
+
+\begin{lemma}[Departure from a primary optimum]\label{lem:irreversible}
+At $G_p=0$, any nonzero $G_a$ makes the joint gradient nonzero when $\alpha>0$. This implies departure from the primary optimum, but neither collapse nor irreversibility.
+\end{lemma}
+
+\begin{corollary}[Fixed-dose attenuation]\label{cor:stf}
+In Theorem~\ref{thm:transition}, a constant auxiliary multiplier $q\in(0,1]$ replaces the effective dose by $q\alpha$ and the threshold by $\alpha_c/q$. Positive attenuation can therefore preserve the positive equilibrium at a fixed dose. Exact deletion removes the contraction term but is not necessary for fixed-dose protection.
+\end{corollary}
+
+\begin{theorem}[First modal contraction versus full linear collapse]\label{thm:spectral}
+For the linear symmetric model $\dot z=(R-\alpha A)z$, assume $R\succ0$ and $A\succeq0$ in the same coordinates. Along an eigenvector of $R-\alpha A$ with eigenvalue $\nu_j$, the modal variance obeys
+\begin{equation}
+\dot\varsigma_j^2=2\nu_j\varsigma_j^2.
+\label{eq:modal}
+\end{equation}
+Let
+\begin{equation}
+T=R^{-1/2}AR^{-1/2},\qquad \rho_\star=\lambda_{\max}(T).
+\label{eq:spectral}
+\end{equation}
+Some mode contracts iff $\alpha\rho_\star>1$. Every mode contracts exponentially iff $\alpha\lambda_{\min}(T)>1$. Equality leaves a neutral mode.
+\end{theorem}
+\begin{proof}
+$R-\alpha A=R^{1/2}(I-\alpha T)R^{1/2}$ has the same inertia as $I-\alpha T$ by congruence. Since the generator is symmetric, its eigenvalue signs determine modal growth or decay.
+\end{proof}
+
+
+The scalar model and the symmetric linear model answer different questions.
+Neither follows from measuring the proxy $\hat\rho$ alone. For example, with
+$R=I$, $A=\operatorname{diag}(2,1/2)$, and $\alpha=1$, one mode contracts and
+another expands. This permits task performance on a surviving direction
+without preserving the full representation. The NYUv2 result is compatible
+with this mechanism but does not identify its dynamical eigenvectors.
+
+\section{Detailed Intervention Comparisons}\label{app:intervention_details}
+
+\begin{table}[t]
+\centering
+\caption{Controlled comparisons, ten seeds per method: collapse rate followed by the mean task metric. The optimizer grid uses $(m,\alpha)=(128,0.1)$ for HAR, $(32,3000)$ for battery, and $(64,10000)$ for RadioML. The detached reference comes from separate R3 controls at $m=64$ and doses $100$, $100$, and $3000$, respectively; its auxiliary encoder update is zero.}
+\label{tab:conflict}
+\footnotesize
+\resizebox{\columnwidth}{!}{\begin{tabular}{lccc}
+\toprule
+ & HAR & Battery & RadioML \\
+Combiner & acc.\ $\uparrow$ & log-SOH RMSE $\downarrow$ & acc.\ $\uparrow$ \\
+\midrule
+\textsc{joint} (plain summation) & $1.00$ ($0.945$) & $1.00$ ($0.611$) & $1.00$ ($0.256$) \\
+\midrule
+\multicolumn{4}{l}{\textit{conflict resolution}} \\
+\quad PCGrad & $1.00$ ($0.585$) & $1.00$ ($0.601$) & $1.00$ ($0.091$) \\
+\quad CAGrad ($c{=}0.5$) & $1.00$ ($0.952$) & $1.00$ ($0.607$) & $1.00$ ($0.091$) \\
+\midrule
+\multicolumn{4}{l}{\textit{Pareto}} \\
+\quad MGDA & $1.00$ ($0.200$) & $1.00$ ($0.385$) & $1.00$ ($0.091$) \\
+\midrule
+\multicolumn{4}{l}{\textit{gradient geometry}} \\
+\quad Aligned-MTL & $1.00$ ($0.865$) & $1.00$ ($0.609$) & $1.00$ ($0.091$) \\
+\quad IMTL-G & $1.00$ ($0.419$) & $1.00$ ($0.601$) & $1.00$ ($0.091$) \\
+\quad Nash-MTL & $1.00$ ($0.280$) & $1.00$ ($0.552$) & $1.00$ ($0.091$) \\
+\midrule
+\multicolumn{4}{l}{\textit{loss weighting}} \\
+\quad FAMO & $1.00$ ($0.182$) & $1.00$ ($0.613$) & $1.00$ ($0.091$) \\
+\quad UW (uncert.) & $1.00$ ($0.940$) & $1.00$ ($0.611$) & $1.00$ ($0.091$) \\
+\quad GradNorm & $1.00$ ($0.958$) & $1.00$ ($0.611$) & $1.00$ ($0.170$) \\
+\quad IMTL-L & $1.00$ ($0.947$) & $1.00$ ($0.611$) & $1.00$ ($0.091$) \\
+\midrule
+Detachment (\textsc{stf-0}) & $0.0$ & $0.0$ & $0.0$ \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Corrected MATR test results: ten initialization seeds on a fixed cell-disjoint split, with validation-based checkpoint selection. $S=\operatorname{tr}\operatorname{Cov}(H)$; relative $S$ is the mean same-seed ratio to the SOH-only reference; PR is participation rank. Censored shortfall measures lower-bound violations in cycles. Table~\ref{tab:battery_evidence} reports uncertainty.}
+\label{tab:bmtl_corrected}
+\footnotesize
+\resizebox{\columnwidth}{!}{\begin{tabular}{lrrrrrr}
+\toprule
+Mode & SOH RMSE\% $\downarrow$ & obs.\ RUL MAE $\downarrow$ & shortfall $\downarrow$ & $S$ & relative $S$ & PR \\
+\midrule
+SOH-only & $0.61$ & --- & --- & $1.01$ & $1.00$ & $1.35$ \\
+\textsc{joint} & $5.57$ & $81.5$ & $17.60$ & $2.86$ & $3.55$ & $2.49$ \\
+\textsc{stf-0} & $\mathbf{2.10}$ & $\mathbf{46.7}$ & $\mathbf{2.06}$ & $4.77$ & $6.24$ & $1.86$ \\
+\textsc{stfcal} & $2.71$ & $63.6$ & $5.73$ & $1.40$ & $1.89$ & $2.03$ \\
+\textsc{stfcalrank} & $4.98$ & $107.6$ & $17.57$ & $617.90$ & $651.77$ & $1.21$ \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Real auxiliary heads at width $64$, ten seeds: mean primary accuracy and collapse rate in parentheses. The listed radial selective arms do not match detachment on high-dose SNR regression. The separate rank-3 arm also avoids collapse in all ten SNR seeds, but reaches only $0.211$ accuracy (Figure~\ref{fig:intervention}c).}
+\label{tab:real_aux}
+\footnotesize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+Auxiliary head & $\alpha$ & \textsc{joint} & \textsc{stf-0} & \textsc{stf-hard} & \textsc{stf-soft} & \textsc{stfcal} \\
+\midrule
+HAR input-reconstruction & $0.1$ & $.942$ ($0.0$) & $.943$ ($0.0$) & $.942$ ($0.0$) & $.942$ ($0.0$) & $.942$ ($0.0$) \\
+HAR subject-ID probe & $0.1$ & $.941$ ($0.0$) & $.943$ ($0.0$) & $.944$ ($0.0$) & $.943$ ($0.0$) & $.942$ ($0.0$) \\
+RadioML I/Q-reconstruction & $3000$ & $.343$ ($0.0$) & $.307$ ($0.0$) & $.329$ ($0.0$) & $.327$ ($0.0$) & $.315$ ($0.0$) \\
+RadioML SNR regression & $3000$ & $.205$ ($1.0$) & $\mathbf{.307}$ ($\mathbf{0.0}$) & $.208$ ($1.0$) & $.200$ ($0.9$) & $.199$ ($0.1$) \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\input{real_basis_evidence_table.tex}
+
+
+A temporal encoder combines a mixer and a gated state-space block, feeding
+SOH, RUL, reconstruction, and distributional heads. The corrected protocol
+selects checkpoints on validation cells, reports observed-lifetime MAE and
+censored shortfall separately, and retains disjoint train/validation/test cells.
+Against joint training, detachment's paired mean differences across ten
+initializations are $-3.47$ SOH percentage points (95\% $t$ interval
+$[-4.20,-2.74]$) and $-34.8$ observed-RUL cycles ($[-57.8,-11.8]$).
+These intervals describe initialization variability on one cell split.
+Several protocol choices changed together; this comparison does not isolate
+censoring as the cause of the changed ranking. The rank arm's large covariance
+trace and low participation rank likewise do not establish useful diversity.
+
+The six-panel summary below retains dose sweeps, width crossings, the NYUv2
+gate-boundary experiment, intervention counts, and financial outcomes.
+Widths change both empirical crossing locations and probe calibration~\citep{yang2021feature};
+neither yields an independently identified universal capacity exponent.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/unified_all.pdf}
+\caption{Additional diagnostics across domains. (a) Dose--scatter curves;
+the half-height crossing differs from the operational $0.3$ criterion.
+(b) Descriptive width trends. (c) Paired NYUv2 boundary outcomes at
+$\alpha=0.5$. (d,e) Collapse and recovery rates for the archived controlled
+interventions. (f) Financial rank-IC with temporal folds as the pairing unit.
+Source protocols and numerical tables are provided in this supplement.}
+\label{fig:unified}
+\end{figure}
+
 The appendices cover the financial application (Appendix~\ref{app:finance}), proofs and scaling analyses (Appendix~\ref{app:proofs}), generalizations and finite-sample theory (Appendix~\ref{app:general}), additional tables and protocols (Appendix~\ref{app:tables}), NYUv2 (Appendix~\ref{app:nyu}), supplementary experiments (Appendix~\ref{app:moved}), and matched-dose regularization baselines (Appendix~\ref{app:reg}).
 \section{Financial Ranking Application}\label{app:finance}
 
@@ -452,7 +635,7 @@ Nine-width HAR and battery sweeps use $m\in\{16,24,32,48,64,96,128,192,256\}$ wi
 
 We also examine probe scaling across encoders. Repeating calibration with a Transformer at $m\in\{32,64,128\}$ and ten seeds gives probe exponents $-0.93$ for HAR ($R^2=0.99$), $+0.39$ for battery ($R^2=0.87$), and $-0.17$ for RadioML ($R^2=0.79$). The corresponding MLP values are $-1.63$ ($R^2=0.96$), $+0.67$ ($R^2=0.86$), and $+0.28$ ($R^2=0.40$). Signs agree for HAR and battery; RadioML is consistent with zero for both encoders, and the 95\% intervals overlap in all three domains. This is evidence of broadly similar probe trends in the tested encoders, not architecture invariance. The script \texttt{probe\_exponent.py} reproduces the analysis.
 
-Probe exponents and scatter-crossing exponents estimate different quantities. Their MLP point estimates agree in sign for RadioML ($+0.28$ versus $+0.02$), but disagree for HAR ($-1.63$ versus $+0.38$) and battery ($+0.67$ versus $-0.06$). A half-height crossing locates a dose at which trained scatter reaches half its reference value; the probe estimates $1/\hat\rho$ at the warm-up anchor. Agreement within a factor of a few at one width (a factor of $7$ for NYUv2 at $m=64$) does not imply agreement in width scaling. Negative probe slopes do not satisfy the restricted nonnegative exponent assumed in \eqref{eq:rank_dilution}, but that assumption is not a general constraint on empirical slopes. Section~\ref{sec:capacity_law} therefore reports crossing exponents, while Appendix~\ref{app:nyu} reports probe values as calibration statistics.
+Probe exponents and scatter-crossing exponents estimate different quantities. Their MLP point estimates agree in sign for RadioML ($+0.28$ versus $+0.02$), but disagree for HAR ($-1.63$ versus $+0.38$) and battery ($+0.67$ versus $-0.06$). A half-height crossing locates a dose at which trained scatter reaches half its reference value; the probe estimates $1/\hat\rho$ at the warm-up anchor. Agreement within a factor of a few at one width (a factor of $7$ for NYUv2 at $m=64$) does not imply agreement in width scaling. Negative probe slopes do not satisfy the restricted nonnegative exponent assumed in \eqref{eq:rank_dilution}, but that assumption is not a general constraint on empirical slopes. The width analysis here therefore reports crossing exponents separately, while Appendix~\ref{app:nyu} reports probe values as calibration statistics.
 
 Several sweeps show bimodal per-seed scatter near an empirical crossing. This is consistent with multiple outcomes but does not uniquely identify a saddle-node bifurcation; initialization, finite training time and optimization can also generate heterogeneous outcomes.
 
@@ -527,7 +710,7 @@ We compare deletion and positive attenuation in the same UCI-HAR setup ($m=64$, 
 \centering
 \caption{Matched attenuation on UCI-HAR ($m=64$, sixty epochs). Accuracy and calibrated multiplier $q$ are averaged over completed seeds; \texttt{div} indicates non-finite evaluation. There are three seeds per configuration, except at $\alpha=300$, where seed $0$ diverges for every arm and is excluded. Bold identifies the best fixed setting and the best calibrated setting when it exceeds the best fixed accuracy.}
 \label{tab:attenuation}
-\small
+\footnotesize
 \begin{tabular}{lcccccc}
 \toprule
 & \multicolumn{3}{c}{accuracy} & \multicolumn{3}{c}{multiplier $q$} \\
@@ -553,7 +736,7 @@ calibrated $c=1.0$ & .9257 & .9266 & .9276 & .759 & .163 & .039 \\
 \centering
 \caption{Selected rank versus auxiliary dose on UCI-HAR ($m=64$, five seeds, probe depth $R=64$). Ranks increase with dose; full detachment blocks all $64$ feature directions. A closed gate removes no directions. Relative scatter is $\mathcal S_h/\mathcal S_{single}$ for the representation-PCA rank arm (\texttt{stfcalrank}); candidate ranks are reported for both bases. These empirical ranks do not establish the PSD optimum in Theorem~\ref{thm:minimalrank}.}
 \label{tab:doserank}
-\small
+\footnotesize
 \begin{tabular}{cccccc}
 \toprule
 $\alpha$ & gate & $r^\star$ (principal) & $r^\star$ (aux.\ basis) & rel.\ scatter (rank arm) & rel.\ scatter (\textsc{joint}) \\
@@ -577,7 +760,7 @@ $100$   & $1$ & $61.6$ & $61.0$ & $0.950$ & $0.016$ \\
 \centering
 \caption{Historical battery results with evaluation-based checkpoint selection. SOH suggests a benefit from detachment, but these are not independent test estimates. The legacy RUL score averages error against observed lifetimes and censored lower bounds; it is not observed-only lifetime MAE. Single-task rows are references, not performance ceilings. Reference rows use four seeds; other rows use ten.}
 \label{tab:bmtl}
-\small
+\footnotesize
 \resizebox{\columnwidth}{!}{\begin{tabular}{lccccc}
 \toprule
  & \multicolumn{2}{c}{MATR} & \multicolumn{2}{c}{NASA} \\
@@ -638,7 +821,7 @@ Repeated probes at a frozen HAR anchor assess sampling variation. Across $2000$ 
 
 \begin{table}[t]
 \centering
-\small
+\footnotesize
 \caption{Frozen-anchor sampling experiment on HAR ($m=64$, four detached warm-up epochs, five seeds). Each seed uses $2000$ batches of size $B$, sampled with replacement. Standard deviation and CV describe variation across batches at a fixed anchor. ``Meas.'' is the observed frequency of $|\hat\rho-\rho|>\eta\rho$; ``bound'' is the Bernstein plug-in envelope from \eqref{eq:calibration}, using estimated probe moments ($\kappa^2=2\rho^2c_0^2+\frac23R_{\max}\varepsilon$). Values above one are uninformative probability bounds. The envelopes exceed observed frequencies but are not population confidence guarantees. The fitted CV slope is $-0.500$ ($R^2=0.96$), and the mean slope is $+0.006$. The norm of $\sum_i g_a^{(i)}$ is at most $4\times10^{-8}$ of $\sum_i\|g_a^{(i)}\|$. Raising nominal confidence from $90\%$ to $99.9\%$ multiplies the sample-size expression by $\ln(2/10^{-3})/\ln(2/0.1)=2.54$.}
 \label{tab:certificate}
 \begin{tabular}{rcccccccc}
@@ -704,9 +887,39 @@ In the historical ten-seed MATR experiment, the radial calibrated arm improves S
 
 \begin{table}[t]
 \centering
+\caption{The sixteen controlled toxifier cells behind Figure~\ref{fig:probe_prediction}a. Every training auxiliary is a fixed projected-variance toxifier; the probe uses an isotropic variance surrogate. $\alpha_{\rm probe}=1/\bar\rho$ is the inverse mean warm-up probe, while $\alpha_{1/2}$ interpolates the mean dose--scatter curve at relative scatter $0.5$. Their ratio is a calibration-transfer diagnostic. Rounded NYUv2 values are shown here; the figure uses full-precision archived WARM records.}
+\label{tab:probe_cells}
+\footnotesize
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lcccccr}
+\toprule
+Domain & Head & Width $m$ & Probe $\bar\rho$ & $\alpha_{\rm probe}$ & $\alpha_{1/2}$ & Ratio \\
+\midrule
+HAR       & toxifier & 32   & $30.2$   & $3.32\times10^{-2}$ & $1.02\times10^{-3}$ & $32.5$ \\
+HAR       & toxifier & 64   & $110.2$  & $9.07\times10^{-3}$ & $1.41\times10^{-3}$ & $6.4$ \\
+HAR       & toxifier & 128  & $552.0$  & $1.81\times10^{-3}$ & $1.63\times10^{-3}$ & $1.1$ \\
+HAR       & toxifier & 256  & $1504.9$ & $6.65\times10^{-4}$ & $4.52\times10^{-3}$ & $0.15$ \\
+Battery   & toxifier   & 32   & $1.10$   & $9.07\times10^{-1}$ & $9.51\times10^{-1}$ & $0.95$ \\
+Battery   & toxifier   & 64   & $0.71$   & $1.42$              & $8.95\times10^{-1}$ & $1.58$ \\
+Battery   & toxifier   & 128  & $0.85$   & $1.18$              & $9.03\times10^{-1}$ & $1.31$ \\
+Battery   & toxifier   & 256  & $0.28$   & $3.56$              & $1.18$              & $3.01$ \\
+RadioML   & toxifier   & 32   & $0.14$   & $7.13$              & $1.73\times10^{-1}$ & $41.1$ \\
+RadioML   & toxifier   & 64   & $0.08$   & $11.9$              & $3.95\times10^{-1}$ & $30.3$ \\
+RadioML   & toxifier   & 128  & $0.05$   & $19.8$              & $2.41\times10^{-1}$ & $82.2$ \\
+RadioML   & toxifier   & 256  & $0.04$   & $24.9$              & $2.16\times10^{-1}$ & $115.6$ \\
+NYUv2     & toxifier   & 32   & $2.26$   & $4.42\times10^{-1}$ & $1.14\times10^{-1}$ & $3.9$ \\
+NYUv2     & toxifier   & 64   & $2.01$   & $4.98\times10^{-1}$ & $6.89\times10^{-2}$ & $7.2$ \\
+NYUv2     & toxifier   & 128  & $1.64$   & $6.10\times10^{-1}$ & $3.56\times10^{-2}$ & $17.1$ \\
+NYUv2     & toxifier   & 256  & $1.29$   & $7.75\times10^{-1}$ & $2.39\times10^{-2}$ & $32.5$ \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}[t]
+\centering
 \caption{Four scientific domains and the financial discovery application. Sample counts describe the listed experimental datasets; individual protocols specify their partitions. Controlled scientific experiments use variance-shrinkage auxiliaries. The financial application uses real heads, and the battery and NYUv2 application studies also evaluate practical reconstruction heads.}
 \label{tab:domains}
-\small
+\footnotesize
 \resizebox{\linewidth}{!}{%
 \begin{tabular}{lllll}
 \toprule
@@ -726,7 +939,7 @@ NYUv2 & RGB-D (144$\times$192) & 13-class seg + depth + normals & 795 / 654 scen
 \centering
 \caption{Financial application: mean OOS rank-IC $\pm$ population s.d. over 100 fold-seed cells (ten temporal folds, ten initialization seeds). Cells sharing a fold are dependent. After averaging seeds within folds and correcting three paired comparisons, no method differs significantly from joint training. These records use real auxiliary heads without the fixed variance toxifier.}
 \label{tab:finance_repair}
-\small
+\footnotesize
 \begin{tabular}{lcc}
 \toprule
 Mode & OOS rank-IC & vs.\ joint \\
@@ -743,7 +956,7 @@ Mode & OOS rank-IC & vs.\ joint \\
 \centering
 \caption{Historical MATR censoring ablation: SOH RMSE (\%) and legacy RUL MAE (cycles), with leave-cell-out evaluation, $d=128$, bf16 training, and fp32 evaluation. Legacy rows use four seeds; the censoring-aware row uses ten. Legacy supervision treats censored bounds as exact targets; the EOL-only variant additionally excludes $96/185$ cells, leaving 14 test cells. Censoring-aware supervision applies a one-sided hinge to the $59.2\%$ censored samples and retains all cells. Evaluation-selected checkpoints and legacy RUL scoring limit interpretation.}
 \label{tab:cens_ablation}
-\small
+\footnotesize
 \begin{tabular}{lccccc}
 \toprule
  & \multicolumn{2}{c}{SOH RMSE (\%)} & \multicolumn{2}{c}{RUL MAE (cyc)} & \\
@@ -764,8 +977,8 @@ censoring-aware (ours) & $5.24\pm0.54$ & $1.68\pm0.41$ & $209.0\pm59.8$ & $574.7
 \centering
 \caption{Historical battery-head comparison at $\alpha=10$ (five seeds): SOH RMSE (\%), legacy all-sample RUL MAE (cycles), and ``scatter'' $\mathbb E_b[\mathrm{Var}_j(h_j^{(b)})]$ (sample correction $d-1$, no centering across examples), not \eqref{eq:cross_sample_scatter}. PCGrad, FAMO, and CAGrad yield higher SOH error than detachment in both datasets. Scatter alone does not establish operational collapse; Table~\ref{tab:conflict} reports separate controlled-toxifier experiments. These evaluation-selected results are exploratory.}
 \label{tab:conflict_num}
-\small
-\setlength{\tabcolsep}{4.5pt}
+\footnotesize
+\setlength{\tabcolsep}{3.5pt}
 \begin{tabular}{lcccccc}
 \toprule
  & \multicolumn{3}{c}{MATR} & \multicolumn{3}{c}{NASA} \\
@@ -788,7 +1001,7 @@ CAGrad & $6.33\pm0.45$ & $198.0$ & $0.166$ & $13.04\pm0.75$ & $17.7$ & $0.198$ \
 \centering
 \caption{Historical MATR auxiliary-weight sweep (seed 0): SOH RMSE (\%) and legacy RUL MAE (cycles), with censoring-aware supervision and bf16 training/fp32 evaluation. Joint training uses reconstruction/distributional weight $\lambda_{\mathrm{aux}}$; detachment makes encoder learning independent of this weight. SOH error generally increases with dose, although the $d=32$ curve is not strictly monotone. Single-task rows are width-matched references; legacy RUL scores and evaluation-selected checkpoints are not independent lifetime-error estimates.}
 \label{tab:aux_sweep}
-\small
+\footnotesize
 \begin{tabular}{ll ccc ccc}
 \toprule
 & & \multicolumn{3}{c}{SOH RMSE (\%)$\downarrow$} & \multicolumn{3}{c}{RUL MAE (cyc)$\downarrow$} \\
@@ -831,7 +1044,7 @@ On the idle device, hard and soft filtering cost at most $21.8\%$ on HAR. At $m=
 \centering
 \caption{UCI-HAR per-epoch overhead relative to plain summation (batch $256$). Entries are medians over ten repetitions of median epoch time; epoch 0 is excluded and each epoch includes device synchronization. Method order rotates, and timing begins after three idle-device readings. A within-rotation paired-ratio estimator differs by at most five percentage points. Absolute reference times are shown in the first row. Negative overhead denotes a measured speedup; the table does not measure the cost of every possible probe or rank configuration.}
 \label{tab:overhead}
-\small
+\footnotesize
 \begin{tabular}{lcccc}
 \toprule
 Method & $m{=}32$ & $m{=}64$ & $m{=}128$ & $m{=}256$ \\
@@ -871,7 +1084,7 @@ The task metric can conceal shrinkage: joint depth RMSE falls overall from $1.33
 \centering
 \caption{NYUv2 under the unified protocol (MLP, $m=64$, ten seeds): depth RMSE in meters on a $9\times12$ grid and scatter relative to the same-seed single-task anchor. Calibration gives mean $\hat\rho=2.01$ and inverse-mean threshold $0.50$. Recorded candidate ranks are 1 at $\alpha\le0.5$ and 3 at $\alpha\ge1$; the radial \textsc{stfcal} arm does not use this rank. Full detachment yields RMSE $1.353$ and relative scatter $1.000$ at every dose.}
 \label{tab:nyu_dose}
-\small
+\footnotesize
 \resizebox{\linewidth}{!}{%
 \begin{tabular}{lccccccccc}
 \toprule
@@ -896,7 +1109,7 @@ Table~\ref{tab:nyu_bmtl} compares dense tasks within a shared small-backbone pro
 \centering
 \caption{NYUv2 three-task comparison using a convolutional encoder ($d=128$, ten seeds, final epoch). Top: single-task references and the three-task model without auxiliaries. Middle: variance-shrinkage auxiliary (\emph{proj}, $\alpha=1$). Bottom: input reconstruction (\emph{ae}, $\alpha=250$). Depth RMSE is in meters and normal error in radians; lower is better for both. The recorded ``scatter'' is $\mathbb E_b[\mathrm{Var}_j(h_j^{(b)})]$, with sample correction $d-1$ and no centering across examples. It differs from \eqref{eq:cross_sample_scatter} and does not establish variation across examples. All rows share the backbone, split, and seeds; absolute values are not directly comparable with published models using different architectures.}
 \label{tab:nyu_bmtl}
-\small
+\footnotesize
 \resizebox{\linewidth}{!}{%
 \begin{tabular}{lccccc}
 \toprule
@@ -926,41 +1139,6 @@ Ten-seed calibrated experiments support Section~\ref{sec:stfcal}. At high doses,
 
 With Transformer encoders at $\alpha=100$, HAR scatter changes from $0.030$ to $1.041$ and battery scatter from $0.036$ to $1.000$, again reducing collapse from $10/10$ to $0/10$. Battery SOH RMSE improves from $0.447$ to $0.267$. On CelebA at $\alpha=100$ (five seeds), scatter increases from $0.003$ to $0.934$ and collapse falls from $5/5$ to $0/5$.
 
-\begin{table}[t]
-\centering
-\caption{Ten multi-task optimizers at the controlled high dose for each domain (ten seeds; HAR $m=128$, RadioML $m=64$, battery $m=32$). Entries give collapse rate and mean task metric in parentheses. All retain joint training's collapse rate of $1.0$ at the tested defaults; this is not an impossibility result for these method families. Nine methods reach RadioML chance accuracy ($1/11\approx0.091$), while GradNorm and joint training retain some predictive signal. Separate battery-only CAGrad settings $c=0.4/0.8$ give collapse rate $1.0$ and log-SOH RMSE $0.608/0.601$. Records are in \texttt{repro/results/P02/MOO\_har.json}, \texttt{MOO\_radioml.json}, and \texttt{MOO\_battery.json}. Figure~\ref{fig:unified}(d,e) and Table~\ref{tab:unified_repair} report separate filter comparisons.}
-\label{tab:conflict}
-\small
-\resizebox{\columnwidth}{!}{\begin{tabular}{lccc}
-\toprule
- & HAR & Battery & RadioML \\
-Combiner & acc.\ $\uparrow$ & log-SOH RMSE $\downarrow$ & acc.\ $\uparrow$ \\
-\midrule
-\textsc{joint} (plain summation) & $1.00$ ($0.945$) & $1.00$ ($0.611$) & $1.00$ ($0.256$) \\
-\midrule
-\multicolumn{4}{l}{\textit{conflict resolution}} \\
-\quad PCGrad & $1.00$ ($0.585$) & $1.00$ ($0.601$) & $1.00$ ($0.091$) \\
-\quad CAGrad ($c{=}0.5$) & $1.00$ ($0.952$) & $1.00$ ($0.607$) & $1.00$ ($0.091$) \\
-\midrule
-\multicolumn{4}{l}{\textit{Pareto}} \\
-\quad MGDA & $1.00$ ($0.200$) & $1.00$ ($0.385$) & $1.00$ ($0.091$) \\
-\midrule
-\multicolumn{4}{l}{\textit{gradient geometry}} \\
-\quad Aligned-MTL & $1.00$ ($0.865$) & $1.00$ ($0.609$) & $1.00$ ($0.091$) \\
-\quad IMTL-G & $1.00$ ($0.419$) & $1.00$ ($0.601$) & $1.00$ ($0.091$) \\
-\quad Nash-MTL & $1.00$ ($0.280$) & $1.00$ ($0.552$) & $1.00$ ($0.091$) \\
-\midrule
-\multicolumn{4}{l}{\textit{loss weighting}} \\
-\quad FAMO & $1.00$ ($0.182$) & $1.00$ ($0.613$) & $1.00$ ($0.091$) \\
-\quad UW (uncert.) & $1.00$ ($0.940$) & $1.00$ ($0.611$) & $1.00$ ($0.091$) \\
-\quad GradNorm & $1.00$ ($0.958$) & $1.00$ ($0.611$) & $1.00$ ($0.170$) \\
-\quad IMTL-L & $1.00$ ($0.947$) & $1.00$ ($0.611$) & $1.00$ ($0.091$) \\
-\midrule
-\textsc{stf-0} (ours) & $0.0$ & $0.0$ & $0.0$ \\
-\bottomrule
-\end{tabular}}
-\end{table}
-
 The real-head experiments use $m=64$ and ten seeds (Table~\ref{tab:real_aux}). Neither reconstruction head collapses at its tested dose; filtering has little effect or modestly reduces primary accuracy. The training-subject classifier presents a different trade-off: joint training achieves identity accuracy $0.646$ against chance $1/21$, while filtering reduces it to $0.055$ and improves primary accuracy. This is a training-head measurement, not a held-out privacy attack. For high-dose SNR regression, joint training collapses in every seed; hard and soft filtering do not restore accuracy, and detachment performs best among the tested interventions. Probe magnitudes differ substantially across these heads, but the false negatives discussed in Section~\ref{sec:real_aux} preclude a universal decision rule.
 
 These experiments delimit the diagnostic and filters. Task metrics may improve despite shrinkage, real heads may be benign at the tested dose, and calibration can produce false negatives. Frozen bases may drift, but the subspace-error bound does not establish drift as the cause of an observed failure. Repeated frozen probes quantify sampling variation rather than certify later training states. Numerical instability and loss of plasticity~\citep{dohare2024loss} are additional mechanisms outside the fixed-operator analysis.
@@ -969,7 +1147,7 @@ These experiments delimit the diagnostic and filters. Task metrics may improve d
 \centering
 \caption{Intervention families and scope. None of the tested neural-network implementations has a universal trajectory guarantee from the projected norm ratio alone. Historical performance comparisons appear in Tables~\ref{tab:conflict} and \ref{tab:reg}.}
 \label{tab:related}
-\small
+\footnotesize
 \begin{tabular}{p{0.27\linewidth}p{0.29\linewidth}p{0.33\linewidth}}
 \toprule
 Family & Intervention & Relevant limitation \\
@@ -988,7 +1166,7 @@ Parameter variance constraint & constrain the actual parameter update & fixed gu
 \centering
 \caption{Controlled high-dose collapse and task-recovery rates for three domains. Recovery is the fraction of seeds whose primary metric improves over the mean joint-training metric. HAR can retain high accuracy despite substantial shrinkage, so scatter recovery does not imply better accuracy. Battery uses 20 seeds per mode and RadioML ten; the historical HAR file provides aggregate rates. The joint recovery rate is set to zero by convention. All plotted rates are reproduced directly from the released records.}
 \label{tab:unified_repair}
-\small
+\footnotesize
 \resizebox{\columnwidth}{!}{\begin{tabular}{llccccc}
 \toprule
  & & \textsc{joint} & \textsc{stf-0} & \textsc{stf-hard} & \textsc{stf-soft} \\
@@ -1028,7 +1206,7 @@ Equation~\eqref{eq:triweight} amplifies windows in which several factors are ele
 \centering
 \caption{Filter-then-combiner experiments at high auxiliary doses (five seeds, three domains). Unfiltered branches retain collapse rates of $1.0$ and relative scatter at most $0.15$. The hard filter, alone or followed by PCGrad/CAGrad, avoids the collapse criterion in every seed. Primary metrics change modestly after composition; the reverse order was not tested. Bold identifies the filter-only reference within each block.}
 \label{tab:compose}
-\small
+\footnotesize
 \resizebox{\columnwidth}{!}{\begin{tabular}{llcccccc}
 \toprule
 & & \multicolumn{3}{c}{unfiltered (\textsc{joint})} & \multicolumn{3}{c}{filtered (\textsc{stf-hard})} \\
@@ -1054,7 +1232,7 @@ Equation~\eqref{eq:triweight} amplifies windows in which several factors are ele
 \centering
 \caption{Anti-collapse regularizers at the doses and seeds of Table~\ref{tab:conflict} (ten seeds per configuration). Penalties of weight $\lambda$ are added to joint training. Entries report collapse rate, primary metric in parentheses, and relative scatter ($1.0$ is the single-task reference). Joint training, detachment, and hard filtering are evaluated in the same runs. Avoiding the scatter threshold need not improve the primary task.}
 \label{tab:reg}
-\small
+\footnotesize
 \resizebox{\columnwidth}{!}{\begin{tabular}{lcccccc}
 \toprule
  & \multicolumn{2}{c}{HAR} & \multicolumn{2}{c}{Battery} & \multicolumn{2}{c}{RadioML} \\
@@ -1102,13 +1280,13 @@ BatteryMTL's multiplicative regime weights use training-data percentiles for C-r
 
 The frozen calibration in Section~\ref{sec:stfcal} is motivated by the behavior of a continuously recomputed probe. We repeat unfiltered joint training with \texttt{--rho-trace}, using five seeds per configuration over 1730 HAR steps and 350 battery steps. Monitoring does not alter the measured trajectories: all 28 shared \textsc{bscale} configurations match exactly in task metric, collapse rate, relative scatter, and $\hat\rho$ (maximum difference zero).
 
-Three observations matter. First, HAR probe values rise sharply during training: from $0.017$ to $1.9\times10^5$ at $m=32$, $0.010$ to $1.0\times10^5$ at $m=64$, and $0.006$ to $3.5\times10^4$ at $m=256$. Second, similar terminal values occur when the toxifier is inactive ($\alpha=0$) and at the lowest positive dose ($10^{-4}$), so a large probe value alone does not establish auxiliary-induced contraction. At $m=32$, increasing the dose instead lowers the terminal probe, to $5.3\times10^2$ at $10^{-2}$ and $1.1\times10^2$ at $3\times10^{-2}$. Third, in ten HAR configurations whose final scatter remains between $0.50$ and $1.04$ of the reference, the gate $\alpha\hat\rho\ge1$ opens in every seed between steps 110 and 590. A gate using this running statistic would therefore activate on some runs that never meet the collapse criterion.
+Three observations matter. First, HAR probe values rise sharply during training: from $0.017$ to $1.9\times10^5$ at $m=32$, $0.010$ to $1.0\times10^5$ at $m=64$, and $0.006$ to $3.5\times10^4$ at $m=256$. Second, similar terminal values occur when the toxifier is inactive ($\alpha=0$) and at the lowest positive dose ($10^{-4}$), so a large probe value alone does not establish auxiliary-induced contraction. At $m=32$, increasing the dose instead lowers the terminal probe, to $5.3\times10^2$ at $10^{-2}$ and $1.1\times10^2$ at $3\times10^{-2}$. Third, in ten HAR configurations whose final scatter lies between $0.50$ and $1.04$ of the reference, the gate $\alpha\hat\rho\ge1$ opens in every seed between steps 110 and 590. A gate using this running statistic therefore activates on runs that do not meet the collapse criterion at the recorded endpoint.
 
-Battery behaves differently: probe values remain $O(1)$, ranging from $0.29$--$0.49$ initially to $0.3$--$2.9$ at the final step. Among 35 seeds whose scatter stays above the half-height level, the gate opens only once, at the last step. These domain-dependent trajectories motivate a specified calibration time; they do not establish that a fixed probe is universally preferable to every adaptive rule. The script \texttt{repro/scripts/rho\_trace\_analyze.py} reproduces both analyses.
+Battery behaves differently: probe values remain $O(1)$, ranging from $0.29$--$0.49$ initially to $0.3$--$2.9$ at the final step. Among 35 seeds whose final scatter lies above the half-height level, the gate opens only once, at the last step. These domain-dependent trajectories motivate a specified calibration time; they do not establish that a fixed probe is universally preferable to every adaptive rule. The script \texttt{repro/scripts/rho\_trace\_analyze.py} reproduces both analyses.
 
 \subsection{Sensitivity to Calibration Time}\label{app:warmup}
 
-The default calibration measures $\hat\rho$ after four detached warm-up epochs and fixes the gate and rank. We vary only this measurement time, $W\in\{1,2,4,8,16,32\}$, using five widths $32$--$512$ and ten seeds for HAR and battery, and four widths and ten seeds for NYUv2. The $W=4$ configuration exactly reproduces all 100 shared HAR and battery probe values. NYUv2 gives $2.258/2.008/1.637/1.285$, matching the rounded values in Appendix~\ref{app:nyu}.
+The default calibration measures $\hat\rho$ after four detached warm-up epochs and fixes the gate and rank. We vary only this measurement time: $W\in\{1,2,4,8,16,32\}$ at five widths $32$--$512$ for HAR and battery, and $W\in\{1,4,16,32\}$ at four widths for NYUv2, with ten seeds per cell. The $W=4$ configuration exactly reproduces all 100 shared HAR and battery probe values. NYUv2 gives $2.258/2.008/1.637/1.285$, matching the rounded values in Appendix~\ref{app:nyu}.
 
 Probe values depend on the training state. Across the warm-up sweep, HAR at $m=32$ increases from $0.63$ to $6.9\times10^4$, and at $m=512$ from $51.9$ to $1.6\times10^4$. Battery remains $O(1)$: $0.96$ to $1.92$ at $m=32$ and $0.058$ to $0.67$ at $m=512$. NYUv2 at $m=32$ changes from $1.94$ to $4.19$, a factor of $2.2$. Accordingly, width slopes fitted to $1/\hat\rho$ vary from $-2.00$ to $+0.55$ for HAR, $+0.37$ to $+0.97$ for battery, and $+0.11$ to $+0.27$ for NYUv2. These are calibration-dependent probe slopes, not interchangeable estimates of capacity scaling. Differences in primary-gradient magnitude, which appears in the denominator, can contribute to this sensitivity.
 
