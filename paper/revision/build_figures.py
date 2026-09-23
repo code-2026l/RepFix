@@ -244,6 +244,12 @@ def fig_boundary(cells):
 
 def dose_records():
     src=ROOT/'repro/results/_screena'
+    # Fail loudly instead of silently: a missing log directory makes
+    # src.glob('*.txt') empty, which used to yield a Figure 3 whose panels (a)
+    # and (b) are blank while the build still exits 0.  The raw logs are shipped
+    # in the repository, so this can only trigger on a damaged checkout.
+    if not src.is_dir():
+        raise SystemExit('missing raw dose-scan logs: %s (Figure 3 a,b cannot be rebuilt)'%src)
     pat=re.compile(r'mode=(\w+) seed=(\d+) metric=([\d.eE+-]+) aux=[\d.eE+-]+ rel_scatter=([\d.eE+-]+) collapse=(True|False)')
     records={};duplicates=0
     for p in sorted(src.glob('*.txt')):

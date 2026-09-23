@@ -17,9 +17,9 @@ scripts/
   wf_fixed_aux_bridge.py     fixed-projection bridge on real data
   wf_bridge_deep.py          deepened bridge scan
   wf_collapse_rank_trap.py   prediction-level rank trap
-  plot_final_figures.py      THE PAPER FIGURES: paper/figures/unified_all.pdf (Fig. 1) and
-                             paper/figures/battery_repair.pdf, from the recorded results
-                             (results/BSCALE, results/R7, results/R5fin, repro/results)
+  plot_final_figures.py      paper/figures/unified_all.pdf (Fig. 4) and
+                             paper/figures/battery_repair.pdf (Fig. 5), from the recorded
+                             results (results/BSCALE, results/R7, results/R5fin, repro/results)
                              Writes paper/figures/; figures/ holds byte-identical copies.
   plot_unified_v4.py         earlier six-panel set (superseded, 2026-09-22); it writes
                              figures/ only and is not the manuscript figure
@@ -31,6 +31,31 @@ B_pipeline_analysis.md       legacy pipeline note,     2026-08-21 -- superseded,
 results/                     experiment JSON outputs
 figures/                     published copies of the paper figures (PDF/PNG)
 ```
+
+The manuscript has **five** figures and they are split across **two** generators. The
+listing above covers only the last two; the first three come from
+`paper/revision/build_figures.py`:
+
+| figure | file | generator |
+|:---:|---|---|
+| 1 | `paper/figures/fig_survival_gap.pdf` | `paper/revision/build_figures.py` |
+| 2 | `paper/figures/fig_probe_boundary.pdf` | `paper/revision/build_figures.py` |
+| 3 | `paper/figures/fig_diagnostic_intervention.pdf` | `paper/revision/build_figures.py` |
+| 4 | `paper/figures/unified_all.pdf` | `repro/scripts/plot_final_figures.py` |
+| 5 | `paper/figures/battery_repair.pdf` | `repro/scripts/plot_final_figures.py` |
+
+Run them from the repository root:
+
+```
+python paper/revision/build_figures.py     # Figs 1-3, plus paper/revision/evidence_audit.json
+python repro/scripts/plot_final_figures.py # Figs 4-5
+```
+
+`build_figures.py` also writes `paper/revision/evidence_audit.json`, the per-cell record
+dump behind the figure captions and the audited numbers (probe cells, warm-up ratios,
+zero-dose drift, the deduplicated dose-scan records, and the source-file SHA-256 list).
+Its Figure-3 input is the raw dose-scan log directory `repro/results/_screena/`; the
+script fails loudly if that directory is absent rather than emitting blank panels.
 
 ## What these produce
 
