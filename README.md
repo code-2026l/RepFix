@@ -246,14 +246,29 @@ actually certify. The repository now ships the audits behind those questions:
 - `results/READOUT/` (driver `repro/scripts/readout_transfer_audit.py`): a head
   and input statistics fitted on the healthy encoder, applied unchanged to a
   contracted encoder, fall from 0.945 to 0.241 accuracy and ECE 0.031 to 0.430.
-  Refitting only the input statistics recovers 0.952 accuracy but not calibration;
-  retraining recovers 0.955 / 0.034 ECE. The same pattern holds at widths 32 and
+  Refitting only the input statistics recovers 0.952 accuracy and most of ECE
+  (0.043), although NLL remains elevated; retraining recovers 0.955 / 0.034 ECE.
+  The healthy temperature map does not repair the frozen readout (ECE 0.512).
+  The same pattern holds at widths 32 and
   128. Applying the same healthy readout to the STF-0 and STF-cal encoders
   recovers 0.946/0.943, so the survival intervention protects the readout,
   not only the scatter statistic. At `alpha=10` the real HAR subject-ID head
   loses 0.11 primary accuracy without meeting the scatter criterion, while
   `stfcal` recovers it. The information survives; the scale-dependent readout
   does not. This is the operational cost that a scatter-only evaluation misses.
+- `results/READOUT/readout_scale_law.json` (driver
+  `repro/scripts/readout_scale_law.py`): a five-seed scale sweep of a linear
+  readout applied to `cH`, with `c` from 1 to 0.001. The frozen readout falls
+  from 0.948 to 0.174; input recalibration is flat at 0.948; the median
+  first-flip scale is `c* = 0.079` of the healthy scale. This turns the
+  qualitative `c -> 0` proposition into a computable critical scale. Figure:
+  `paper/figures/fig_readout_scale_law.pdf`.
+- `results/READOUT/har_subject_readout.json` (driver
+  `repro/scripts/real_head_readout_transfer.py`): a real HAR subject-ID head at
+  `alpha=10` does not contract (relative `S = 0.90`), yet a readout fitted on
+  the healthy encoder falls from 0.948 to 0.401; input recalibration reaches
+  0.434 and retraining recovers 0.897. This is readout failure by
+  representation drift, not scale: contraction is sufficient, not necessary.
 
 The calibrated arm is a local heuristic: the warm-up probe changes by orders of
 magnitude with the read time (`1/mean rho_hat = 1.34, 0.181, 0.00907, 1.7e-5` at

@@ -47,31 +47,31 @@
 \maketitle
 
 \begin{abstract}
-Multi-task learning can fail silently in deployment even when all task losses look healthy and gradients do not conflict. Auxiliary tasks can shrink the shared representation by orders of magnitude---$4{,}600\times$ on HAR---and break a calibrated downstream readout: accuracy falls from $0.945$ to $0.241$ while a standardised linear probe stays at $0.955$. The information is intact; the instrument is not. We call this auxiliary-driven loss of variation \emph{gradient toxicity}, show that conflict criteria cannot detect it, and introduce a signed variance diagnostic with a local validity boundary and a finite-horizon transport condition for the cheap frozen probe. Across three domains, ten multi-task optimizers collapse under a scatter criterion in $10/10$ seeds at high doses, while detachment never does; a RadioML dose scan puts the toxic onset between $\alpha=3$ and $10$, and STF-cal restores the calibrated readout to $0.943$ by preventing contraction. The probe overestimates the crossing by $30$--$116\times$ on RadioML and changes by orders of magnitude with calibration time; the certificate fires rarely but is never wrong when it does. Variance survival is a separate evaluation axis; probe validity is a quantity to audit.
+Multi-task learning can fail silently in deployment even when every task loss is healthy and no gradients conflict. Auxiliary tasks can shrink a shared representation by orders of magnitude---$4{,}600\times$ in covariance trace on HAR---and break a readout calibrated before the shift: the frozen readout falls from $0.945$ to $0.241$ accuracy while a standardised linear probe stays at $0.955$ and a retrained head recovers $0.955$. The information survives; the instrument does not. We call this \emph{silent scale shift}. For an affine readout, the first prediction change occurs at a computable critical scale; on HAR its median is $c^\star=0.08$ of the healthy scale, and input recalibration is scale-invariant by construction. Conflict criteria cannot see the shift: ten multi-task optimizers fail to prevent it at their calibrated high doses, while detachment does. A cheap radial probe screens for it but is valid only inside a computable margin; on $405$ audited checkpoints it agrees with the exact signed derivative on $51\%$, and the offline certificate fires on $2/405$ but is never wrong when it does. Variance survival is a separate evaluation axis; readout validity is a quantity to audit.
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
 
-A production equity model once failed silently. It combined a pairwise-ranking head with distributional, reconstruction, and contrastive auxiliaries over a shared encoder of A-share factors. After deployment, predicted rankings became nearly constant: cross-sectional prediction spreads fell by $93\%$ relative to validation, while every training loss stayed low and no task gradient conflicted. The shared representation had lost its variation.
+A production equity model once failed silently. It combined a pairwise-ranking head with distributional, reconstruction, and contrastive auxiliaries over a shared encoder of A-share factors. After deployment, predicted rankings became nearly constant: cross-sectional prediction spreads fell by $93\%$ relative to validation, while every training loss stayed low and no task gradient conflicted (Appendix~\ref{app:finance}). The shared representation had lost its variation.
 
-We call this \emph{variance contraction}. Standard diagnostics ask whether task gradients conflict; they do not ask whether the representation retains variation. The distinction matters because contraction is neither conflict nor information loss: a standardised probe can survive it while a readout calibrated before it fails. On our controlled HAR benchmark, accuracy stays near $0.95$ at only $0.05$ of the reference scatter; a readout fitted on the healthy encoder drops from $0.945$ to $0.241$ after contraction, while a re-fitted head recovers $0.955$ (Appendix~\ref{app:readout}).
+We call this \emph{silent scale shift}. Standard diagnostics ask whether task gradients conflict; they do not ask whether the representation retains variation. The distinction matters because a scale shift is neither conflict nor information loss: a standardised probe can survive it while a readout calibrated before it fails. On our controlled HAR benchmark, the covariance trace falls $4{,}600\times$ and the standardised probe stays at $0.955$ (primary accuracy $0.952$), yet a readout fitted on the healthy encoder drops from $0.945$ to $0.241$. Refitting only its input statistics, with no new labels, recovers $0.952$; retraining recovers $0.955$ (Table~\ref{tab:readout}). The information survives; the instrument does not.
 
-Conflict resolution addresses a different question. PCGrad~\citep{yu2020pcgrad}, CAGrad~\citep{liu2021cagrad}, and related methods combine task gradients using directional or loss-based criteria. Representation variance, however, changes according to the update's projection onto the \emph{variance gradient}. We call the auxiliary contribution to this change \emph{gradient toxicity}. The distinction is structural: two auxiliary gradients can have identical task-gradient inner products and norms, yet drive variance in opposite directions. In a contraction-dominated regime, satisfying a conflict criterion need not preserve the representation. Ten multi-task optimizers exhibit this gap at the tested high doses on three domains; detachment does not (Figure~\ref{fig:conflict_toxicity}b).
+The failure has a computable scale. For an affine readout, logits are $W(cH)+b$; as $c$ falls, the bias term dominates and the prediction becomes constant. We derive the first-flip scale for each example and a median critical scale $c^\star$; on HAR $c^\star=0.08$ of the healthy scale (Figure~\ref{fig:scale_law}). Input recalibration is scale-invariant by construction, which is why it recovers accuracy without new labels. Temperature scaling alone does not repair the readout (Section~\ref{sec:stf}).
 
-The diagnostic itself needs an audit. We separate three quantities---variance contraction, scale-invariant information, and readout utility---and ask when the cheap projected-gradient probe can be trusted. Its interpretation depends on the numerator, the restoration denominator, and the distance to calibration.
+Conflict resolution addresses a different question. PCGrad~\citep{yu2020pcgrad}, CAGrad~\citep{liu2021cagrad}, and related methods combine task gradients using directional or loss-based criteria. Representation variance, however, changes according to the update's projection onto the \emph{variance gradient}. We call the auxiliary contribution to this change \emph{gradient toxicity}. The distinction is structural: two auxiliary gradients can have identical task-gradient inner products and norms, yet drive variance in opposite directions. In a contraction-dominated regime, satisfying a conflict criterion need not preserve the representation. Ten multi-task optimizers fail to prevent the shift at their calibrated high doses on three domains; on HAR, four of them retain accuracy near $0.95$ even as the scatter criterion fires, which is exactly why survival and utility are separate axes (Table~\ref{tab:conflict}). Detachment blocks the shift.
 
-Starting from an exact chain-rule identity, we derive a margin condition that separates trustworthy local probe decisions from unresolved ones. The condition decomposes the discrepancy into restoration direction, encoder-induced geometry, and probe mismatch. It also predicts distinct \emph{types} of error: a large primary-gradient norm can conceal weak restoration, an unsigned projection loses the sign of contraction, and a calibration statistic can drift even without auxiliary contact.
+The diagnostic itself needs an audit. We separate three quantities---variance contraction, scale-invariant information, and readout utility---and ask when the cheap projected-gradient probe can be trusted. Starting from an exact chain-rule identity, we derive a local validity boundary and a finite-horizon transport condition; its decomposition predicts three error types: a large primary-gradient norm can conceal weak restoration, an unsigned projection loses the sign of contraction, and a calibration statistic can drift without auxiliary contact.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{figures/fig_survival_gap.pdf}
-\caption{(a) Terminal probes of four real auxiliary heads, ten seeds each. The horizontal coordinate is the \emph{mean per-example} task-gradient cosine; the vertical coordinate is unsigned radial loading. SNR regression has high loading and $10/10$ collapsed endpoints. (b) Operational collapse counts at controlled doses $0.1$ (HAR), $3000$ (battery), and $10000$ (RadioML). All ten optimizers retain collapse. The detached reference uses separate ten-seed controls. Full metrics and control settings are in Table~\ref{tab:conflict}.}
-\label{fig:conflict_toxicity}
+\includegraphics[width=\linewidth]{figures/fig_readout_scale_law.pdf}
+\caption{A linear readout fitted on the healthy HAR encoder, applied to $cH$ for $c\in[10^{-3},1]$. (a) The frozen readout collapses while input recalibration is scale-invariant by construction. (b) The same readout's ECE; the healthy temperature map does not repair the frozen readout. Shaded bands are seed standard deviations; the dashed line is the median first-flip scale $c^\star$. Five seeds, $m=64$.}
+\label{fig:scale_law}
 \end{figure}
 
-We test the mechanism with a controlled variance toxifier, then with real auxiliary heads. The same probe is accurate on battery but overestimates the crossing by $30$--$116\times$ on RadioML; calibration time alone flips a HAR filter; zero-dose controls drift without auxiliary contact. Real heads dissociate: SNR regression is toxic, I/Q reconstruction is benign, and a subject-ID head loses primary accuracy without contraction. A RadioML dose scan puts the SNR onset between $\alpha=3$ and $10$, with reconstruction benign to $\alpha=10000$.
+We test the mechanism with a controlled variance toxifier and real auxiliary heads. The probe is accurate on battery but overestimates the critical dose by $30$--$116\times$ on RadioML; calibration time alone flips a HAR filter; zero-dose controls drift. Real heads dissociate: SNR regression is toxic, I/Q reconstruction is benign, and a subject-ID head loses accuracy and breaks a frozen readout without contraction. A dose scan puts the SNR onset between $\alpha=3$ and $10$, with reconstruction clearing the criterion at every tested dose. Contraction is a sufficient mechanism, not the only one.
 
-We make three contributions. First, we formalize variance survival as an axis distinct from conflict and information, and show that contraction can break a calibrated readout without erasing information. Second, we derive a local validity boundary and finite-horizon transport condition for the probe, and test failure modes across domains and calibration. Third, we use detachment and spectral toxicity filtering (\STF) as interventions, separating survival, utility, and readout recovery. The result is an audit protocol, not a universal cutoff.
+We make three contributions. First, we formalize variance survival as an axis distinct from conflict and information and give a critical-scale law for the readout failure. Second, we derive a local validity boundary and finite-horizon transport condition for the probe and test its failure modes. Third, we use detachment and spectral toxicity filtering (\STF) as interventions, separating survival, utility, and readout recovery. The result is an audit protocol, not a universal cutoff.
 
 \section{Variance Contraction: The Core Phenomenon}\label{sec:formulation}
 
@@ -98,7 +98,42 @@ Take $G_p=e_1$, $G_a^\pm=\pm e_2$, and $v=-e_1+\beta e_2$ for $\beta>0$. Both pa
 
 The proposition identifies the missing information: a rule based only on task-gradient relations has no variance constraint. Reducing the effective auxiliary dose can preserve variance, but conflict resolution alone provides no survival certificate for a retained auxiliary update. The high-dose comparison tests this gap at fixed operating points.
 
-Equation~\eqref{eq:signed_variance} describes instantaneous total variation. Eventual collapse also depends on how this balance evolves. In the symmetric linear model $\dot z=(R-\alpha A)z$, $R\succ0$, $A\succeq0$, some mode contracts when $\alpha\lambda_{\max}(R^{-1/2}AR^{-1/2})>1$, whereas \emph{all} modes contract only when the corresponding minimum eigenvalue exceeds $1/\alpha$ (Theorem~\ref{thm:spectral}). A task head can exploit surviving modes even as other directions disappear. We therefore report variance contraction and task error together, supplemented by effective rank and scale-invariant probes; Appendix~\ref{app:scale_audit} reports a $4{,}600\times$ HAR contraction with unchanged standardised-probe accuracy, so contraction is not information loss. The scale channel is elementary: an affine readout $Wz+b$ on $H_c=cH$ has logits $c\,Wh+b\to b$ as $c\to0$, so a calibrated readout becomes constant while the information in $H$ remains linearly available. Appendix~\ref{app:readout} measures both sides of this dissociation.
+Equation~\eqref{eq:signed_variance} describes instantaneous total variation. Eventual collapse also depends on how this balance evolves. In the symmetric linear model $\dot z=(R-\alpha A)z$, $R\succ0$, $A\succeq0$, some mode contracts when $\alpha\lambda_{\max}(R^{-1/2}AR^{-1/2})>1$, whereas \emph{all} modes contract exactly when the minimum eigenvalue exceeds $1/\alpha$ (Theorem~\ref{thm:spectral}). A task head can exploit surviving modes even as other directions disappear. We therefore report variance contraction and task error together, supplemented by effective rank and scale-invariant probes; Appendix~\ref{app:scale_audit} reports a $4{,}600\times$ HAR contraction with unchanged standardised-probe accuracy, so contraction is not information loss.
+
+The scale channel is elementary: an affine readout $Wz+b$ on $H_c=cH$ has logits $c\,Wh+b\to b$ as $c\to0$, so a calibrated readout becomes constant while the information in $H$ remains linearly available. The qualitative limit has a quantitative counterpart.
+
+\begin{proposition}[Critical scale of a frozen affine readout]\label{prop:scale_law}
+Write $z_c(h)=W(ch)+b$ after fixed input statistics, and let $z_0$ be its $c\to0$ limit. Let $t=\arg\max_j z_0[j]$. For each example $i$, the first class change occurs at
+\begin{equation}
+ c_i^\star=\min_{j\ne t}\frac{z_0[t]-z_0[j]}{s_i[j]-s_i[t]},
+ \label{eq:critical_scale}
+\end{equation}
+over competitors with a positive denominator, where $s_i=Wh_i/\mathrm{sd}$ is the signal part. The prediction is the $c\to0$ class below $c_i^\star$ and changes above it. The median $c_i^\star$ is the scale at which half the batch has moved; on HAR it is $c^\star=0.08$ (Figure~\ref{fig:scale_law}). Refitting the input statistics makes the readout scale-invariant by construction, because standardising $cH$ returns the same normalized features for every $c>0$.
+\end{proposition}
+\begin{proof}
+The logit difference between the bias-only top class and competitor $j$ is linear in $c$; solving for its first zero gives the displayed ratio. Standardising $cH$ cancels $c$ from numerator and denominator. The empirical curve in Figure~\ref{fig:scale_law} evaluates the same formula at five seeds.
+\end{proof}
+
+\begin{table}[t]
+\centering
+\caption{Readout transfer from a healthy to a contracted HAR encoder (five seeds, means). ``Frozen'' applies the healthy head and input statistics unchanged; the reported ECE is the raw softmax ECE, and applying the healthy temperature map raises frozen ECE to $0.512$. Input recalibration reuses the weights but refits the feature statistics; retraining fits a new head. The frozen readout falls to chance with large NLL/ECE, while cheap input recalibration recovers accuracy but not the NLL of a retrained head. The last two rows apply the same healthy readout to the STF-0 and STF-cal encoders.}
+\label{tab:readout}
+\footnotesize
+\begin{tabular}{lrrr}
+\toprule
+Readout & accuracy & NLL & ECE \\
+\midrule
+healthy reference & $0.945$ & $0.187$ & $0.031$ \\
+frozen (healthy statistics) & $0.241$ & $2.516$ & $0.430$ \\
+input recalibration & $0.952$ & $0.396$ & $0.043$ \\
+retrained on contracted features & $0.955$ & $0.190$ & $0.034$ \\
+STF-0 encoder (same readout) & $0.946$ & $0.188$ & $0.031$ \\
+STF-cal encoder (same readout) & $0.943$ & $0.201$ & $0.033$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The same dissociation holds at $m=32$, $m=128$, and with a Transformer encoder (Appendix~\ref{app:readout}). The readout is fitted on a held-out split of the healthy features, its temperature map is fitted on a separate calibration split, and ECE uses $15$ equal-width confidence bins. Temperature scaling alone does not repair the frozen readout: applying the healthy temperature map raises ECE to $0.512$ rather than lowering it, because the failure is a scale shift, not a calibration-parameter shift. Input recalibration is the cheap repair; retraining is the expensive one.
 
 \section{The Diagnostic Protocol}\label{sec:theory}\label{sec:diagnosis}
 
@@ -148,7 +183,7 @@ the probe and the exact variance derivative agree in sign. If $1-\alpha q>\Delta
 The chain rule gives $\dot V=-u^\top K(g_p+\alpha g_a)/B$. Substitute $K=k(I+E)$, divide by $N$, and add and subtract $1-\alpha q$. The triangle inequality bounds $|\mathcal E|$ by $\Delta$.
 \end{proof}
 
-The theorem supplies a \emph{sufficient, checkpoint-local} boundary. Its decomposition attributes a scalar threshold's discrepancy to quantities that can be checked separately. The directly evaluated $\mathcal E$ is sharper than the conservative envelope $\Delta$. A uniform bound over a trajectory would transport the decision through time; the archived neural-network experiments do not measure such a bound. The checkpoint-local certificate itself is audited on $405$ HAR checkpoints in Appendix~\ref{app:boundary_proof}.
+The theorem supplies a \emph{sufficient, checkpoint-local} boundary. Its decomposition attributes a scalar threshold's discrepancy to quantities that can be checked separately; the directly evaluated $\mathcal E$ is sharper than the conservative envelope $\Delta$. Corollary~\ref{cor:transport} transports the decision through time, and Appendix~\ref{app:boundary_proof} audits it on $405$ HAR checkpoints: it fires on $2/405$ at the canonical scale and $14/405$ at a per-checkpoint optimal scale, and is never wrong when it fires. The checkpoint-local certificate agrees with the exact derivative on $51\%$ of those checkpoints; the remaining errors are the subject of Section~\ref{sec:experiments}.
 
 In the identity metric ($E=0$) with positive signed loading, $\dot V/N=d-\alpha a$. If $a=q$ but $0<d<\alpha q<1$, the frozen gate reports a subcritical dose although variance contracts: the primary norm overstates restoration. If $a=-q$, the unsigned gate can report danger while the auxiliary expands variance. If $a$ changes after calibration, the error moves with $a-q$. These are algebraic predictions about the sign of the diagnostic error, rather than an assumption that every high probe value indicates collapse.
 
@@ -165,7 +200,7 @@ A scalar reduction of the same balance, $\dot\sigma=-\alpha\kappa\sigma+b(\sigma
 
 \subsection{Protocols and observables}\label{sec:unified_protocol}
 
-The controlled benchmark spans UCI-HAR~\citep{ucihar}, RadioML2016.10A~\citep{radioml}, battery health~\citep{nasa_battery}, and NYUv2. It uses a three-layer MLP of width $m$, a linear primary head, and a fixed auxiliary $L_{\rm tox}=K_a^{-1}\sum_{k=1}^{K_a}\operatorname{Var}_b(W_kh)$, with $K_a=3$ seeded projections. Adam uses learning rate $10^{-3}$ and batch size $256$; experiments use $5$--$10$ seeds and bf16 autocast. The default frozen probe follows four detached warm-up epochs. Detailed data partitions, encoder variants, and real-head protocols are in Appendices~\ref{app:tables}--\ref{app:moved}.
+The controlled benchmark spans UCI-HAR~\citep{ucihar}, RadioML2016.10A~\citep{radioml}, battery health~\citep{nasa_battery}, and NYUv2. It uses a three-layer MLP of width $m$, a linear primary head, and a fixed auxiliary $L_{\rm tox}=K_a^{-1}\sum_{k=1}^{K_a}\operatorname{Var}_b(W_kh)$, with $K_a=3$ seeded projections. Adam uses learning rate $10^{-3}$ and batch size $256$; experiments use $5$--$10$ seeds and bf16 autocast. The default frozen probe follows four detached warm-up epochs. The optimizer grid uses HAR, battery, and RadioML; CelebA is the fifth domain for the calibrated-filter check; NYUv2 is used for the probe-boundary experiment; the financial model is a deployment case. Detailed data partitions, encoder variants, and real-head protocols are in Appendices~\ref{app:tables}--\ref{app:moved}.
 
 Our operational label is relative scatter, $s=\mathcal S_h/\mathcal S_{\rm single}<0.3$ against the same-seed single-task reference, with
 \begin{equation}
@@ -173,13 +208,6 @@ Our operational label is relative scatter, $s=\mathcal S_h/\mathcal S_{\rm singl
  \label{eq:cross_sample_scatter}
 \end{equation}
 The proxy is coordinate-dependent and can miss variation along the all-ones feature direction; throughout, ``collapse'' means this threshold. The half-height $\alpha_{1/2}$ interpolates the mean dose--scatter curve at $s=0.5$ in log dose and serves as a transition summary, not an information verdict. Error bars denote population standard deviation across the stated seeds unless noted.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/fig_probe_boundary.pdf}
-\caption{(a) $\alpha_{\rm probe}/\alpha_{1/2}$ for $16$ domain--width cells; \emph{all use the controlled toxifier}. Red indicates an optimistic dose estimate, blue a conservative one. (b) Changing calibration time changes this ratio at $m=64$; the shaded factor-$3$ band is a visual reference, not a confidence interval. Both panels use ten-seed mean probes. (c) At $\alpha=0$, HAR's probe drifts by orders of magnitude while battery's remains comparatively stable; median and full range over five seeds, each normalized to its initial value. (d) HAR at $\alpha=0.03$: early calibration leaves all gates closed and all ten runs collapse; at $W\ge4$, all gates open and none collapse. Source values and crossing definitions are in Table~\ref{tab:probe_cells} and Appendices~\ref{app:online}--\ref{app:warmup}.}
-\label{fig:probe_prediction}
-\end{figure}
 
 \subsection{A controlled toxifier does not guarantee a valid probe}\label{sec:validation}\label{sec:har}\label{sec:radioml}\label{sec:battery}\label{sec:nyu}\label{sec:capacity_law}
 
@@ -197,13 +225,13 @@ The calibration change has a direct intervention consequence. At dose $\alpha=0.
 
 Recomputing the same norm ratio is not a universal correction. On unfiltered HAR trajectories, the probe increases by orders of magnitude, including at $\alpha=0$, when no auxiliary update reaches the encoder (Figure~\ref{fig:probe_prediction}c). At positive doses, a running gate activates in all seeds of ten HAR configurations whose \emph{final} relative scatter is $0.50$--$1.04$. These are false alarms relative to the endpoint criterion. Battery probes remain $O(1)$; among 35 seeds ending above half-height, only one gate activation occurs, at the last step (Appendix~\ref{app:online}).
 
-The zero-dose control distinguishes drift of the statistic from damage caused by the auxiliary. Because the primary-gradient norm is in the denominator, improved task fitting can inflate the ratio without establishing signed contraction. We evaluate every term of Theorem~\ref{thm:probe_boundary} on $405$ HAR checkpoints; the median restoration alignment is $0.065$ rather than $1$. The appropriate response is to inspect the signed flux and its components, rather than to interpret each increase of $\hat\rho$ as a loss of representation survival.
+The zero-dose control distinguishes drift of the statistic from damage caused by the auxiliary. Because the primary-gradient norm is in the denominator, improved task fitting can inflate the ratio without establishing signed contraction. On $405$ HAR checkpoints, the cheap probe agrees with the exact signed derivative on only $51\%$ of them, and the median restoration alignment is $0.065$ rather than $1$. The denominator is not a noisy estimator of a strong restoration direction; the primary gradient simply does not restore variance in this regime. The appropriate response is to inspect the signed flux and its components, rather than to interpret each increase of $\hat\rho$ as a loss of representation survival.
 
 \subsection{Real heads expose sign and intervention mismatch}\label{sec:real_aux}
 
 Terminal probes of four real heads provide a second stress test (Figure~\ref{fig:conflict_toxicity}a). Across ten seeds, mean per-example task-gradient cosines have magnitude at most $0.06$, while SNR regression places $88\%$ of its gradient norm on each example's radial axis, compared with $1$--$14\%$ for the other heads. This separates the collapsed SNR endpoints from benign endpoints. It is not evidence that every example has negligible conflict: the SNR head has negative primary--auxiliary dot products on approximately $54\%$ of probe examples.
 
-The signed measurement is equally informative. Despite its large unsigned loading, the SNR head's mean signed radial cosine is approximately $-0.12$ at the endpoint. An unsigned projection therefore cannot be read as a signed contraction rate or a forecast from that state. Both observations support the second axis while motivating its validity audit. The result also explains why success on a deliberately contracting objective is insufficient evidence of transfer to an arbitrary real auxiliary loss. A dose scan (Appendix~\ref{app:rml_dose}) puts the SNR collapse onset between $\alpha=3$ and $10$; by $\alpha=30$ every seed collapses, while I/Q reconstruction remains $0/3$ at every tested dose up to $\alpha=10000$. The reported $\alpha=3000$ is two orders of magnitude inside the supercritical regime, and the same nominal dose leaves the reconstruction head benign.
+The signed measurement is equally informative. Despite its large unsigned loading, the SNR head's mean signed radial cosine is approximately $-0.12$ at the endpoint. An unsigned projection therefore cannot be read as a signed contraction rate or a forecast from that state. Both observations support the second axis while motivating its validity audit. The result also explains why success on a deliberately contracting objective is insufficient evidence of transfer to an arbitrary real auxiliary loss. A dose scan (Appendix~\ref{app:rml_dose}) puts the SNR collapse onset between $\alpha=3$ and $10$; by $\alpha=30$ every seed collapses, while I/Q reconstruction remains $0/3$ at every tested dose up to $\alpha=10000$ (relative scatter $0.64$ at the last dose, still above the $0.3$ criterion). The reported $\alpha=3000$ is two orders of magnitude inside the supercritical regime, and the same nominal dose leaves the reconstruction head benign.
 
 \section{Interventions and Boundaries}\label{sec:stf}\label{sec:stfcal}
 
@@ -216,27 +244,22 @@ while the implemented selective arms transform the auxiliary input, $\widetilde 
 
 The calibrated arm freezes its warm-up probe and opens the gate when $\alpha\hat\rho\ge1$; this is a local heuristic, not a trajectory certificate (Appendix~\ref{app:warmup}). The rank variant selects
 \begin{equation}
- r_{\rm sel}=\min\{r\le R:\alpha\hat\rho_{\rm res}[r]<1\},
+ \mathrm{rank}_{\rm sel}=\min\{\mathrm{rank}\le \mathrm{rank}_{\max}:\alpha\hat\rho_{\rm res}[\mathrm{rank}]<1\},
  \label{eq:calrule}
 \end{equation}
 using nested candidate subspaces; if none passes, it uses the cap and records the unresolved residual. The radial arm is a separate intervention. Theorem~\ref{thm:minimalrank} characterizes minimum deletion rank for a specified PSD operator; empirical PCA bases require their own identification. This makes gate calibration and subspace choice two distinct parts of the intervention.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/fig_diagnostic_intervention.pdf}
-\caption{Real RadioML SNR-regression auxiliary. (a,b) At $20\%$ primary labels and width $64$, calibrated STF retains a mean accuracy advantage over detachment at intermediate doses; the advantage disappears at extreme doses even while scatter remains above $0.3$. Bands are seed standard deviations; crosses mark doses with at least one collapsed joint run. Five unique seeds per dose; duplicate log records are removed. (c) A separate fully labeled, dose-$3000$ protocol gives a different ordering: rank-3 filtering clears the scatter criterion in all ten seeds, but detachment has higher accuracy. Faint points are seeds; large points and bars show means and standard deviations. The dotted line is the $0.3$ scatter criterion.}
-\label{fig:intervention}
-\end{figure}
-
 \label{sec:conflict_ablations}
-A useful auxiliary can also become toxic: in the $20\%$-label SNR dose scan (Figure~\ref{fig:intervention}a,b), joint training has a healthy encoder at low dose, but collapses in every seed from $\alpha=30$ onward. Calibrated STF avoids collapse at every sampled dose. Over $\alpha\in[15,100]$, its mean accuracy is approximately $0.5$--$1.0$ percentage points above detachment. These five-seed results establish a tested regime in which selective intervention preserves a useful effect; they do not imply a uniform advantage across protocols.
+A useful auxiliary can also become toxic: in the $20\%$-label SNR dose scan (Figure~\ref{fig:intervention}a,b), joint training has a healthy encoder at low dose, but collapses in every seed from $\alpha=30$ onward. Calibrated STF avoids collapse at every sampled dose. Over $\alpha\in[15,100]$, its mean accuracy is approximately $0.5$--$1.0$ percentage points above detachment. These five-seed results establish a tested regime in which selective intervention preserves a useful effect; they do not imply a uniform advantage across protocols. The fully labeled scan uses a different label budget, so its ordering need not agree with the $20\%$-label scan; Appendix~\ref{app:rml_dose} reports it separately.
 
 The fully labeled SNR experiment demonstrates why the benchmark needs both axes of evaluation (Figure~\ref{fig:intervention}c). Detachment reaches $0.307$ accuracy with $0/10$ collapses. The radial arm reaches $0.199$ with $1/10$ collapses, while the rank-3 arm reaches $0.211$ with $0/10$. Removing enough contraction to clear a scatter threshold does not ensure that the remaining auxiliary update helps the task. In a separate HAR reconstruction study, an auxiliary-gradient basis uses $30.75$ directions versus PCA's $62.0$ among the same four gate-open seeds at similar accuracy (Table~\ref{tab:realbasis}); basis choice changes how much of the auxiliary channel is removed.
 
 \label{sec:bmtl}\label{sec:bmtl_ablation}\label{sec:finance}
-At the tested high doses, calibrated filtering changes collapse counts from $10/10$ to $0/10$ across four controlled scientific domains. Protection also transfers to a Transformer encoder: at RadioML $\alpha=3000$, joint training collapses in $10/10$ seeds at accuracy $0.156$, whereas calibrated filtering has $0/10$ collapses and relative scatter $0.970$. On CelebA's Smiling task~\citep{liu2015celeba}, the calibration probe spans $\hat\rho=1602$--$3585$ across widths; at $\alpha=100$, joint training collapses in $5/5$ seeds and calibrated filtering in $0/5$. This holds despite the probe errors in Figure~\ref{fig:probe_prediction}: an extreme dose can open a biased gate reliably. Filtering before a conflict operator also preserves scatter in the tested compositions (Table~\ref{tab:compose}). Variance regularization offers another intervention, but its ability to clear the scatter threshold and its task accuracy vary independently (Appendix~\ref{app:reg}).
+At the tested high doses, calibrated filtering changes collapse counts from $10/10$ to $0/10$ on HAR, battery, and RadioML (ten seeds each), and from $5/5$ to $0/5$ on CelebA's Smiling task~\citep{liu2015celeba} (five seeds). Protection also transfers to a Transformer encoder: at RadioML $\alpha=3000$, joint training collapses in $10/10$ seeds at accuracy $0.156$, whereas calibrated filtering has $0/10$ collapses and relative scatter $0.970$. This holds despite the probe errors in Figure~\ref{fig:probe_prediction}: an extreme dose can open a biased gate reliably. Filtering before a conflict operator also preserves scatter in the tested compositions (Table~\ref{tab:compose}). Variance regularization offers another intervention, but its ability to clear the scatter threshold and its task accuracy vary independently (Appendix~\ref{app:reg}).
 
 On the corrected, cell-disjoint MATR battery protocol~\citep{severson2019data}, validation-selected detachment improves SOH RMSE from $5.57$ to $2.10$ percentage points and observed-RUL MAE from $81.5$ to $46.7$ cycles. Joint training is not contracted there (relative $S=3.55$), so this gain is negative transfer rather than repair of a contracted representation. Selective filtering does not improve on detachment there (Table~\ref{tab:bmtl_corrected}). The historical ranking reverses after changing evaluation-selected checkpoints and censoring-blind scoring together, so the corrected comparison concerns the complete protocol. Financial and battery application details remain in the appendix; their role is to test diagnostic scope, not to redefine survival through whichever task metric improves.
+
+A real subject-ID head supplies the second readout test. At $\alpha=10$, joint training does not contract the representation (relative $S=0.90$), yet a readout fitted on the healthy encoder falls from $0.948$ to $0.401$; input recalibration reaches $0.434$ and retraining recovers $0.897$. The failure is representation drift, not scale. Contraction is therefore a sufficient mechanism, not the only one, and the audit reports readout validity separately from either variance or task accuracy (Table~\ref{tab:dissociation}). This is why the protocol asks for a readout measurement rather than treating the scatter criterion as a proxy for deployment.
 
 \section{A Reporting Standard for Shared Representations}\label{sec:standard}
 
@@ -247,6 +270,7 @@ The practical output of the analysis is a reporting protocol, not a universal cu
 \begin{algorithmic}[1]
 \REQUIRE Diagnostic batch, healthy reference, checkpoint $\theta$, operating losses and dose $\alpha$, recorded calibration value $q$.
 \STATE Report task metrics, covariance trace $2V$, effective rank, standardised linear probe, and the declared operational scatter criterion.
+\STATE Fit a linear readout on the healthy reference; apply it unchanged to the audited checkpoint and report accuracy, NLL, and ECE. Refit only the input statistics to separate scale from information.
 \STATE Differentiate $V$ and the actual losses; report signed restoration $r$ and auxiliary contraction $c$ from \eqref{eq:signed_variance}.
 \STATE Record the cheap decision $1-\alpha q$ and compute the discrepancy $\mathcal E$ and envelope $\Delta$ using \eqref{eq:probe_discrepancy}--\eqref{eq:validity_margin}.
 \IF{$|1-\alpha q|>\Delta$}
@@ -262,11 +286,13 @@ A large $\Delta$ leaves the probe undecided; it does not make it wrong. Directly
 
 A survival intervention should first alter the contraction observable in the intended direction, then preserve or improve predictive utility. These criteria can disagree: the rank-3 SNR filter passes the scatter criterion while underperforming detachment, and the low-label radial filter loses its accuracy advantage at extreme doses. Reporting only collapse counts would hide both outcomes. Contraction also invalidates readouts calibrated before it: a frozen healthy head drops from $0.945$ to $0.241$ accuracy and ECE rises from $0.031$ to $0.430$, while input recalibration recovers $0.952$ (Appendix~\ref{app:readout}). Likewise, a gate that opens correctly can still choose an ineffective deletion subspace. The diagnostic benchmark therefore retains closed-gate failures, open-gate failures, and successful protection as different outcomes.
 
-This protocol can be added to an existing optimizer without replacing its objective: the cheap probe is a screening measurement, and the signed audit checks its interpretation at selected checkpoints. Its scope is explicit. STF-cal is a local heuristic, not a trajectory certificate; the rank rule assumes the specified PSD operator, and empirical PCA bases need separate identification. Real heads can be benign, toxic, or negative-transfer---battery improves under detachment without contraction, and a subject-ID head loses accuracy without it---so the axes are reported separately. The certificate is an offline audit (roughly $70\times$ the flux) that fires rarely but is never wrong when it does. These are boundaries of the diagnostic, not implementation details.
+This protocol can be added to an existing optimizer without replacing its objective: the cheap probe is a screening measurement, and the signed audit checks its interpretation at selected checkpoints. Its scope is explicit. STF-cal is a local heuristic, not a trajectory certificate; the rank rule assumes the specified PSD operator, and empirical PCA bases need separate identification. Real heads can be benign, toxic, or negative-transfer---battery improves under detachment without contraction, and a subject-ID head loses accuracy without it---so the axes are reported separately. The certificate is an offline audit (roughly $70\times$ the cost of the exact flux) that fires on $2/405$ checkpoints at the canonical scale and is never wrong when it does. These are boundaries of the diagnostic, not implementation details.
 
 \section{Related Work}\label{sec:related}
 
 Multi-task learning~\citep{caruana1997multitask} studies transfer among objectives, and task-grouping studies ask when joint training helps~\citep{standley2020tasks,vandenhende2021multi}. PCGrad and CAGrad address gradient conflict~\citep{yu2020pcgrad,liu2021cagrad}; MGDA, Nash-MTL, and FAMO pursue Pareto, bargaining, or progress-balancing criteria~\citep{sener2018multi,navon2022multi,liu2023famo}. Other methods modify task-gradient geometry or loss weights~\citep{senushkin2023aligned,liu2021imtl,chen2018gradnorm,kendall2018multi,wang2021gradient,limarenko2026gcond,zhou2025imgrad}. Our structural result concerns what task-gradient relations leave unidentified: their effect on representation variance. It motivates an additional diagnostic alongside these optimization criteria.
+
+A frozen readout is a calibrated classifier under a changed input distribution. Calibration is known to degrade under dataset shift even when accuracy is stable~\citep{guo2017calibration,ovadia2019trust}; here the shift is internal to the encoder, not the data, and the readout's input statistics are part of the affine map. Feature normalization is the standard response to scale changes~\citep{ioffe2015batchnorm}, and linear classifier probes are the standard scale-invariant readout~\citep{alain2016probe}; our audit combines both. Negative transfer is usually defined through task performance~\citep{wang2019negative}; we separate it from contraction and from readout failure, and the battery and subject-ID cases show why.
 
 Representation collapse has been studied extensively in self-supervised learning, including stop-gradient mechanisms~\citep{grill2020bootstrap,chen2021simsiam,caron2021emerging}, variance and covariance regularization~\citep{zbontar2021barlow,bardes2022vicreg,ermolov2021whitening}, and spectral dynamics~\citep{jing2022understanding,dong2021attention,kim2025taxonomy}. RankMe evaluates learned representations through effective rank~\citep{garrido2023rankme}. Here collapse refers to reduced variation across examples, distinct from terminal classifier geometry in neural collapse~\citep{papyan2020prevalence,wang2026neuralcollapse}. Our contribution connects an update-level signed observable to the validity of the cheap probe used to approximate it.
 
@@ -274,7 +300,7 @@ Auxiliary-gradient projection is also established. ATTITTUD and GradOPS choose s
 
 \section{Conclusion}\label{sec:conclusion}
 
-Task-gradient compatibility does not certify that a shared representation survives. Gradient toxicity adds the missing variance-sensitive axis, and its exact signed form exposes when a cheap frozen probe is reliable. We give a computable local validity boundary and identify distinct failure patterns under calibration changes, training-state drift, and real-head geometry. These mechanisms define its scope. Detachment and selective filtering test the consequences: a representation can survive without recovering task utility, and an auxiliary can be useful before becoming toxic. Multi-task evaluation should report variance survival alongside task accuracy, and audit the probe that links them.
+Task-gradient compatibility does not certify that a shared representation survives. Gradient toxicity adds the missing variance-sensitive axis, and its exact signed form exposes when a cheap frozen probe is reliable. A critical-scale law makes the readout failure predictable from the bias and signal of the deployed map, and a real subject-ID head shows that contraction is sufficient but not necessary: readout drift can break the instrument without a scale shift. We give a computable local validity boundary and identify distinct failure patterns under calibration changes, training-state drift, and real-head geometry. These mechanisms define its scope. Detachment and selective filtering test the consequences: a representation can survive without recovering task utility, and an auxiliary can be useful before becoming toxic. Multi-task evaluation should report variance survival alongside task accuracy, and audit the readout that links them.
 
 \clearpage
 \section*{AI Use Statement}
@@ -507,7 +533,7 @@ This section collects the per-method intervention comparisons (Table~\ref{tab:co
 
 \begin{table}[t]
 \centering
-\caption{Controlled comparisons, ten seeds per method: collapse rate followed by the mean task metric. The optimizer grid uses $(m,\alpha)=(128,0.1)$ for HAR, $(32,3000)$ for battery, and $(64,10000)$ for RadioML. The detached reference comes from separate R3 controls at $m=64$ and doses $100$, $100$, and $3000$, respectively; its auxiliary encoder update is zero.}
+\caption{Controlled comparisons, ten seeds per method: collapse rate followed by the mean task metric. The optimizer grid uses $(m,\alpha)=(128,0.1)$ for HAR, $(32,3000)$ for battery, and $(64,10000)$ for RadioML. Battery here is the controlled toxifier protocol, not the MATR flagship of Table~\ref{tab:bmtl_corrected}. The detached reference comes from separate controls at $m=64$ and doses $100,100,3000$; full detachment has no auxiliary gradient, so the dose is irrelevant, but the width differs from the grid and the reference is reported separately.}
 \label{tab:conflict}
 \footnotesize
 \resizebox{\columnwidth}{!}{\begin{tabular}{lccc}
@@ -539,6 +565,13 @@ Detachment (\textsc{stf-0}) & $0.0$ & $0.0$ & $0.0$ \\
 \bottomrule
 \end{tabular}}
 \end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/fig_survival_gap.pdf}
+\caption{Real-head and optimizer comparisons. (a) Terminal probes of four real auxiliary heads, ten seeds each. The horizontal coordinate is the \emph{mean per-example} task-gradient cosine; the vertical coordinate is unsigned radial loading. SNR regression has high loading and $10/10$ collapsed endpoints. (b) Collapse counts at controlled doses $0.1$ (HAR), $3000$ (battery), and $10000$ (RadioML). All ten optimizers show the scatter criterion in $10/10$ seeds. The detached reference uses separate ten-seed controls; full metrics and settings are in Table~\ref{tab:conflict}.}
+\label{fig:conflict_toxicity}
+\end{figure}
 
 \begin{table}[t]
 \centering
@@ -1201,6 +1234,20 @@ joint3 (no aux) & 0.356 & 0.100 & 1.130 & 0.586 & 7.30 \\
 
 \section{Supplementary Experimental Results}\label{app:moved}
 
+\begin{figure}[h]
+\centering
+\includegraphics[width=\linewidth]{figures/fig_probe_boundary.pdf}
+\caption{(a) $\alpha_{\rm probe}/\alpha_{1/2}$ for $16$ domain--width cells; \emph{all use the controlled toxifier}. Red indicates an optimistic dose estimate, blue a conservative one. (b) Changing calibration time changes this ratio at $m=64$; the shaded factor-$3$ band is a visual reference, not a confidence interval. Both panels use ten-seed mean probes. (c) At $\alpha=0$, HAR's probe drifts by orders of magnitude while battery's remains comparatively stable; median and full range over five seeds, each normalized to its initial value. (d) HAR at $\alpha=0.03$: early calibration leaves all gates closed and all ten runs collapse; at $W\ge4$, all gates open and none collapse. Source values and crossing definitions are in Table~\ref{tab:probe_cells} and Appendices~\ref{app:online}--\ref{app:warmup}.}
+\label{fig:probe_prediction}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\linewidth]{figures/fig_diagnostic_intervention.pdf}
+\caption{Real RadioML SNR-regression auxiliary. (a,b) At $20\%$ primary labels and width $64$, calibrated STF retains a mean accuracy advantage over detachment at intermediate doses; the advantage disappears at extreme doses even while scatter remains above $0.3$. Bands are seed standard deviations; crosses mark doses with at least one collapsed joint run. Five unique seeds per dose; duplicate log records are removed. (c) A separate fully labeled, dose-$3000$ protocol gives a different ordering: rank-3 filtering clears the scatter criterion in all ten seeds, but detachment has higher accuracy. Faint points are seeds; large points and bars show means and standard deviations. The dotted line is the $0.3$ scatter criterion.}
+\label{fig:intervention}
+\end{figure}
+
 Ten-seed calibrated experiments support Section~\ref{sec:stfcal}. At high doses, joint versus \textsc{stfcal} relative scatter is $0.016$ versus $0.990$ for HAR ($\alpha=100$), $0.147$ versus $1.001$ for battery ($\alpha=100$), and $0.014$ versus $0.982$ for RadioML ($\alpha=3000$). In each case, collapse rates are $10/10$ versus $0/10$. At low doses with closed gates, outcomes are close: HAR at $\alpha=0.001$ gives $0.525$ versus $0.528$, and battery at $\alpha=0.01$ gives $0.963$ versus $0.965$.
 
 With Transformer encoders at $\alpha=100$, HAR scatter changes from $0.030$ to $1.041$ and battery scatter from $0.036$ to $1.000$, again reducing collapse from $10/10$ to $0/10$. Battery SOH RMSE improves from $0.447$ to $0.267$. On CelebA at $\alpha=100$ (five seeds), scatter increases from $0.003$ to $0.934$ and collapse falls from $5/5$ to $0/5$.
@@ -1432,68 +1479,35 @@ MGDA & $0.551$ ($3/3$) & $0.186$ ($3/3$) \\
 
 \subsection{Readout Transfer Under Contraction}\label{app:readout}
 
-The scale-invariant audit shows that the primary information can remain linearly decodable after contraction. The operational question is different: what happens to a readout that was trained and calibrated on the healthy representation and then applied, unchanged, to the contracted one? We train a healthy ($\alpha=0$) and a contracted ($\alpha=100$) HAR encoder for five seeds, split the training set into head-fitting and calibration subsets, and evaluate four readouts on the held-out test split: the healthy reference; the same head and input statistics applied unchanged to the contracted features; the same head with input statistics refitted on the contracted features (a cheap recalibration with no new labels); and a new head trained on the contracted features.
+The scale-invariant audit shows that the primary information can remain linearly decodable after contraction. The operational question is different: what happens to a readout that was trained and calibrated on the healthy representation and then applied, unchanged, to the contracted one? We train a healthy ($\alpha=0$) and a contracted ($\alpha=100$) HAR encoder for five seeds, split the training set into head-fitting and calibration subsets, and evaluate four readouts on the held-out test split: the healthy reference; the same head and input statistics applied unchanged to the contracted features; the same head with input statistics refitted on the contracted features (a cheap recalibration with no new labels); and a new head trained on the contracted features. The per-readout numbers are Table~\ref{tab:readout} in the main text.
 
-\begin{table}[h]
-\centering
-\caption{Readout transfer from a healthy to a contracted HAR encoder (five seeds, means). ``Frozen'' applies the healthy head and healthy input statistics unchanged. Input recalibration reuses the weights but refits the feature statistics; retraining fits a new head. The frozen readout falls to chance with large NLL/ECE, while cheap input recalibration recovers accuracy but not calibration; full retraining recovers both. The last two rows apply the same healthy readout to the STF-0 and STF-cal encoders.}
-\label{tab:readout}
-\footnotesize
-\begin{tabular}{lrrr}
-\toprule
-Readout & accuracy & NLL & ECE \\
-\midrule
-healthy reference & $0.945$ & $0.187$ & $0.031$ \\
-frozen (healthy statistics) & $0.241$ & $2.516$ & $0.430$ \\
-input recalibration & $0.952$ & $0.396$ & $0.043$ \\
-retrained on contracted features & $0.955$ & $0.190$ & $0.034$ \\
-STF-0 encoder (same readout) & $0.946$ & $0.188$ & $0.031$ \\
-STF-cal encoder (same readout) & $0.943$ & $0.201$ & $0.033$ \\
-\bottomrule
-\end{tabular}
-\end{table}
+The $c\to0$ special case is Proposition~\ref{prop:scale_law}: it isolates the scale channel and says nothing about the information in $H$, only that a biased affine readout becomes constant when the representation is contracted. A fixed input scaler is part of that affine map, so even a bias-free head acquires an effective offset through the scaler; a probe whose input statistics are refitted is not affected in the same way. The empirical audit in Table~\ref{tab:readout} is the corresponding measurement.
 
-\begin{proposition}[Scale sensitivity of affine readouts]\label{prop:readout}
-Apply a frozen affine readout $z\mapsto Wz+b$ to representations $H_c=cH$ with $c>0$. If $b\neq0$, then as $c\to0$ the logits converge to $b$, so the predicted class is $\arg\max b$ for every input; if $b=0$, the predicted class is invariant to $c$.
-\end{proposition}
-\begin{proof}
-$W(cH)+b=c\,WH+b\to b$ as $c\to0$. With $b=0$, $\arg\max WH$ is unchanged by the positive factor $c$.
-\end{proof}
-
-The proposition isolates the scale channel: it says nothing about the information in $H$, only that a biased affine readout becomes constant when the representation is contracted. A fixed input scaler is part of that affine map, so even a bias-free head acquires an effective offset through the scaler; a probe whose input statistics are refitted is not affected in the same way. The empirical audit in Table~\ref{tab:readout} is the corresponding measurement.
-
-The frozen readout is not a straw man: it is what a deployment does when a head or calibration map is fitted once and the encoder keeps training. Contraction changes the feature scale, the bias term dominates, and the head predicts a near-constant class; NLL and ECE rise by an order of magnitude. Replacing only the input statistics restores accuracy, which confirms that the information survived; it does not restore calibration, which requires refitting the readout. The same readout applied to the STF-0 and STF-cal encoders reaches $0.946$ and $0.943$, so the survival intervention protects the readout itself, not only a scalar scatter statistic; the driver is \texttt{repro/scripts/stf\_readout\_audit.py}. The same pattern holds at $m=32$ (frozen $0.236$, input recalibration $0.887$, retrained $0.909$), at $m=128$ (frozen $0.166$, recalibration $0.955$, retrained $0.954$), and with the Transformer encoder (frozen $0.162$, recalibration $0.950$, retrained $0.952$), so the failure is neither a width nor an architecture artifact. The experiment therefore separates three claims that the main text keeps apart: the representation contracts, the primary information remains linearly available, and a readout calibrated before the contraction becomes operationally invalid. This is why Algorithm~\ref{alg:survival_audit} reports contraction and task utility separately, and why a scale-invariant probe belongs beside the scatter criterion. Driver: \texttt{repro/scripts/readout\_transfer\_audit.py}; records: \texttt{results/READOUT/}.
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=\linewidth]{figures/fig_three_axes.pdf}
-\caption{(a) HAR toxifier: relative scatter falls by roughly $60\times$ from $\alpha=0$ to $\alpha=100$, while the standardised linear probe is unchanged. (b) A readout fitted on the healthy encoder falls to chance after contraction; refitting only its input statistics recovers accuracy, retraining recovers calibration, and applying the same readout to the STF-cal encoder preserves it. Both panels use the five/ten-seed records in \texttt{results/REPAUDIT/} and \texttt{results/READOUT/}.}
-\label{fig:three_axes}
-\end{figure}
+The frozen readout is not a straw man: it is what a deployment does when a head or calibration map is fitted once and the encoder keeps training. Contraction changes the feature scale, the bias term dominates, and the head predicts a near-constant class; NLL and ECE rise by an order of magnitude. Replacing only the input statistics recovers accuracy and most of ECE, but NLL remains elevated; retraining recovers both. The same readout applied to the STF-0 and STF-cal encoders reaches $0.946$ and $0.943$, so the survival intervention protects the readout itself, not only a scalar scatter statistic; the driver is \texttt{repro/scripts/stf\_readout\_audit.py}. The same pattern holds at $m=32$ (frozen $0.236$, input recalibration $0.887$, retrained $0.909$), at $m=128$ (frozen $0.166$, recalibration $0.955$, retrained $0.954$), and with the Transformer encoder (frozen $0.162$, recalibration $0.950$, retrained $0.952$), so the failure is neither a width nor an architecture artifact. The experiment therefore separates three claims that the main text keeps apart: the representation contracts, the primary information remains linearly available, and a readout calibrated before the contraction becomes operationally invalid. This is why Algorithm~\ref{alg:survival_audit} reports contraction and task utility separately, and why a scale-invariant probe belongs beside the scatter criterion. Driver: \texttt{repro/scripts/readout\_transfer\_audit.py}; records: \texttt{results/READOUT/}.
 
 \subsection{Dissociation Between Contraction and Utility}\label{app:dissociation}
 
-The audits above separate three quantities that are often conflated: variance contraction, scale-invariant information, and readout utility. Table~\ref{tab:dissociation} collects the four cases that separate them. These are case studies; the battery and subject-ID rows use the protocols cited in their sections.
+The audits above separate three quantities that are often conflated: variance contraction, scale-invariant information, and readout utility. Table~\ref{tab:dissociation} collects the five cases that separate them. These are case studies; the battery and subject-ID rows use the protocols cited in their sections.
 
 \begin{table}[h]
 \centering
-\caption{Contraction, information, and utility dissociate. Relative $S$ is the same-seed scatter ratio; the scale-invariant probe is the standardised linear probe; utility is the primary metric or the frozen-readout metric named in the row.}
+\caption{Contraction, information, and utility dissociate. Relative $S$ is the same-seed scatter ratio; the scale-invariant check is the standardised linear probe where measured, otherwise n/a; utility is the primary metric or the frozen-readout metric named in the row. The subject-ID row uses the five-seed real-head readout audit; the battery row is the MATR protocol, not the controlled toxifier.}
 \label{tab:dissociation}
 \footnotesize
-\begin{tabular}{p{0.20\linewidth}p{0.12\linewidth}p{0.18\linewidth}p{0.20\linewidth}p{0.20\linewidth}}
+\begin{tabular}{p{0.20\linewidth}p{0.08\linewidth}p{0.16\linewidth}p{0.34\linewidth}p{0.18\linewidth}}
 \toprule
-Case & Relative $S$ & Information & Utility & Diagnosis \\
+Case & Relative $S$ & Scale check & Utility & Diagnosis \\
 \midrule
-HAR toxifier, $\alpha=100$ & $0.016$ & probe $0.955$ (healthy $0.947$) & frozen head $0.241$; recalibrated $0.952$ & contraction, information intact, readout broken \\
-MATR battery, joint & $3.55$ & PR $2.49$ & SOH $5.57$ vs $2.10$ detached & no contraction; negative transfer \\
-RadioML SNR & $0.134$ & primary $0.205$ vs $0.307$ detached & collapse $10/10$ & contraction with utility loss \\
-HAR subject-ID, $\alpha=10$ & $0.76$--$0.80$ & primary $0.83$ vs $0.94$ detached & STF-cal $0.938$ & no contraction; utility loss \\
-HAR reconstruction & $1.00$ & primary $0.942$ & no loss & benign head \\
+HAR toxifier ($100$) & $0.016$ & probe $0.955$ (healthy $0.947$) & frozen $0.241$; input recal $0.952$; retrained $0.955$ & contraction; information intact; readout broken \\
+MATR battery & $3.55$ & PR $2.49$ & SOH $5.57$ vs $2.10$ detached & no contraction; negative transfer \\
+RadioML SNR & $0.134$ & n/a & joint $0.205$ vs detached $0.307$ & contraction; utility loss \\
+HAR subject-ID ($10$) & $0.90$ & n/a & own $0.883$; frozen $0.401$; retrained $0.897$ & no contraction; frozen readout broken by drift \\
+HAR reconstruction & $1.00$ & n/a & $0.942$ & benign head \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The toxifier row is the central case: the representation contracts by a factor of $60$ in scatter, yet the primary information is still linearly decodable, so the harm is to a scale-dependent readout, not to the information. The battery row is the opposite dissociation: the representation is not contracted (relative $S>1$), yet detachment improves SOH; the mechanism is negative transfer, not toxicity. The SNR row is the case where contraction and utility loss coincide, and the subject-ID row shows that utility loss can occur without contraction: at $\alpha=10$ joint accuracy is $0.830$ at relative scatter $0.74$ (no collapse), detachment reaches $0.940$, calibrated filtering reaches $0.940$ without collapse, and the hard/soft arms reach $0.940/0.939$ but over-filter to $3/10$ scatter collapses. No single scalar criterion—scatter, probe, or task accuracy—orders all four rows. This is the empirical justification for the three-question audit in Algorithm~\ref{alg:survival_audit}.
+The toxifier row is the central case: the representation contracts by a factor of $60$ in scatter, yet the primary information is still linearly decodable, so the harm is to a scale-dependent readout, not to the information. The battery row is the opposite dissociation: the representation is not contracted (relative $S>1$), yet detachment improves SOH; the mechanism is negative transfer, not toxicity. The SNR row is the case where contraction and utility loss coincide. The subject-ID row now contains two dissociations: joint accuracy is $0.883$ at relative scatter $0.90$ (no collapse), and a readout fitted on the healthy encoder falls to $0.401$ while retraining recovers $0.897$. The mechanism there is representation drift, not scale contraction. No single scalar criterion---scatter, probe, task accuracy, or readout accuracy---orders all five rows. This is the empirical justification for the three-question audit in Algorithm~\ref{alg:survival_audit}.
 
 \subsection{RadioML Dose--Response and Natural Scale}\label{app:rml_dose}
 
@@ -1501,7 +1515,7 @@ Table~\ref{tab:rml_dose} varies the auxiliary dose for two real RadioML heads at
 
 \begin{table}[h]
 \centering
-\caption{RadioML dose--response. Joint training, three seeds, $m=64$. ``Coll.'' is the scatter-collapse count; $\alpha\rho$ is the nominal dose times the measured per-example radial ratio. The SNR onset lies between $\alpha=3$ and $10$, and the head collapses in every seed from $\alpha=30$ onward; the reconstruction head never collapses at any tested dose.}
+\caption{RadioML dose--response, fully labeled. Joint training, three seeds, $m=64$. ``Coll.'' is the scatter-collapse count; $\alpha\rho$ is the nominal dose times the measured per-example radial ratio. The SNR onset lies between $\alpha=3$ and $10$, and the head collapses in every seed from $\alpha=30$ onward; the reconstruction head never collapses at any tested dose.}
 \label{tab:rml_dose}
 \footnotesize
 \resizebox{\columnwidth}{!}{\begin{tabular}{lrrrrrrr}
@@ -1520,13 +1534,13 @@ $10000$ & $0.204$ & $3/3$ & $0.140$ & $4138$ & $0.320$ & $0/3$ & $0.641$ \\
 \end{tabular}}
 \end{table}
 
-The scan answers the natural-scale question directly. The SNR head is not a pathology of the single value $\alpha=3000$: its collapse begins between $\alpha=3$ and $10$, and by $\alpha=30$ every seed has crossed the criterion. The reported $\alpha=3000$ is two orders of magnitude inside the supercritical regime. At the same nominal doses the I/Q reconstruction head never collapses, and its relative scatter stays near or above the reference until $\alpha=10000$. The separation is therefore head-specific rather than a global loss-scale artifact, and the effective dose $\alpha\rho$ makes the difference explicit: at $\alpha=30$ the SNR head already has $\alpha\rho=22.6$, while the reconstruction head's measured $\rho$ is numerically zero. A loss-rescaling explanation would have to explain why the same nominal scaling leaves one head benign and drives the other across the criterion; the measured $\rho$ difference does.
+The scan answers the natural-scale question directly. The SNR head is not a pathology of the single value $\alpha=3000$: its collapse begins between $\alpha=3$ and $10$, and by $\alpha=30$ every seed has crossed the criterion. The reported $\alpha=3000$ is two orders of magnitude inside the supercritical regime. At the same nominal doses the I/Q reconstruction head never collapses: its relative scatter stays near or above the reference through $\alpha=1000$, and at $\alpha=10000$ it falls to $0.641$, still above the $0.3$ criterion. The separation is therefore head-specific rather than a global loss-scale artifact, and the effective dose $\alpha\rho$ makes the difference explicit: at $\alpha=30$ the SNR head already has $\alpha\rho=22.6$, while the reconstruction head's measured $\rho$ is near zero. A loss-rescaling explanation would have to explain why the same nominal scaling leaves one head benign and drives the other across the criterion; the measured $\rho$ difference does.
 
 Table~\ref{tab:rml_stf} adds STF-cal at the three doses around and above the SNR onset. At $\alpha=30$, calibrated filtering reaches $0.303$ against joint $0.248$ and detached $0.306$, with no collapse; at $\alpha=100$ and $300$ the recovery shrinks to $0.278$ and $0.236$ even though the gate opens in every seed. The reconstruction gate stays shut (gate rate $0.00$) at all three doses and STF-cal stays at $0.308$. This is the dose-dependent selective-intervention behaviour claimed in the main text: filtering helps near the onset but not at every dose.
 
 \begin{table}[h]
 \centering
-\caption{STF-cal at the SNR onset (RadioML, three seeds, $m=64$). Gate rate and mean margin are for the calibrated arm; joint and STF-0 show the reference endpoints.}
+\caption{STF-cal at the SNR onset (RadioML, fully labeled, three seeds, $m=64$). Gate rate and mean margin are for the calibrated arm; joint and STF-0 show the reference endpoints.}
 \label{tab:rml_stf}
 \footnotesize
 \begin{tabular}{lrrrr}
