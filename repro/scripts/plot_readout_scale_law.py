@@ -15,12 +15,12 @@ OUT.parent.mkdir(parents=True, exist_ok=True)
 plt.rcParams.update({
     "font.family": "serif",
     "font.serif": ["Times New Roman", "DejaVu Serif"],
-    "font.size": 8,
-    "axes.labelsize": 8.5,
-    "axes.titlesize": 8.5,
-    "legend.fontsize": 7,
-    "xtick.labelsize": 7.5,
-    "ytick.labelsize": 7.5,
+    "font.size": 10,
+    "axes.labelsize": 10.5,
+    "axes.titlesize": 10,
+    "legend.fontsize": 8.5,
+    "xtick.labelsize": 9,
+    "ytick.labelsize": 9,
     "pdf.fonttype": 42,
     "ps.fonttype": 42,
 })
@@ -71,13 +71,12 @@ ax.set_xlabel(r"representation scale $c$ (fraction of healthy)")
 ax.set_ylabel("accuracy")
 ax.set_title("(a) frozen vs scale-invariant readout")
 ax.text(0.02, 0.08, f"$c^\\star={cstar_med:.3f}$", transform=ax.transAxes,
-        fontsize=7.5, color="#333333")
-ax.legend(loc="lower right", frameon=False)
+        fontsize=9, color="#333333")
 
 ax = axes[1]
 for y, color, label, ls in [
-    (ece_f, "#C44E52", "frozen (healthy $T$)", "-"),
-    (ece_ft, "#8172B2", "frozen + temperature", "--"),
+    (ece_f, "#C44E52", "frozen readout (healthy $T$)", "-"),
+    (ece_ft, "#8172B2", "frozen + temperature $T$", "--"),
     (ece_r, "#55A868", "input-recalibrated", "-"),
 ]:
     m, s = y.mean(0), y.std(0)
@@ -90,9 +89,12 @@ ax.set_ylim(0, 0.55)
 ax.set_xlabel(r"representation scale $c$ (fraction of healthy)")
 ax.set_ylabel("ECE")
 ax.set_title("(b) calibration map does not repair scale")
-ax.legend(loc="upper right", frameon=False, ncol=1)
+handles, labels = ax.get_legend_handles_labels()
 
-fig.tight_layout(pad=0.35, w_pad=1.0)
+fig.legend(handles, labels, loc="lower center", bbox_to_anchor=(0.5, 0.0),
+           ncol=3, frameon=False, handlelength=1.8, columnspacing=1.8,
+           fontsize=9)
+fig.tight_layout(pad=0.35, w_pad=1.0, rect=(0, 0.11, 1, 1))
 fig.savefig(OUT.with_suffix(".pdf"), bbox_inches="tight")
 fig.savefig(OUT.with_suffix(".png"), dpi=220, bbox_inches="tight")
 print("wrote", OUT.with_suffix(".pdf"))
