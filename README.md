@@ -1,7 +1,7 @@
-# RepFix — Spectral Toxicity Filtering for Multi-Task Representation Learning
+# RepFix — Silent Scale Shift: Variance Contraction and Calibrated Readout Failure
 
-Code release for *"Gradient Toxicity: When Auxiliary Heads Collapse the Shared
-Encoder"* (ICLR 2027, double-blind submission).
+Code release for *"Silent Scale Shift: Variance Contraction Breaks Calibrated
+Readouts"* (ICLR 2027, double-blind submission).
 
 Multi-task learning usually worries about gradient **conflict** — auxiliary gradients
 that oppose the primary task. This work studies the opposite regime, **gradient
