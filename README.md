@@ -308,6 +308,10 @@ actually certify. The repository now ships the audits behind those questions:
   agreement (0.47 below the median `d`, 0.56 above). (d) Exact discrepancy
   `|E|` against envelope `Delta_min`; median ratio 1.19, so the envelope is
   tight in absolute terms.
+- `paper/figures/fig_probe_arms.pdf` (driver `repro/scripts/plot_probe_arms.py`):
+  (a) certified checkpoints for the three probe arms (2, 15, 154 of 405); (b) ROC
+  of the certificate margin for predicting sign agreement (AUC 0.63 frozen,
+  0.80 corrected). No fired checkpoint is wrong in any arm.
 
 The calibrated arm is a local heuristic: the warm-up probe changes by orders of
 magnitude with the read time (`1/mean rho_hat = 1.34, 0.181, 0.00907, 1.7e-5` at

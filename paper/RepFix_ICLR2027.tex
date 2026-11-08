@@ -384,7 +384,7 @@ the probe $q$. Its purpose is to identify why the cheap decision can or cannot b
 transported to an operating checkpoint.
 The archive used here contains the cheap proxies and intervention outcomes. On $405$ HAR checkpoints the frozen probe agrees in sign with the exact variance derivative on $51\%$ of them, while the certificate is never wrong when it fires: $2$ checkpoints at the zero-trace scale $k=\operatorname{tr}(K)/(Bm)$, and $15$ under a per-checkpoint optimal one.
 
-A corrected probe raises this firing rate without adding cost. Set $q^\star=a/d$, i.e., signed radial loading over directional restoration. This replaces the unsigned per-example numerator of $q$ by $a$ and its primary-norm reference by $d\,n_p$. In the identity metric the prediction $d(1-\alpha q^\star)=d-\alpha a$ is exact, so only the encoder-geometry term remains. Table~\ref{tab:probe_arms} reports the three arms on the same archive. The corrected probe fires on $154/405$ checkpoints ($38.0\%$), never wrongly, with a median envelope of $0.43$ against $4.57$ for the optimal frozen arm; the median per-checkpoint shrink factor is $23.9$. Its sign agreement is $58\%$ overall and $61\%$ at positive dose, and its margin ranks correct checkpoints with AUC $0.80$ against $0.63$ for the frozen probe. The firing set is sign-balanced only in part: it contains $57$ of $226$ contracting checkpoints ($25\%$) but $97$ of $179$ expanding ones ($54\%$). The corrected probe is therefore a validity filter that removes uncertain decisions, not a contraction detector; the exact signed flux remains the working diagnostic for the contraction sign. Because $a$ and $d$ come from the same two head-level backward passes as $q$, the correction is free; unlike a frozen gate it must be evaluated at the audited checkpoint, so it is a checkpoint-local screen rather than a one-shot calibration. The division by $d$ requires care: the archive's smallest $|d|$ is $2.8\times10^{-4}$, and $51$ checkpoints have $|d|\le0.01$, where $q^\star$ can be large. Whenever the certificate fires, Corollary~\ref{cor:corrected} guarantees the sign; the small-$d$ issue is numerical, not a validity gap.
+A corrected probe raises this firing rate without adding cost. Set $q^\star=a/d$, i.e., signed radial loading over directional restoration. This replaces the unsigned per-example numerator of $q$ by $a$ and its primary-norm reference by $d\,n_p$. In the identity metric the prediction $d(1-\alpha q^\star)=d-\alpha a$ is exact, so only the encoder-geometry term remains. Table~\ref{tab:probe_arms} and Figure~\ref{fig:probe_arms} report the three arms on the same archive. The corrected probe fires on $154/405$ checkpoints ($38.0\%$), never wrongly, with a median envelope of $0.43$ against $4.57$ for the optimal frozen arm; the median per-checkpoint shrink factor is $23.9$. Its sign agreement is $58\%$ overall and $61\%$ at positive dose, and its margin ranks correct checkpoints with AUC $0.80$ against $0.63$ for the frozen probe. The firing set is sign-balanced only in part: it contains $57$ of $226$ contracting checkpoints ($25\%$) but $97$ of $179$ expanding ones ($54\%$). The corrected probe is therefore a validity filter that removes uncertain decisions, not a contraction detector; the exact signed flux remains the working diagnostic for the contraction sign. Because $a$ and $d$ come from the same two head-level backward passes as $q$, the correction is free; unlike a frozen gate it must be evaluated at the audited checkpoint, so it is a checkpoint-local screen rather than a one-shot calibration. The division by $d$ requires care: the archive's smallest $|d|$ is $2.8\times10^{-4}$, and $51$ checkpoints have $|d|\le0.01$, where $q^\star$ can be large. Whenever the certificate fires, Corollary~\ref{cor:corrected} guarantees the sign; the small-$d$ issue is numerical, not a validity gap.
 
 \begin{table}[h]
 \centering
@@ -401,6 +401,13 @@ corrected $q^\star=a/d$ & $154/405$ & $0$ & $0.43$ & $0.58$ ($0.61$) & $0.80$ \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\linewidth]{figures/fig_probe_arms.pdf}
+\caption{(a) Checkpoints certified out of $405$ by the frozen probe at the canonical and optimal scale and by the corrected probe $q^\star=a/d$. (b) ROC curve of the certificate margin for predicting sign agreement with the exact derivative; the corrected margin raises AUC from $0.63$ to $0.80$. No fired checkpoint is wrong in any arm.}
+\label{fig:probe_arms}
+\end{figure}
 
 \paragraph{What the operational rule assumes.}
 The gate $\alpha\hat\rho\ge1$ is certified only under the following conditions:
@@ -461,7 +468,9 @@ If $|d|\,|1-\alpha q^\star|>|\epsilon_p-\alpha\epsilon_a|$, then $\dot V$ has th
 Substitute $q^\star=a/d$ into \eqref{eq:probe_discrepancy}; the identity is exact. The triangle inequality bounds the remaining two terms by $|\epsilon_p-\alpha\epsilon_a|$.
 \end{proof}
 
-The corollary states when a one-shot calibration transports: the frozen margin
+Read directly, $a\propto\sum_i(h_i-\bar h)^\top g_{a,i}$ is the total centered auxiliary radial derivative and $d\propto-\sum_i(h_i-\bar h)^\top g_{p,i}$ the total centered primary one, so $q^\star$ is their signed ratio. The archived probe averages per-example magnitudes against $\|g_p\|$; opposing per-example contributions cancel in $q^\star$ but not in $q$. This is why the corrected envelope drops the $|d-1|$ term rather than merely rescaling it.
+
+The transport corollary states when a one-shot calibration transports: the frozen margin
 must exceed both the current envelope and the probe drift. On the $405$ HAR checkpoints, this condition fires on $2/405$
 checkpoints at the canonical zero-trace scale and $14/405$ under a per-checkpoint
 optimal scale, and it is never wrong when it fires. The frozen certificate
