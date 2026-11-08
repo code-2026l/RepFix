@@ -290,11 +290,24 @@ actually certify. The repository now ships the audits behind those questions:
 - `results/READOUT/rml_snr_flux*.json`, `rml_iq_flux.json`: per-epoch signed
   flux (`V`, `r`, `c`, cosine) from `--flux-trace`. The SNR seed-median `c_t`
   is `-3.97/-49.3/-66.1/-107.5` at epochs 1/5/10/25; I/Q gives `|c_t| < 1e-5`.
+- `results/READOUT/rml_snr_readout_stfcal.json` (driver
+  `repro/scripts/real_head_readout_transfer.py --stfcal`): the calibrated arm
+  at `alpha=3000`, three seeds. The gate opens and the deletion rank saturates
+  at 3 in every seed (calibrated `rho` 0.44--0.49), yet relative scatter stays
+  0.25--0.36 and the frozen readout rises only from 0.094 (joint) to 0.136;
+  recalibration gives 0.124 and retraining 0.212. Two orders of magnitude above
+  the onset, a rank-3 deletion is beyond the arm's reach, consistent with
+  STF-cal being a local heuristic without a trajectory guarantee.
 - `results/REPAUDIT_MLP/`: one-hidden-layer MLP probe at `alpha` 0/100 over five
   seeds: 0.9449/0.9543 against the linear probe's 0.9439/0.9545.
 - `paper/figures/fig_probe_phase.pdf` (driver `repro/scripts/plot_probe_phase.py`):
-  the transport-certificate phase diagram and slack histogram; 14/405
-  checkpoints are certified, none is wrong, and the median slack is 0.86.
+  four-panel transport audit. (a) Frozen margin against the transport envelope;
+  14/405 checkpoints are certified and none is wrong. (b) Slack-ratio histogram
+  (median 0.86, upper quartile 0.996). (c) Cell-level median restoration
+  alignment `d` against median signed mismatch `|a-q|`, coloured by sign
+  agreement (0.47 below the median `d`, 0.56 above). (d) Exact discrepancy
+  `|E|` against envelope `Delta_min`; median ratio 1.19, so the envelope is
+  tight in absolute terms.
 
 The calibrated arm is a local heuristic: the warm-up probe changes by orders of
 magnitude with the read time (`1/mean rho_hat = 1.34, 0.181, 0.00907, 1.7e-5` at

@@ -88,7 +88,7 @@ def flux_terms(model, Xq, yq, aq, aux_kind, mode):
 
 def train_real(D, aux_kind, alpha, mode, seed, m, epochs, lr, batch, device,
                flux_trace=False, flux_batch=384, flux_every=25,
-               flux_epochs=2):
+               flux_epochs=2, cal_warm=3):
     cdm.set_seed(seed)
     model = ram.RealAuxModel(D["d_in"], D["n_classes"], m, aux_kind,
                              D["aux_dim"], regress=False).to(device)
@@ -99,6 +99,11 @@ def train_real(D, aux_kind, alpha, mode, seed, m, epochs, lr, batch, device,
          else torch.from_numpy(np.asarray(D["aux_tr"])).long().to(device))
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     n = len(X)
+    cal = None
+    if mode == "stfcal":
+        n_steps = (n + batch - 1) // batch
+        cal = ram.CalController(alpha, warm_steps=int(cal_warm * n_steps),
+                                rank_max=3)
     flux_rows = []
     if flux_trace:
         Bq = min(flux_batch, len(D["X_te"]))
@@ -121,7 +126,17 @@ def train_real(D, aux_kind, alpha, mode, seed, m, epochs, lr, batch, device,
         for b0 in range(0, n, batch):
             idx = perm[b0:b0 + batch]
             h = model(X[idx])
-            aux_in = h.detach() if mode == "stf0" else h
+            if cal is not None:
+                if not cal.calibrated and cal.step >= cal.warm_steps:
+                    pb = ram.real_aux_probe(model, X[idx], y[idx], A[idx],
+                                            aux_kind, D["aux_dim"],
+                                            F.cross_entropy, False, R=3,
+                                            basis="pca")
+                    cal.calibrate(pb)
+                aux_in, _, _ = cal.step_h(h, "stfcal",
+                                         warm=(not cal.calibrated))
+            else:
+                aux_in = h.detach() if mode == "stf0" else h
             loss = F.cross_entropy(model.primary(h), y[idx])
             loss = loss + alpha * ram._aux_loss(model, aux_in, A[idx], aux_kind)
             opt.zero_grad()
@@ -143,7 +158,9 @@ def train_real(D, aux_kind, alpha, mode, seed, m, epochs, lr, batch, device,
             ft.update(epoch=ep + 1, step=gstep, phase="epoch")
             flux_rows.append(ft)
     model.eval()
-    return model, flux_rows
+    cal_info = (dict(gate=cal.gate_val, rank=cal.r_use, margin=cal.margin,
+                     rho_cal=cal.rho_u) if cal is not None else {})
+    return model, flux_rows, cal_info
 
 
 def main():
@@ -165,6 +182,9 @@ def main():
                     help="sample the joint-mode flux every N minibatches inside "
                          "the first --flux-epochs epochs")
     ap.add_argument("--flux-epochs", type=int, default=2)
+    ap.add_argument("--stfcal", action="store_true",
+                    help="also train a calibrated STF arm and audit its readout")
+    ap.add_argument("--cal-warm-epochs", type=int, default=3)
     ap.add_argument("--out", default="results/READOUT/har_subject_readout.json")
     a = ap.parse_args()
     device = ("cuda" if torch.cuda.is_available() else "cpu") if a.device == "auto" else a.device
@@ -174,15 +194,20 @@ def main():
     Xte = torch.from_numpy(D["X_te"]).float()
     yte = torch.from_numpy(D["y_te"]).long()
     rows = []
+    modes = [("healthy", 0.0), ("joint", a.alpha), ("stf0", a.alpha)]
+    if a.stfcal:
+        modes.append(("stfcal", a.alpha))
     for s in [int(x) for x in a.seeds.split(",")]:
-        print(f"seed {s}: training healthy/joint/detached", flush=True)
+        print(f"seed {s}: training {','.join(m for m, _ in modes)}", flush=True)
         models = {}
         flux = {}
-        for mode, alpha in [("healthy", 0.0), ("joint", a.alpha), ("stf0", a.alpha)]:
-            models[mode], flux[mode] = train_real(
+        calinfo = {}
+        for mode, alpha in modes:
+            models[mode], flux[mode], calinfo[mode] = train_real(
                 D, a.aux, alpha, mode, s, a.m, a.epochs, a.lr, a.batch, device,
                 flux_trace=a.flux_trace, flux_batch=a.flux_batch,
-                flux_every=a.flux_every, flux_epochs=a.flux_epochs)
+                flux_every=a.flux_every, flux_epochs=a.flux_epochs,
+                cal_warm=a.cal_warm_epochs)
         ht, cal = stratified_split(ytr, 0.2, s)
         htr = {k: embed_model(v, Xtr) for k, v in models.items()}
         hte = {k: embed_model(v, Xte) for k, v in models.items()}
@@ -190,7 +215,9 @@ def main():
         row = dict(seed=s, aux=a.aux, alpha=a.alpha, m=a.m,
                    base_scatter=float(cdm.scatter(htr["healthy"].float())),
                    encoders={}, readouts={})
-        for name in ["healthy", "joint", "stf0"]:
+        if a.stfcal:
+            row["stfcal"] = calinfo["stfcal"]
+        for name in models.keys():
             own = evaluate(clf, hte[name], yte, mu, sd)
             sc = float(cdm.scatter(hte[name].float()))
             with torch.no_grad():
@@ -220,6 +247,8 @@ def main():
     out.write_text(json.dumps(dict(domain=a.domain, aux=a.aux, alpha=a.alpha,
                                    flux_trace=a.flux_trace, flux_batch=a.flux_batch,
                                    flux_every=a.flux_every, flux_epochs=a.flux_epochs,
+                                   stfcal=a.stfcal,
+                                   cal_warm_epochs=a.cal_warm_epochs,
                                    protocol="healthy readout transferred to a real auxiliary encoder",
                                    rows=rows), indent=2))
     print("wrote", out)
