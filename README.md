@@ -269,20 +269,40 @@ actually certify. The repository now ships the audits behind those questions:
   the healthy encoder falls from 0.944 to 0.384; input recalibration reaches
   0.466 and retraining recovers 0.901. This is readout failure by
   representation drift, not scale: contraction is sufficient, not necessary.
-- `results/READOUT/rml_snr_readout.json` (driver
+- `results/READOUT/rml_snr_readout_a3000.json` (driver
   `repro/scripts/real_head_readout_transfer.py`): the contracting RadioML SNR
-  head at `alpha=3000` (three seeds). The healthy readout is 0.312; the frozen
-  readout on the joint encoder is 0.094, chance for 11 classes (1/11 = 0.091);
-  input recalibration does not recover it (0.094); retraining reaches 0.229;
-  STF-0 detachment preserves 0.312 at relative `S = 1.00`. This is the
-  real-head version of the scale channel.
+  head at `alpha=3000` (five seeds; supersedes the three-seed
+  `rml_snr_readout.json`). The healthy readout is 0.315; the frozen readout on
+  the joint encoder is 0.099, chance for 11 classes (1/11 = 0.091); input
+  recalibration does not recover it (0.094); retraining reaches 0.229, above
+  the joint head's own 0.205; STF-0 detachment preserves 0.315 at relative
+  `S = 1.00`. The exact signed flux is non-positive at 74/75 epoch ends, so
+  this is a relative collapse, not a signed auxiliary contraction.
+- `results/READOUT/rml_snr_readout_a{3,10,30,100,300}.json`: the five-seed
+  readout dose scan. The frozen readout is 0.176 at `alpha=3`, 0.121 at 10,
+  and near chance (0.099--0.106) from 30 to 3000; retraining recovers
+  0.322/0.283/0.256/0.240/0.234. The readout degrades before the 0.3 scatter
+  criterion fires at `alpha=3` (relative `S = 0.558`).
+- `results/READOUT/rml_iq_readout.json`: the I/Q reconstruction control (three
+  seeds). It does not contract (relative `S = 1.05`) and retrained accuracy
+  0.351 exceeds detached 0.312, yet the frozen readout falls to 0.195. A
+  non-contracting head can still invalidate a readout by drift.
+- `results/READOUT/rml_snr_flux*.json`, `rml_iq_flux.json`: per-epoch signed
+  flux (`V`, `r`, `c`, cosine) from `--flux-trace`. The SNR seed-median `c_t`
+  is `-3.97/-49.3/-66.1/-107.5` at epochs 1/5/10/25; I/Q gives `|c_t| < 1e-5`.
+- `results/REPAUDIT_MLP/`: one-hidden-layer MLP probe at `alpha` 0/100 over five
+  seeds: 0.9449/0.9543 against the linear probe's 0.9439/0.9545.
+- `paper/figures/fig_probe_phase.pdf` (driver `repro/scripts/plot_probe_phase.py`):
+  the transport-certificate phase diagram and slack histogram; 14/405
+  checkpoints are certified, none is wrong, and the median slack is 0.86.
 
 The calibrated arm is a local heuristic: the warm-up probe changes by orders of
 magnitude with the read time (`1/mean rho_hat = 1.34, 0.181, 0.00907, 1.7e-5` at
 `W = 1, 2, 4, 32`), the zero-dose control drifts without auxiliary contact, and the
 frozen probe agrees with the exact derivative on 51% of 405 audited checkpoints.
 The certificate is never wrong when it fires, but it fires on 2/405 checkpoints at
-the zero-trace scale and 15/405 under an optimal scale; it is sufficient, not
+the zero-trace scale, 15/405 for the frozen certificate at an optimal scale, and
+14/405 for the transport certificate with the drift term; it is sufficient, not
 universal. In the corrected MATR battery table, joint training has relative
 `S = 3.55` (above the single-task anchor), so detachment's SOH improvement there is
 negative transfer, not repair of a contracted representation.

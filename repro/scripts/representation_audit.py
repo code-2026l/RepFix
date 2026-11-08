@@ -129,6 +129,36 @@ def fit_probe(Xtr, ytr, Xte, yte, n_classes, standardize=True, whiten=False,
         return float((clf(Xte).argmax(1) == yte).float().mean())
 
 
+def fit_mlp_probe(Xtr, ytr, Xte, yte, n_classes, hidden=64, epochs=120,
+                  lr=1e-3, batch=256, seed=0, l2=1e-4):
+    """One-hidden-layer MLP probe on the same frozen features.
+
+    The linear probe establishes that the primary label is linearly decodable;
+    this probe checks whether a mild nonlinear readout finds more.  Inputs are
+    per-dimension standardised with train statistics, as in the linear probe.
+    """
+    Xtr, Xte = Xtr.float(), Xte.float()
+    mu = Xtr.mean(0, keepdim=True)
+    sd = Xtr.std(0, keepdim=True).clamp_min(1e-6)
+    Xtr, Xte = (Xtr - mu) / sd, (Xte - mu) / sd
+    torch.manual_seed(seed)
+    g = torch.Generator().manual_seed(seed)
+    mlp = nn.Sequential(nn.Linear(Xtr.shape[1], hidden), nn.ReLU(),
+                        nn.Linear(hidden, n_classes))
+    opt = torch.optim.Adam(mlp.parameters(), lr=lr, weight_decay=l2)
+    n = len(Xtr)
+    for _ in range(epochs):
+        perm = torch.randperm(n, generator=g)
+        for b0 in range(0, n, batch):
+            idx = perm[b0:b0 + batch]
+            opt.zero_grad()
+            loss = nn.functional.cross_entropy(mlp(Xtr[idx]), ytr[idx])
+            loss.backward()
+            opt.step()
+    with torch.no_grad():
+        return float((mlp(Xte).argmax(1) == yte).float().mean())
+
+
 def stratified_subsample(y, frac, seed):
     g = torch.Generator().manual_seed(1000 + seed)
     keep = []
@@ -152,6 +182,7 @@ def audit(model, D, seed, frac=0.1):
     out["probe_activity_raw"] = fit_probe(htr, ytr, hte, yte, 6, standardize=False)
     out["probe_activity_std"] = fit_probe(htr, ytr, hte, yte, 6, standardize=True)
     out["probe_activity_whiten"] = fit_probe(htr, ytr, hte, yte, 6, standardize=True, whiten=True)
+    out["probe_activity_mlp"] = fit_mlp_probe(htr, ytr, hte, yte, 6, seed=seed)
     sub = stratified_subsample(ytr, frac, seed)
     out["probe_activity_10pct_std"] = fit_probe(htr[sub], ytr[sub], hte, yte, 6,
                                                 standardize=True, max_iter=150)
@@ -185,7 +216,8 @@ def summarise(outdir):
     fields = ["cov_trace", "mean_feature_variance", "participation_rank", "entropy_rank",
               "stable_rank", "top1_fraction", "mean_norm", "std_norm"]
     probes = ["activity_acc", "probe_activity_raw", "probe_activity_std",
-              "probe_activity_whiten", "probe_activity_10pct_std",
+              "probe_activity_whiten", "probe_activity_mlp",
+              "probe_activity_10pct_std",
               "probe_coarse_raw", "probe_coarse_std"]
     ms = lambda v: dict(mean=stats.mean(v), std=stats.pstdev(v))
     summary = {"n_seeds": {str(a): len(rs) for a, rs in by.items()}, "cells": {}}
