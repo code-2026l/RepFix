@@ -316,9 +316,13 @@ frozen probe agrees with the exact derivative on 51% of 405 audited checkpoints.
 The certificate is never wrong when it fires, but it fires on 2/405 checkpoints at
 the zero-trace scale, 15/405 for the frozen certificate at an optimal scale, and
 14/405 for the transport certificate with the drift term; it is sufficient, not
-universal. In the corrected MATR battery table, joint training has relative
-`S = 3.55` (above the single-task anchor), so detachment's SOH improvement there is
-negative transfer, not repair of a contracted representation.
+universal. A corrected checkpoint-local probe `q* = a/d` (signed loading over
+directional restoration, same two head-level backward passes) raises the certified
+set to 154/405 with zero false fires and a 23.9x tighter median envelope; its
+sign agreement is 0.58 (0.61 at positive dose) and its margin ranks correctness
+with AUC 0.80 against 0.63. In the corrected MATR battery table, joint training has
+relative `S = 3.55` (above the single-task anchor), so detachment's SOH improvement
+there is negative transfer, not repair of a contracted representation.
 
 ## License and citation
 

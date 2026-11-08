@@ -47,7 +47,7 @@
 \maketitle
 
 \begin{abstract}
-Multi-task learning can fail silently in deployment even when every task loss is healthy and no gradients conflict. Auxiliary tasks can shrink a shared representation by orders of magnitude---$4{,}600\times$ in covariance trace on HAR---and break a readout calibrated before the shift: the frozen readout falls from $0.945$ to $0.241$ accuracy while a standardised linear probe stays at $0.955$ and a retrained head recovers $0.955$. The information survives; the instrument does not. We call this \emph{silent scale shift}. For an affine readout, the first prediction change occurs at a computable critical scale; on HAR its median is $c^\star=0.054$ of the healthy scale, and input recalibration is scale-invariant by construction. Conflict criteria cannot see the shift: ten multi-task optimizers fail to prevent it at their calibrated high doses, while detachment does. A cheap radial probe screens for it but is valid only inside a computable margin; on $405$ audited checkpoints it agrees with the exact signed derivative on $51\%$, and the offline certificate fires on $2/405$ but is never wrong when it does. On a real RadioML SNR head at $\alpha=3000$, the frozen readout falls from $0.315$ to $0.099$ (chance), while retraining recovers $0.229$ and detachment preserves $0.315$; a five-seed dose scan brackets the fall between $\alpha=3$ and $10$. Variance survival is a separate evaluation axis; readout validity is a quantity to audit.
+Multi-task learning can fail silently in deployment even when every task loss is healthy and no gradients conflict. Auxiliary tasks can shrink a shared representation by orders of magnitude---$4{,}600\times$ in covariance trace on HAR---and break a readout calibrated before the shift: the frozen readout falls from $0.945$ to $0.241$ accuracy while a standardised linear probe stays at $0.955$ and a retrained head recovers $0.955$. The information survives; the instrument does not. We call this \emph{silent scale shift}. For an affine readout, the first prediction change occurs at a computable critical scale; on HAR its median is $c^\star=0.054$ of the healthy scale, and input recalibration is scale-invariant by construction. Conflict criteria cannot see the shift: ten multi-task optimizers fail to prevent it at their calibrated high doses, while detachment does. A cheap radial probe screens for it but is valid only inside a computable margin; on $405$ audited checkpoints it agrees with the exact signed derivative on $51\%$, and the offline certificate fires on $2/405$ but is never wrong when it does. A corrected probe that uses signed loading over directional restoration raises the certified set to $154/405$ with no false fires at the same cost. On a real RadioML SNR head at $\alpha=3000$, the frozen readout falls from $0.315$ to $0.099$ (chance), while retraining recovers $0.229$ and detachment preserves $0.315$; a five-seed dose scan brackets the fall between $\alpha=3$ and $10$. Variance survival is a separate evaluation axis; readout validity is a quantity to audit.
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
@@ -183,7 +183,7 @@ the probe and the exact variance derivative agree in sign. If $1-\alpha q>\Delta
 The chain rule gives $\dot V=-u^\top K(g_p+\alpha g_a)/B$. Substitute $K=k(I+E)$, divide by $N$, and add and subtract $1-\alpha q$. The triangle inequality bounds $|\mathcal E|$ by $\Delta$.
 \end{proof}
 
-The theorem supplies a \emph{sufficient, checkpoint-local} boundary. Its decomposition attributes a scalar threshold's discrepancy to quantities that can be checked separately; the directly evaluated $\mathcal E$ is sharper than the conservative envelope $\Delta$. Corollary~\ref{cor:transport} transports the decision through time, and Appendix~\ref{app:boundary_proof} audits it on $405$ HAR checkpoints: it fires on $2/405$ at the canonical scale and $14/405$ at a per-checkpoint optimal scale, and is never wrong when it fires. The checkpoint-local certificate agrees with the exact derivative on $51\%$ of those checkpoints; the remaining errors are the subject of Section~\ref{sec:experiments}.
+The theorem supplies a \emph{sufficient, checkpoint-local} boundary. Its decomposition attributes a scalar threshold's discrepancy to quantities that can be checked separately; the directly evaluated $\mathcal E$ is sharper than the conservative envelope $\Delta$. Corollary~\ref{cor:transport} transports the decision through time, and Appendix~\ref{app:boundary_proof} audits it on $405$ HAR checkpoints: it fires on $2/405$ at the canonical scale and $14/405$ at an optimal scale, and is never wrong when it fires. A corrected probe $q^\star=a/d$ fires on $154/405$ checkpoints with zero false fires and a $24\times$ tighter envelope (Table~\ref{tab:probe_arms}), so the boundary is a graded screen rather than only a rare interlock. The remaining errors are the subject of Section~\ref{sec:experiments}.
 
 In the identity metric ($E=0$) with positive signed loading, $\dot V/N=d-\alpha a$. If $a=q$ but $0<d<\alpha q<1$, the frozen gate reports a subcritical dose although variance contracts: the primary norm overstates restoration. If $a=-q$, the unsigned gate can report danger while the auxiliary expands variance. If $a$ changes after calibration, the error moves with $a-q$. These are algebraic predictions about the sign of the diagnostic error, rather than an assumption that every high probe value indicates collapse.
 
@@ -383,6 +383,24 @@ cheap substitute for measuring the flux; the cheap object in the deployed rule i
 the probe $q$. Its purpose is to identify why the cheap decision can or cannot be
 transported to an operating checkpoint.
 The archive used here contains the cheap proxies and intervention outcomes. On $405$ HAR checkpoints the frozen probe agrees in sign with the exact variance derivative on $51\%$ of them, while the certificate is never wrong when it fires: $2$ checkpoints at the zero-trace scale $k=\operatorname{tr}(K)/(Bm)$, and $15$ under a per-checkpoint optimal one.
+
+A corrected probe raises this firing rate without adding cost. Set $q^\star=a/d$, i.e., signed radial loading over directional restoration. This replaces the unsigned per-example numerator of $q$ by $a$ and its primary-norm reference by $d\,n_p$. In the identity metric the prediction $d(1-\alpha q^\star)=d-\alpha a$ is exact, so only the encoder-geometry term remains. Table~\ref{tab:probe_arms} reports the three arms on the same archive. The corrected probe fires on $154/405$ checkpoints ($38.0\%$), never wrongly, with a median envelope of $0.43$ against $4.57$ for the optimal frozen arm; the median per-checkpoint shrink factor is $23.9$. Its sign agreement is $58\%$ overall and $61\%$ at positive dose, and its margin ranks correct checkpoints with AUC $0.80$ against $0.63$ for the frozen probe. Because $a$ and $d$ come from the same two head-level backward passes as $q$, the correction is free; unlike a frozen gate it must be evaluated at the audited checkpoint, so it is a checkpoint-local screen rather than a one-shot calibration.
+
+\begin{table}[h]
+\centering
+\caption{Probe validity on the $405$ HAR checkpoints. ``Fires'' counts checkpoints meeting $|1-\alpha q|>\Delta$; ``wrong'' counts fired checkpoints whose sign disagrees with the exact derivative. Agreement and AUC are over all checkpoints; the parentheses give agreement at positive dose.}
+\label{tab:probe_arms}
+\footnotesize
+\begin{tabular}{lrrrrr}
+\toprule
+Probe & fires & wrong & median envelope & agree & AUC \\
+\midrule
+frozen, canonical $k$ & $2/405$ & $0$ & $28.2$ & $0.51$ & $0.63$ \\
+frozen, optimal $k$ & $15/405$ & $0$ & $4.57$ & $0.51$ & $0.62$ \\
+corrected $q^\star=a/d$ & $154/405$ & $0$ & $0.43$ & $0.58$ ($0.61$) & $0.80$ \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \paragraph{What the operational rule assumes.}
 The gate $\alpha\hat\rho\ge1$ is certified only under the following conditions:
