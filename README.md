@@ -320,7 +320,9 @@ universal. A corrected checkpoint-local probe `q* = a/d` (signed loading over
 directional restoration, same two head-level backward passes) raises the certified
 set to 154/405 with zero false fires and a 23.9x tighter median envelope; its
 sign agreement is 0.58 (0.61 at positive dose) and its margin ranks correctness
-with AUC 0.80 against 0.63. In the corrected MATR battery table, joint training has
+with AUC 0.80 against 0.63. It certifies 25% of contracting but 54% of expanding
+checkpoints, so it is a validity filter rather than a contraction detector. In the
+corrected MATR battery table, joint training has
 relative `S = 3.55` (above the single-task anchor), so detachment's SOH improvement
 there is negative transfer, not repair of a contracted representation.
 
