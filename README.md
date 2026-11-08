@@ -259,16 +259,23 @@ actually certify. The repository now ships the audits behind those questions:
 - `results/READOUT/readout_scale_law.json` (driver
   `repro/scripts/readout_scale_law.py`): a five-seed scale sweep of a linear
   readout applied to `cH`, with `c` from 1 to 0.001. The frozen readout falls
-  from 0.948 to 0.174; input recalibration is flat at 0.948; the median
-  first-flip scale is `c* = 0.079` of the healthy scale. This turns the
+  from 0.944 to 0.169; input recalibration is flat at 0.944; the median
+  first-flip scale is `c* = 0.054` of the healthy scale. This turns the
   qualitative `c -> 0` proposition into a computable critical scale. Figure:
   `paper/figures/fig_readout_scale_law.pdf`.
 - `results/READOUT/har_subject_readout.json` (driver
   `repro/scripts/real_head_readout_transfer.py`): a real HAR subject-ID head at
-  `alpha=10` does not contract (relative `S = 0.90`), yet a readout fitted on
-  the healthy encoder falls from 0.948 to 0.401; input recalibration reaches
-  0.434 and retraining recovers 0.897. This is readout failure by
+  `alpha=10` does not contract (relative `S = 0.93`), yet a readout fitted on
+  the healthy encoder falls from 0.944 to 0.384; input recalibration reaches
+  0.466 and retraining recovers 0.901. This is readout failure by
   representation drift, not scale: contraction is sufficient, not necessary.
+- `results/READOUT/rml_snr_readout.json` (driver
+  `repro/scripts/real_head_readout_transfer.py`): the contracting RadioML SNR
+  head at `alpha=3000` (three seeds). The healthy readout is 0.312; the frozen
+  readout on the joint encoder is 0.094, chance for 11 classes (1/11 = 0.091);
+  input recalibration does not recover it (0.094); retraining reaches 0.229;
+  STF-0 detachment preserves 0.312 at relative `S = 1.00`. This is the
+  real-head version of the scale channel.
 
 The calibrated arm is a local heuristic: the warm-up probe changes by orders of
 magnitude with the read time (`1/mean rho_hat = 1.34, 0.181, 0.00907, 1.7e-5` at
