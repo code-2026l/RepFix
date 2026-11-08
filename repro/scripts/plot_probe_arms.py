@@ -1,97 +1,77 @@
-"""Summarize the corrected probe: certified counts and margin ROC.
-
-Panel (a): certified checkpoints for the frozen probe at the canonical and
-optimal scale, and for the corrected probe q* = a/d.
-Panel (b): ROC of the certificate margin for predicting sign agreement.
-"""
+"""Plot matched retrospective certificate ablations and exact-flux margins."""
 import json
 from pathlib import Path
 
 import matplotlib
-matplotlib.use("Agg")
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 
+from certificate_matched_audit import auc
+
 ROOT = Path(__file__).resolve().parents[2]
-SRC = ROOT / "repro" / "results" / "PBA" / "PBA_har.json"
-OUT = ROOT / "paper" / "figures" / "fig_probe_arms"
-OUT.parent.mkdir(parents=True, exist_ok=True)
+RAW = ROOT / 'repro/results/PBA/PBA_har.json'
+MATCHED = ROOT / 'repro/results/CPUCONT/certificate_matched.json'
+OUT = ROOT / 'paper/figures/fig_probe_arms'
 
-plt.rcParams.update({
-    "font.family": "serif",
-    "font.serif": ["Times New Roman", "DejaVu Serif"],
-    "font.size": 8,
-    "axes.labelsize": 8.5,
-    "axes.titlesize": 8.5,
-    "legend.fontsize": 7,
-    "xtick.labelsize": 7.5,
-    "ytick.labelsize": 7.5,
-    "pdf.fonttype": 42,
-    "ps.fonttype": 42,
-})
+plt.rcParams.update({'font.family': 'serif', 'font.serif': ['Times New Roman', 'DejaVu Serif'],
+                     'font.size': 9, 'axes.labelsize': 9, 'axes.titlesize': 9,
+                     'legend.fontsize': 8, 'xtick.labelsize': 8, 'ytick.labelsize': 8,
+                     'pdf.fonttype': 42, 'ps.fonttype': 42})
 
-D = json.load(open(SRC))
-P = [p for r in D["runs"] for p in r["points"] if p.get("frozen") and p.get("corrected")]
-n = len(P)
+summary = json.loads(MATCHED.read_text())['arms']
+raw = json.loads(RAW.read_text())
+points = [dict(p, B=r['audit_batch']) for r in raw['runs'] for p in r['points'] if not p.get('degenerate')]
+fig, axes = plt.subplots(1, 2, figsize=(6.9, 2.65))
+x = np.arange(3)
+fixed = [summary[k]['fired'] for k in ['frozen_canonical_triangle', 'corrected_canonical_triangle', 'corrected_canonical_combined']]
+optimized = [summary[k]['fired'] for k in ['frozen_optimized_triangle', 'corrected_optimized_triangle', 'corrected_optimized_combined']]
+for offset, values, color, label in [(-.18, fixed, '#8C9BAB', 'canonical scale'),
+                                      (.18, optimized, '#C44E52', 'optimized scale')]:
+    bars = axes[0].bar(x + offset, values, width=.34, color=color, label=label)
+    for bar, value in zip(bars, values):
+        axes[0].text(bar.get_x() + bar.get_width() / 2, value + 3, str(value), ha='center', fontsize=8)
+axes[0].set_xticks(x, ['frozen\ntriangle', 'corrected\ntriangle', 'corrected\ncombined'])
+axes[0].set_ylabel('certified checkpoints (of 405)')
+axes[0].set_ylim(0, 180)
+axes[0].set_title('(a) predictor, envelope, and scale separated')
+axes[0].legend(loc='upper left', frameon=False)
 
-def fired(tag, field):
-    return sum(1 for p in P if p[tag][field])
 
-counts = [fired("frozen", "fired"), fired("frozen", "fired_at_kopt"),
-          fired("corrected", "fired")]
-labels = ["frozen\ncanonical $k$", "frozen\noptimal $k$", "corrected\n$q^\\star=a/d$"]
-colors = ["#8C9BAB", "#4C72B0", "#C44E52"]
+def scores(kind):
+    values, labels = [], []
+    for p in points:
+        alpha = p['alpha']
+        actual = p['r'] - alpha * p['c']
+        if kind == 'frozen':
+            pred = 1 - alpha * p['frozen']['q']
+            delta = p['frozen']['Delta']
+        else:
+            pred = p['d'] - alpha * p['a']
+            if kind == 'corrected_optimized':
+                delta = abs(p['d']) * p['corrected']['Delta_star_min']
+            else:
+                base = p['nu'] * p['n_p'] / p['B']
+                delta = abs(actual / (p['k_tr'] * base) - pred)
+        values.append(abs(pred) / max(delta, 1e-300))
+        labels.append(pred * actual > 0)
+    return np.array(values), np.array(labels)
 
-def roc(scores, labels_):
-    s = np.asarray(scores, float)
-    y = np.asarray(labels_, bool)
-    order = np.argsort(-s)
-    tpr = np.concatenate([[0], np.cumsum(y[order]) / y.sum()])
-    fpr = np.concatenate([[0], np.cumsum(~y[order]) / (~y).sum()])
-    return fpr, tpr
 
-def auc(scores, labels_):
-    s = np.asarray(scores, float)
-    y = np.asarray(labels_, bool)
-    n1, n0 = y.sum(), (~y).sum()
-    order = np.argsort(s)
-    r = np.empty(len(s)); r[order] = np.arange(1, len(s) + 1)
-    return (r[y].sum() - n1 * (n1 + 1) / 2) / (n1 * n0)
-
-m_frozen = [abs(1 - float(p["alpha"]) * float(p["frozen"]["q"]))
-            / max(float(p["frozen"]["Delta"]), 1e-12) for p in P]
-y_frozen = [p["frozen"]["agree"] for p in P]
-m_corr = [abs(1 - float(p["alpha"]) * float(p["corrected"]["q_star"]))
-          / max(float(p["corrected"]["Delta_star_min"]), 1e-12) for p in P]
-y_corr = [p["corrected"]["agree"] for p in P]
-
-fig, axes = plt.subplots(1, 2, figsize=(6.9, 2.55))
-
-ax = axes[0]
-bars = ax.bar(range(3), counts, color=colors, width=0.62)
-ax.set_xticks(range(3))
-ax.set_xticklabels(labels)
-ax.set_ylabel("certified checkpoints")
-ax.set_ylim(0, 175)
-ax.set_title("(a) certified set, zero false fires")
-for i, c in enumerate(counts):
-    ax.text(i, c + 4, str(c), ha="center", fontsize=7.4)
-ax.text(0.02, 0.92, f"of {n} checkpoints", transform=ax.transAxes, fontsize=7)
-
-ax = axes[1]
-for m, y, c, lab in ((m_frozen, y_frozen, "#4C72B0", "frozen $q$"),
-                     (m_corr, y_corr, "#C44E52", "corrected $q^\\star$")):
-    f, t = roc(m, y)
-    ax.plot(f, t, color=c, lw=1.2, label=f"{lab} (AUC {auc(m, y):.2f})")
-ax.plot([0, 1], [0, 1], ls="--", color="#777777", lw=0.8)
-ax.set_xlabel("false-positive rate")
-ax.set_ylabel("true-positive rate")
-ax.set_title("(b) margin predicts sign agreement")
-ax.legend(loc="lower right", frameon=False)
-
-fig.tight_layout(pad=0.35, w_pad=1.1)
-fig.savefig(OUT.with_suffix(".pdf"), bbox_inches="tight")
-fig.savefig(OUT.with_suffix(".png"), dpi=220, bbox_inches="tight")
-print("wrote", OUT.with_suffix(".pdf"))
-print("counts", counts, "auc frozen", auc(m_frozen, y_frozen),
-      "auc corrected", auc(m_corr, y_corr))
+for kind, color, label in [('frozen', '#4C72B0', 'frozen, canonical'),
+                            ('corrected', '#55A868', 'corrected, canonical'),
+                            ('corrected_optimized', '#C44E52', 'corrected, optimized')]:
+    score, correct = scores(kind)
+    order = np.argsort(-score, kind='stable')
+    end = np.r_[np.flatnonzero(np.diff(score[order]) != 0), len(score) - 1]
+    tpr = np.r_[0, np.cumsum(correct[order])[end] / correct.sum()]
+    fpr = np.r_[0, np.cumsum(~correct[order])[end] / (~correct).sum()]
+    axes[1].plot(fpr, tpr, color=color, lw=1.4, label=f'{label} ({auc(score, correct):.2f})')
+axes[1].plot([0, 1], [0, 1], '--', color='#999999', lw=.8)
+axes[1].set(xlabel='false-positive rate', ylabel='true-positive rate',
+            title='(b) retrospective margin (uses exact flux)')
+axes[1].legend(loc='lower right', frameon=False, fontsize=7)
+fig.tight_layout(pad=.5, w_pad=1.1)
+fig.savefig(OUT.with_suffix('.pdf'), bbox_inches='tight')
+fig.savefig(OUT.with_suffix('.png'), dpi=220, bbox_inches='tight')
+print('counts', fixed, optimized)

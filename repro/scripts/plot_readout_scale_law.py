@@ -70,12 +70,12 @@ ax.set_ylim(0.10, 1.02)
 ax.set_xlabel(r"representation scale $c$ (fraction of healthy)")
 ax.set_ylabel("accuracy")
 ax.set_title("(a) frozen vs scale-invariant readout")
-ax.text(0.02, 0.08, f"$c^\\star={cstar_med:.3f}$", transform=ax.transAxes,
+ax.text(0.02, 0.08, f"$c^{{\\rm bias}}={cstar_med:.3f}$", transform=ax.transAxes,
         fontsize=9, color="#333333")
 
 ax = axes[1]
 for y, color, label, ls in [
-    (ece_f, "#C44E52", "frozen readout (healthy $T$)", "-"),
+    (ece_f, "#C44E52", "frozen readout (raw)", "-"),
     (ece_ft, "#8172B2", "frozen + temperature $T$", "--"),
     (ece_r, "#55A868", "input-recalibrated", "-"),
 ]:

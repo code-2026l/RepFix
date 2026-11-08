@@ -31,6 +31,7 @@ for run in D["runs"]:
     for p in run["points"]:
         q = dict(p)
         q["m"] = run["m"]
+        q["B"] = run["audit_batch"]
         pts.append(q)
 
 margin, envelope, agree, fired, dvals, aq, E, Dl = [], [], [], [], [], [], [], []
@@ -46,8 +47,14 @@ for p in pts:
     fired.append(bool(m > env))
     dvals.append(float(p["d"]))
     aq.append(abs(float(p["a"]) - float(p["frozen"]["q"])))
-    E.append(abs(float(p["frozen"]["E"])))
+    base = float(p['nu']) * float(p['n_p']) / float(p['B'])
+    k_opt = float(p['frozen']['k_opt'])
+    exact_at_k_opt = (float(p['r']) - a * float(p['c'])) / (k_opt * base)
+    E.append(abs(exact_at_k_opt - (1.0 - a * q0)))
     Dl.append(float(p["frozen"]["Delta_min"]))
+
+if np.any(np.asarray(E) > np.asarray(Dl) * (1 + 1e-10) + 1e-10):
+    raise AssertionError('Discrepancy and envelope must be compared at the same scale')
 
 margin = np.array(margin)
 envelope = np.array(envelope)
@@ -116,14 +123,14 @@ ax.text(0.47, 0.66, f"median $d={np.median(dvals):.3f}$",
 ax = axes[1, 1]
 bins = np.linspace(-2.2, 5.5, 34)
 ax.hist(np.log10(E), bins=bins, color="#4C72B0", alpha=0.62,
-        label=r"exact discrepancy $|E|$", edgecolor="white", lw=0.3)
+        label=r"exact discrepancy $|\mathcal{E}|$", edgecolor="white", lw=0.3)
 ax.hist(np.log10(Dl), bins=bins, color="#DD8452", alpha=0.55,
         label=r"envelope $\Delta_{\min}$", edgecolor="white", lw=0.3)
 ax.set_xlabel(r"$\log_{10}$ magnitude")
 ax.set_ylabel("checkpoints")
 ax.set_ylim(0, 140)
-ax.set_title("(d) envelope is comparable to the exact discrepancy")
-ax.text(0.04, 0.93, f"median $|E|/\\Delta={np.median(np.array(E)/np.array(Dl)):.2f}$",
+ax.set_title("(d) discrepancy and envelope at the same $k$")
+ax.text(0.04, 0.93, f"median $|\\mathcal{{E}}|/\\Delta={np.median(np.array(E)/np.array(Dl)):.2f}$",
         transform=ax.transAxes, fontsize=7.2, color="#333333")
 ax.legend(loc="upper right", frameon=False)
 

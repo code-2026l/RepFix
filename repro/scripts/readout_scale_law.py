@@ -110,7 +110,11 @@ def evaluate_logits(logits, y, temperature=1.0):
 
 
 def critical_scales(clf, mu, sd, X):
-    """Exact first class-change scale for each example under z_c = W(c h)+b."""
+    """Bias-class exit scale while increasing c from zero (legacy output keys).
+
+    This is not generally the first flip while shrinking from c=1. The stored
+    c_star_median is conditional on a finite bias-exit threshold.
+    """
     W = clf.weight.detach().double()
     b = clf.bias.detach().double()
     z0 = b - (W @ (mu / sd).squeeze(0))          # logits at c = 0

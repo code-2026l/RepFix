@@ -1,0 +1,38 @@
+\begin{table}[t]
+\centering
+\caption{Paired checkpoint continuation with held-out calibration. Means $\pm$ population seed standard deviations. Each branch starts from the same healthy model and Adam state; the future minibatch order is shared. Trace is relative to the initial healthy checkpoint. HAR uses 60 healthy plus 30 continuation epochs; RadioML uses 25 plus 15. The real auxiliary head is trained on detached features during warm-up.}
+\label{tab:cpu_paired}
+\footnotesize
+\begin{tabular}{llrrrrr}
+\toprule
+Case / dose & arm & frozen & input recal. & retrained & own & rel. trace \\
+\midrule
+\multicolumn{7}{l}{\textit{HAR variance, 10 seeds}} \\
+$0$ & primary only & $0.943\pm0.007$ & $0.943\pm0.006$ & $0.945\pm0.005$ & $0.944\pm0.005$ & $1.0897$ \\
+0.1 & joint & $0.789\pm0.161$ & $0.951\pm0.005$ & $0.953\pm0.002$ & $0.951\pm0.007$ & $0.0213$ \\
+0.1 & STF-cal & $0.943\pm0.007$ & $0.943\pm0.006$ & $0.945\pm0.005$ & $0.944\pm0.005$ & $1.0897$ \\
+3 & joint & $0.453\pm0.135$ & $0.947\pm0.005$ & $0.952\pm0.004$ & $0.948\pm0.006$ & $0.0037$ \\
+3 & STF-cal & $0.943\pm0.007$ & $0.943\pm0.005$ & $0.945\pm0.005$ & $0.941\pm0.009$ & $1.0868$ \\
+100 & joint & $0.221\pm0.067$ & $0.829\pm0.062$ & $0.935\pm0.016$ & $0.796\pm0.060$ & $0.0003$ \\
+100 & STF-cal & $0.941\pm0.009$ & $0.942\pm0.005$ & $0.944\pm0.005$ & $0.941\pm0.006$ & $1.0918$ \\
+\midrule
+\multicolumn{7}{l}{\textit{HAR projected, 5 seeds}} \\
+$0$ & primary only & $0.941\pm0.007$ & $0.940\pm0.004$ & $0.944\pm0.004$ & $0.943\pm0.004$ & $1.0636$ \\
+0.1 & joint & $0.844\pm0.128$ & $0.932\pm0.022$ & $0.950\pm0.005$ & $0.945\pm0.007$ & $0.3460$ \\
+0.1 & STF-cal & $0.941\pm0.007$ & $0.940\pm0.004$ & $0.944\pm0.004$ & $0.943\pm0.004$ & $1.0636$ \\
+3 & joint & $0.652\pm0.125$ & $0.782\pm0.077$ & $0.946\pm0.003$ & $0.936\pm0.011$ & $0.3489$ \\
+3 & STF-cal & $0.939\pm0.011$ & $0.940\pm0.004$ & $0.945\pm0.004$ & $0.943\pm0.004$ & $1.0737$ \\
+100 & joint & $0.214\pm0.056$ & $0.398\pm0.033$ & $0.851\pm0.083$ & $0.724\pm0.110$ & $0.0640$ \\
+100 & STF-cal & $0.939\pm0.011$ & $0.940\pm0.003$ & $0.944\pm0.005$ & $0.943\pm0.004$ & $1.0717$ \\
+\midrule
+\multicolumn{7}{l}{\textit{RadioML SNR, 5 seeds}} \\
+$0$ & primary only & $0.304\pm0.011$ & $0.306\pm0.015$ & $0.320\pm0.010$ & $0.319\pm0.009$ & $1.1045$ \\
+3 & joint & $0.293\pm0.011$ & $0.300\pm0.014$ & $0.314\pm0.012$ & $0.312\pm0.011$ & $0.8280$ \\
+3 & STF-cal & $0.296\pm0.012$ & $0.304\pm0.015$ & $0.318\pm0.012$ & $0.317\pm0.012$ & $0.9778$ \\
+10 & joint & $0.269\pm0.017$ & $0.281\pm0.016$ & $0.302\pm0.011$ & $0.298\pm0.013$ & $0.7274$ \\
+10 & STF-cal & $0.292\pm0.015$ & $0.301\pm0.015$ & $0.317\pm0.011$ & $0.315\pm0.011$ & $0.8520$ \\
+30 & joint & $0.243\pm0.020$ & $0.253\pm0.016$ & $0.285\pm0.012$ & $0.277\pm0.014$ & $0.6394$ \\
+30 & STF-cal & $0.286\pm0.014$ & $0.297\pm0.013$ & $0.312\pm0.011$ & $0.309\pm0.010$ & $0.7111$ \\
+\bottomrule
+\end{tabular}
+\end{table}

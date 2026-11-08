@@ -249,6 +249,9 @@ actually certify. The repository now ships the audits behind those questions:
   Refitting only the input statistics recovers 0.952 accuracy and most of ECE
   (0.043), although NLL remains elevated; retraining recovers 0.955 / 0.034 ECE.
   The healthy temperature map does not repair the frozen readout (ECE 0.512).
+  This historical audit trains the encoders separately and excludes calibration
+  examples from readout fitting, but not from supervised encoder fitting. Its
+  conformal coverage values are descriptive, not a split-conformal guarantee.
   The same pattern holds at widths 32 and
   128. Applying the same healthy readout to the STF-0 and STF-cal encoders
   recovers 0.946/0.943, so the survival intervention protects the readout,
@@ -260,8 +263,10 @@ actually certify. The repository now ships the audits behind those questions:
   `repro/scripts/readout_scale_law.py`): a five-seed scale sweep of a linear
   readout applied to `cH`, with `c` from 1 to 0.001. The frozen readout falls
   from 0.944 to 0.169; input recalibration is flat at 0.944; the median
-  first-flip scale is `c* = 0.054` of the healthy scale. This turns the
-  qualitative `c -> 0` proposition into a computable critical scale. Figure:
+  finite bias-exit scale is `0.054` of the healthy scale (median of five seed
+  medians, which range from `0.020` to `0.207`). It describes increasing scale
+  from zero, not generally the first class flip while shrinking from one.
+  `scale_boundaries.py` implements both distinct boundaries. Figure:
   `paper/figures/fig_readout_scale_law.pdf`.
 - `results/READOUT/har_subject_readout.json` (driver
   `repro/scripts/real_head_readout_transfer.py`): a real HAR subject-ID head at
@@ -276,8 +281,9 @@ actually certify. The repository now ships the audits behind those questions:
   the joint encoder is 0.099, chance for 11 classes (1/11 = 0.091); input
   recalibration does not recover it (0.094); retraining reaches 0.229, above
   the joint head's own 0.205; STF-0 detachment preserves 0.315 at relative
-  `S = 1.00`. The exact signed flux is non-positive at 74/75 epoch ends, so
-  this is a relative collapse, not a signed auxiliary contraction.
+  `S = 1.00`. The gradient-flow signed flux is negative at 74/75 epoch ends.
+  This does not attribute the actual Adam trajectory; the new continuation
+  audit measures optimizer increments and counterfactuals separately.
 - `results/READOUT/rml_snr_readout_a{3,10,30,100,300}.json`: the five-seed
   readout dose scan. The frozen readout is 0.176 at `alpha=3`, 0.121 at 10,
   and near chance (0.099--0.106) from 30 to 3000; retraining recovers
@@ -306,12 +312,14 @@ actually certify. The repository now ships the audits behind those questions:
   (median 0.86, upper quartile 0.996). (c) Cell-level median restoration
   alignment `d` against median signed mismatch `|a-q|`, coloured by sign
   agreement (0.47 below the median `d`, 0.56 above). (d) Exact discrepancy
-  `|E|` against envelope `Delta_min`; median ratio 1.19, so the envelope is
-  tight in absolute terms.
+  `|E|` against envelope `Delta_min` at the same optimized scale; the median
+  ratio is 0.885. Comparing canonical and optimized normalizations would not
+  be a valid bound-tightness test.
 - `paper/figures/fig_probe_arms.pdf` (driver `repro/scripts/plot_probe_arms.py`):
-  (a) certified checkpoints for the three probe arms (2, 15, 154 of 405); (b) ROC
-  of the certificate margin for predicting sign agreement (AUC 0.63 frozen,
-  0.80 corrected). No fired checkpoint is wrong in any arm.
+  (a) fixed versus optimized scale, separating predictor correction and
+  residual cancellation; (b) retrospective exact-flux margin ROC. Canonical
+  corrected combined AUC is 0.60; optimized AUC is 0.80. These margins already
+  use the exact derivative and are not prospective cheap predictions.
 
 The calibrated arm is a local heuristic: the warm-up probe changes by orders of
 magnitude with the read time (`1/mean rho_hat = 1.34, 0.181, 0.00907, 1.7e-5` at
@@ -320,17 +328,63 @@ frozen probe agrees with the exact derivative on 51% of 405 audited checkpoints.
 The certificate is never wrong when it fires, but it fires on 2/405 checkpoints at
 the zero-trace scale, 15/405 for the frozen certificate at an optimal scale, and
 14/405 for the transport certificate with the drift term; it is sufficient, not
-universal. A corrected checkpoint-local probe `q* = a/d` (signed loading over
-directional restoration, same two head-level backward passes) raises the certified
-set to 154/405 with zero false fires and a 23.9x tighter median envelope; its
-sign agreement is 0.58 (0.61 at positive dose) and its margin ranks correctness
-with AUC 0.80 against 0.63. It certifies 25% of contracting but 54% of expanding
-checkpoints, so it is a validity filter rather than a contraction detector. The
+universal. The corrected signed balance `psi = d - alpha*a` avoids dividing by
+weak restoration; `q* = a/d` is an equivalent ratio only when `d != 0`.
+Matched ablations distinguish the predictor, envelope, and scale. At canonical
+scale, the frozen triangle arm certifies 2/405; the corrected triangle arm 3/405;
+and the corrected combined residual 10/405. Per-checkpoint scale optimization
+raises those counts to 15, 121, and 154, respectively. All are retrospective
+certificates using exact flux. The corrected sign agreement is 0.58 (0.61 at
+positive dose); its optimized combined arm certifies 25% of contracting and 54%
+of expanding points. A direct exact-residual frozen control certifies 128/405
+even at canonical scale. This separates an audit's coverage from a cheap
+predictor's accuracy. `certificate_matched_audit.py` regenerates all arms. The
 canonical zero-trace-scale certificate needs the Jacobian trace (69.6x the exact
 flux); envelopes at an optimised scale need the exact flux but not the trace. In the
 corrected MATR battery table, joint training has
 relative `S = 3.55` (above the single-task anchor), so detachment's SOH improvement
 there is negative transfer, not repair of a contracted representation.
+
+## Paired CPU continuation evidence
+
+`repro/results/CPUCONT/` contains 20 completed numerical runs: 10 HAR isotropic
+variance seeds, 5 HAR projected-variance seeds, and 5 RadioML real-SNR seeds.
+Each run clones one healthy model and its Adam state across 10 continuation
+branches, for 200 branch endpoints. The last five isotropic seeds replicate the
+fixed recipe after the initial five-seed batch; all outcomes are retained.
+Calibration examples are held out before any encoder or readout fitting.
+
+- HAR isotropic variance at dose 3: the frozen readout falls from 0.946 to
+  0.453 while input-statistic recalibration reaches 0.947, refitting 0.952, and
+  the jointly trained head 0.948. Detachment preserves 0.943. Relative trace
+  is 0.0037 of the initial reference. At dose 100, input recalibration reaches
+  only 0.829 versus 0.935 after refitting; the trained path is not pure scaling.
+- The projected-variance control retains substantial non-scalar drift: at
+  dose 3, frozen / recalibrated / refitted accuracy is 0.652 / 0.782 / 0.946.
+- In healthy-checkpoint SNR continuation at dose 30, frozen accuracy is 0.243
+  versus 0.304 detached, with relative scatter 0.870. The historical severe
+  from-initialization onset does not transfer to this different protocol.
+- On 75 sampled SNR updates, the gradient-flow variance sign and actual Adam
+  step disagree 33 times. Actual-step and primary-only counterfactual records
+  are included; checkpoints along a trajectory are not independent samples.
+
+The numerical driver forces CPU tensors and one PyTorch/BLAS thread. The run
+queue used at most four simultaneous workers. Writing, figures, statistics,
+and LaTeX compilation were performed locally. Connection details and local
+run-control mappings are excluded from the release.
+
+```bash
+python repro/scripts/paired_readout_continuation.py --domain har --aux variance \
+  --seed 0 --warm-epochs 60 --cont-epochs 30 --doses 0.1,3,100 \
+  --data-root /path/to/data_x --out repro/results/CPUCONT/example.json
+python repro/scripts/certificate_matched_audit.py
+python repro/scripts/summarize_cpu_evidence.py
+```
+
+`summary.json` includes seed-level descriptive intervals and source-record
+hashes. Calibration/test exchangeability is not assumed, so coverage values
+are reported empirically. Original-run checkpoints remain local numerical
+artifacts and are regenerated by the driver rather than distributed in Git.
 
 ## License and citation
 
