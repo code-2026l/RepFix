@@ -1,0 +1,33 @@
+HAR, m=64, 60 epochs, three seeds. Accuracy (collapse count / 3).
+
+alpha   joint        MGDA         IMTL-G       Aligned      Nash         FAMO
+0.001   0.943 (0/3)  0.551 (3/3)  0.242 (3/3)  0.927 (3/3)  0.425 (3/3)  0.176 (3/3)
+0.01    0.950 (2/3)  0.409 (3/3)  0.301 (3/3)  0.884 (3/3)  0.461 (3/3)  0.176 (3/3)
+0.1     0.953 (3/3)  0.182 (3/3)  0.183 (3/3)  0.832 (3/3)  0.565 (3/3)  0.181 (3/3)
+
+Reading: at alpha=0.001 plain summation is healthy, while the default
+scalarizations contract the representation in every seed. This is reported as
+operator conditioning, not as evidence that the toxifier causes the contraction.
+The main paper's claim is only that none of the ten operators prevents
+contraction at the tested doses.
+
+Learning-rate control, alpha=0.001, HAR, m=64, three seeds. Accuracy (collapse count / 3).
+
+method       lr=1e-3          lr=1e-4
+joint        0.943 (0/3)      0.934 (0/3)
+PCGrad       0.660 (3/3)      0.656 (3/3)
+CAGrad       0.954 (3/3)      0.953 (3/3)
+FAMO         0.176 (3/3)      0.176 (3/3)
+UW           0.941 (0/3)      0.935 (0/3)
+GradNorm     0.954 (0/3)      0.934 (0/3)
+IMTL-L       0.944 (0/3)      0.935 (0/3)
+IMTL-G       0.242 (3/3)      0.187 (3/3)
+Nash-MTL     0.425 (3/3)      0.338 (3/3)
+Aligned-MTL  0.927 (3/3)      0.790 (3/3)
+MGDA         0.551 (3/3)      0.186 (3/3)
+
+Reading: lowering the step size makes the loss-weighting families healthy, but
+the gradient-geometry operators still collapse in every seed; several accuracies
+worsen at the lower rate. The low-dose contraction is operator-specific, not a
+single step-size artifact. Files: lowalpha_har_a0.001_lr1e3_all10.json and
+lowalpha_har_a0.001_lr1e4_all10.json (plus the alpha=0.01 pair).

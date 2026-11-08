@@ -7,20 +7,22 @@ Multi-task learning usually worries about gradient **conflict** — auxiliary gr
 that oppose the primary task. This work studies the opposite regime, **gradient
 toxicity**: auxiliary heads with a *constant attractor* (reconstruction, distribution
 matching, view invariance) push the shared encoder along one variance-contracting axis,
-so their gradients are mutually *aligned* rather than opposed. The encoder then falls
-through a saddle-node transition into a degenerate fixed point, and no directional
-gradient surgery sees it coming.
+so their gradients are mutually *aligned* rather than opposed. Under the stated
+conditions the encoder can fall through a saddle-node transition into a degenerate
+fixed point, and no directional gradient surgery sees it coming.
 
 The order parameter is
 
     rho = ||Pi_c g_a|| / ||g_p||,
 
-with `Pi_c` the projector onto the batch-centred representation direction. The encoder
-collapses once the operating point `alpha * rho` crosses 1. The **Spectral Toxicity
+with `Pi_c` the projector onto the batch-centred representation direction. In the
+conditional scalar model the encoder contracts once the operating point `alpha * rho`
+crosses 1. The **Spectral Toxicity
 Filter (STF)** deletes only the toxic projection and keeps the rest of the auxiliary
 gradient; **STF-cal** derives both its on/off gate and its deletion rank from a single
-probe taken on a short detached warm-up, so there is nothing to tune by hand and no
-online feedback loop.
+probe taken on a short detached warm-up. It is a local heuristic, not a trajectory
+certificate: the probe read time changes the calibrated dose, and the zero-dose
+control drifts without auxiliary contact (see the audit below).
 
 ## Layout
 
@@ -209,6 +211,59 @@ The toxifier is a variance-shrinkage projection over three seeded random project
 constant attractor makes it a controlled stand-in for the real heads. All datasets are
 public (UCI-HAR, RadioML2016.10A, NASA PCoE and MATR battery archives, A-share daily
 bars, CelebA, NYUv2).
+
+## Post-submission audit and scope
+
+The reviews asked whether the operational scatter criterion can fall without a
+loss of useful information, and what the STF-cal rule and the margin certificate
+actually certify. The repository now ships the audits behind those questions:
+
+- `results/REPAUDIT/` (driver `repro/scripts/representation_audit.py`): on HAR at
+  `alpha=100` the covariance trace falls 4,600x and the paper's criterion records
+  10/10 collapses, while a per-dimension-standardised linear probe is unchanged
+  (0.947 -> 0.955), participation rank rises from 2.0 to 4.9, and a probe for a new
+  label space remains at ceiling. **The criterion is scale-sensitive; contraction
+  is not evidence of information loss.** The paper's axis should therefore be read
+  as variance contraction, and scale-invariant probes should be reported beside it.
+- `results/LOWALPHA/` (driver `repro/scripts/lowalpha_operator_audit.py`): at
+  `alpha=0.001` plain summation is healthy while the default MGDA/IMTL-G/Nash/FAMO
+  scalarizations contract in every seed. This is operator conditioning, not
+  evidence that the toxifier is responsible.
+- `results/CERTCOST/` (driver `repro/scripts/certificate_cost.py`): the exact
+  certificate costs 69.6x the exact signed flux at one HAR checkpoint. It is an
+  offline audit, not a cheap deployment substitute.
+- `results/RMLDOSE/` (driver `code/real_aux_mtl.py`): the RadioML dose--response
+  for the SNR and I/Q reconstruction heads. The SNR collapse onset is between
+  `alpha=3` and `10` and is total from `alpha=30`; the reconstruction head is
+  0/3 at every tested dose up to `alpha=10000`. The reported `alpha=3000` is
+  therefore inside a supercritical regime whose onset is two orders of
+  magnitude lower, not an isolated extreme.
+- `results/RMLSTF/` (driver `code/real_aux_mtl.py`): STF-cal at RadioML
+  `alpha=30/100/300`. At onset (`alpha=30`) it reaches 0.303 against joint
+  0.248 and detached 0.306 without collapse; the advantage shrinks to
+  0.278/0.236 at 100/300 although the gate opens. The reconstruction gate stays
+  shut at all three doses, so activation is head-specific.
+- `results/READOUT/` (driver `repro/scripts/readout_transfer_audit.py`): a head
+  and input statistics fitted on the healthy encoder, applied unchanged to a
+  contracted encoder, fall from 0.945 to 0.241 accuracy and ECE 0.031 to 0.430.
+  Refitting only the input statistics recovers 0.952 accuracy but not calibration;
+  retraining recovers 0.955 / 0.034 ECE. The same pattern holds at widths 32 and
+  128. Applying the same healthy readout to the STF-0 and STF-cal encoders
+  recovers 0.946/0.943, so the survival intervention protects the readout,
+  not only the scatter statistic. At `alpha=10` the real HAR subject-ID head
+  loses 0.11 primary accuracy without meeting the scatter criterion, while
+  `stfcal` recovers it. The information survives; the scale-dependent readout
+  does not. This is the operational cost that a scatter-only evaluation misses.
+
+The calibrated arm is a local heuristic: the warm-up probe changes by orders of
+magnitude with the read time (`1/mean rho_hat = 1.34, 0.181, 0.00907, 1.7e-5` at
+`W = 1, 2, 4, 32`), the zero-dose control drifts without auxiliary contact, and the
+frozen probe agrees with the exact derivative on 51% of 405 audited checkpoints.
+The certificate is never wrong when it fires, but it fires on 2/405 checkpoints at
+the zero-trace scale and 15/405 under an optimal scale; it is sufficient, not
+universal. In the corrected MATR battery table, joint training has relative
+`S = 3.55` (above the single-task anchor), so detachment's SOH improvement there is
+negative transfer, not repair of a contracted representation.
 
 ## License and citation
 
