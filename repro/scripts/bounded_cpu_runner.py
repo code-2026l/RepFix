@@ -111,7 +111,10 @@ def main():
                 if not identifier.isalnum():
                     raise ValueError('Opaque alphanumeric job ids are required')
                 log = (out / (identifier + '.log')).open('wb')
-                argv = [manifest['python'], '-u', str(root / 'repro/scripts/paired_readout_continuation.py'),
+                driver = (root / job.get('driver', 'repro/scripts/paired_readout_continuation.py')).resolve()
+                if not driver.is_relative_to(root) or driver.suffix != '.py' or not driver.is_file():
+                    raise ValueError('Numerical driver must be a Python file inside the campaign')
+                argv = [manifest['python'], '-u', str(driver),
                         *job['argv'], '--out', str(out / (identifier + '.json'))]
                 process = subprocess.Popen(argv, cwd=root, env=env, stdin=subprocess.DEVNULL,
                                            stdout=log, stderr=subprocess.STDOUT, start_new_session=True,

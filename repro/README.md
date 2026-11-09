@@ -189,6 +189,58 @@ three-width fits carry one residual degree of freedom and the fitted exponent
 follows the normalization rather than the rank. The cheapest check of the
 construction is `controlled_rank_scan.py --self-test`.
 
+## Paired CPU continuation and fixed readout repairs
+
+The current manuscript also includes a separate CPU-only paired protocol.
+Calibration examples are reserved before encoder/head fitting. All branches
+clone the complete healthy model and Adam state and reuse future minibatches.
+The first 20 runs cover HAR isotropic/projected variance and RadioML SNR; the
+next 10 use real reconstruction with fixed HAR doses `1,10,100` and RadioML
+doses `30,300,3000`. All results, including the near-null RadioML continuation
+control, are retained under `repro/results/CPUCONT/`.
+
+With prepared input data, one numerical rerun is:
+
+```bash
+python repro/scripts/paired_readout_continuation.py --domain har --aux recon \
+  --seed 0 --warm-epochs 60 --cont-epochs 30 --doses 1,10,100 \
+  --data-root /path/to/data_x --out repro/results/CPUCONT/example/u000.json
+python repro/scripts/checkpoint_repair_audit.py \
+  --record repro/results/CPUCONT/example/u000.json --data-root /path/to/data_x \
+  --out repro/results/CPUCONT/example/repair.json
+```
+
+`checkpoint_repair_audit.py` first reproduces the original healthy/frozen
+metrics, then compares mean, global scale, their combination, per-feature
+statistics, paired diagonal regression, scaled Procrustes, covariance alignment,
+and paired ridge. All maps fit fitting-split features only, with no new labels
+or test-statistic fitting. Ridge is fixed at `1e-3`; the covariance eigenvalue
+floor is `1e-6` of the largest eigenvalue. The paired estimators need old/new
+features of the same anchors. They are diagnostic post-hoc baselines, not a
+reimplementation of jointly trained BC-Aligner.
+
+`reconstruction_task_audit.py --record <record.json> --out <audit.json>` evaluates
+the saved healthy/final decoders without fitting, with `REPFIX_DATA_X` set to
+the prepared data root. Its default MSE uses the declared auxiliary forward
+filter and frozen gate in fixed 256-example batches; raw-head MSE is also saved.
+`radioml_split_audit.py --out <audit.json>` checks all prepared cache tensors
+against the original dictionary's documented seeded 50/50 partition, read-only.
+
+To regenerate the manuscript numbers, tables, and figure from the complete
+shipped numerical records without datasets or model checkpoints:
+
+```bash
+python repro/scripts/summarize_readout_mechanism.py
+python -m pytest repro/scripts/test_readout_alignment.py repro/scripts/test_scale_boundaries.py -q
+python repro/scripts/build_cpu_paper.py
+```
+
+`verify_cpu_evidence.py` and `verify_readout_mechanism.py` additionally verify
+model/optimizer checkpoint hashes when the full training runs have been
+regenerated at their recorded paths. The released verification JSON records
+the checks on the original saved numerical artifacts; large trained states and
+raw datasets are not distributed. Analysis and PDF compilation are local.
+
 ## Reproduce
 
 ### Current manuscript evidence audit (2026-09-21)
