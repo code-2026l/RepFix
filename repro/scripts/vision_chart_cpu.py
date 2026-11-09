@@ -204,6 +204,27 @@ def run(args):
                                   labels[validation], head, mean, sd)
     out['imposed_scale_control'] = dict(scale=.25, artificial=True,
         frozen=paired.metrics(head((imposed-mean)/sd), labels[validation]), repairs=control)
+    # Preserve the anchor mean and covariance while rotating whitened features.
+    # Marginal matching cannot determine the orientation of their semantics.
+    center = healthy_anchor.mean(0, keepdim=True)
+    covariance = (healthy_anchor-center).T @ (healthy_anchor-center)/(len(healthy_anchor)-1)
+    values, vectors = torch.linalg.eigh(covariance)
+    values = values.clamp_min(1e-8*values.max())
+    white = (vectors*values.rsqrt())@vectors.T
+    color = (vectors*values.sqrt())@vectors.T
+    generator = torch.Generator().manual_seed(args.seed+41000)
+    rotation = torch.linalg.qr(torch.randn(512, 512, generator=generator, dtype=torch.float64)).Q
+    matrix = white@rotation@color
+    shifted_anchor = (healthy_anchor-center)@matrix+center
+    shifted_val = (healthy_val-center)@matrix+center
+    control, _ = repair_metrics(healthy_anchor, shifted_anchor, shifted_val,
+                                labels[validation], head, mean, sd)
+    shifted_covariance = (shifted_anchor-center).T@(shifted_anchor-center)/(len(shifted_anchor)-1)
+    out['covariance_rotation_control'] = dict(artificial=True,
+        relative_anchor_covariance_error=float((shifted_covariance-covariance).norm()/covariance.norm()),
+        frozen=paired.metrics(head((shifted_val-mean)/sd), labels[validation]), repairs=control,
+        known_inverse=paired.metrics(head((((shifted_val-center)@torch.linalg.inv(matrix)+center)-mean)/sd),
+                                    labels[validation]))
     out.update(complete=True, elapsed_s=time.time()-started)
     paired.save_json(args.out, out)
     print(dict(stage='complete', elapsed_s=out['elapsed_s']), flush=True)
