@@ -141,7 +141,7 @@ def main():
     (ROOT / 'paper/cpu_evidence_table.tex').write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
     audits = [r'\begin{table}[t]',r'\centering',
-              r'\caption{Actual-step audit on a fixed 256-example fitting batch. The sampled update is the first minibatch of predeclared continuation epochs. ``Disagree'' counts opposite signs for the gradient-flow derivative and actual Adam variance change. ``Aux. contracts'' compares the joint step with a primary-only Adam step from the identical optimizer state. The final column counts a negative gradient-flow auxiliary flux but a contracting auxiliary counterfactual. Checkpoints within a trajectory are dependent.}',
+              r'\caption{Actual-step audit on a fixed 256-example fitting batch, using the first minibatch of predeclared continuation epochs. Disagree counts opposite signs for the gradient-flow derivative and actual Adam variance change. Aux. contracts compares the joint step with a primary-only Adam step from the same optimizer state. The final column counts negative flow auxiliary flux with a contracting auxiliary counterfactual. Checkpoints within a trajectory are dependent.}',
               r'\label{tab:cpu_adam}',r'\footnotesize',r'\begin{tabular}{lrrrrr}',r'\toprule',
               r'Case & $\alpha$ & updates & disagree & aux. contracts & $c<0$, aux. contracts \\',r'\midrule']
     for label, item, doses in [('HAR variance',h,[.1,3.,100.]),

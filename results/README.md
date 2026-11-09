@@ -1,10 +1,18 @@
-# results/ — raw per-seed artefacts
+# Recorded historical benchmarks
 
-Every JSON here is a raw run output: the aggregate means, and the per-seed
-records behind them wherever the runner kept them. Each directory below names
-the table or figure it backs. One file does not retain per-seed records
-(`B10/MATR_eolonly_10s.json`, see its row below); everything else can be
-recomputed from the shipped data alone.
+This directory contains completed domain sweeps, readout audits, summaries, and
+archived per-seed records where available. The detailed directory map below
+preserves the conventions of those studies, including the aggregate-only
+`B10/MATR_eolonly_10s.json` exception. Some historical four-seed entries cannot be
+recomputed from the released aggregate alone; the manuscript identifies their
+exploratory scope.
+
+For the polished manuscript, start with the current
+[evidence index](../docs/EVIDENCE_INDEX.md). Paired continuation, repair, CNN,
+protected-benefit confirmation, compiled controls, and nonlinear-side development
+are in [`repro/results/CPUCONT/`](../repro/results/CPUCONT/).
+The [reproduction guide](../docs/REPRODUCIBILITY.md) distinguishes archived-result
+checks from data- and checkpoint-dependent reruns.
 
 ## Layout
 

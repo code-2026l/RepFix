@@ -1,588 +1,77 @@
-# RepFix — Silent Scale Shift: Variance Contraction and Calibrated Readout Failure
+# RepFix
 
-Code release for *"Silent Scale Shift: Variance Contraction Breaks Calibrated
-Readouts"* (ICLR 2027, double-blind submission).
+**Silent Scale Shift: When Shared Updates Break Existing Readouts**
 
-Multi-task learning usually worries about gradient **conflict** — auxiliary gradients
-that oppose the primary task. This work studies the opposite regime, **gradient
-toxicity**: auxiliary heads with a *constant attractor* (reconstruction, distribution
-matching, view invariance) push the shared encoder along one variance-contracting axis,
-so their gradients are mutually *aligned* rather than opposed. Under the stated
-conditions the encoder can fall through a saddle-node transition into a degenerate
-fixed point, and no directional gradient surgery sees it coming.
+This artifact accompanies the 62-page manuscript in
+[`paper/RepFix_ICLR2027.pdf`](paper/RepFix_ICLR2027.pdf), with nine main-text pages.
+It contains the source, complete recorded outcomes, analysis and figure scripts,
+fixed study protocols, and structural checks.
 
-The order parameter is
+The paper separates task decodability from compatibility with an existing readout.
+Matched continuation and input repair isolate a scale-sensitive failure. Signed
+update audits examine the diagnostic, while the SNR confirmation and single-encoder
+controls measure the benefit and cost of preserving compatibility. The artifact
+retains the CNN, frozen-trunk, nonlinear-side, and calibration boundary results.
 
-    rho = ||Pi_c g_a|| / ||g_p||,
+## Paper and downloads
 
-with `Pi_c` the projector onto the batch-centred representation direction. In the
-conditional scalar model the encoder contracts once the operating point `alpha * rho`
-crosses 1. The **Spectral Toxicity
-Filter (STF)** deletes only the toxic projection and keeps the rest of the auxiliary
-gradient; **STF-cal** derives both its on/off gate and its deletion rank from a single
-probe taken on a short detached warm-up. It is a local heuristic, not a trajectory
-certificate: the probe read time changes the calibrated dose, and the zero-dose
-control drifts without auxiliary contact (see the audit below).
+- [Read the final paper](paper/RepFix_ICLR2027.pdf) — 9 main pages, 62 pages total.
+- [Download supplementary material](artifacts/2026-11-09/RepFix_Supplementary_20261109.zip)
+- [Download manuscript source and evidence](artifacts/2026-11-09/RepFix_ICLR_Polished_20261109_source.zip)
+- [Reproduction guide](docs/REPRODUCIBILITY.md) · [Evidence index](docs/EVIDENCE_INDEX.md)
 
-## Layout
+![Readout compatibility overview](paper/figures/fig_readout_overview.png)
 
-```
-code/
-  cross_domain_mtl.py     unified-protocol harness: variance-shrinkage toxifier,
-                          STF-0/hard/soft, STF-cal/rank, MLP + small Transformer
-                          encoders (--arch), collapse / scatter / rho diagnostics
-  real_aux_mtl.py         real auxiliary heads (input reconstruction, subject-ID probe,
-                          I/Q reconstruction, SNR regression) under the same controller
-  battery_bmtl_v3.py      BatteryMTL flagship: joint SOH/RUL over a TSMixer+S4 encoder,
-                          censoring-aware (Tobit) RUL supervision, tri-weight regime gate
-  runner.py               job-queue runner; skips any cell whose output already exists
-  moo_combiners.py        faithful ports of the reference multi-objective combiners
-                          (PCGrad, CAGrad, FAMO, MGDA, Aligned-MTL, IMTL-G/L,
-                          Nash-MTL, UW, GradNorm), shared by every driver
-  # discovery-domain stack (Appendix A): a production A-share StudentModel with an MDN
-  # distributional head, an autoencoder, and a view-contrastive head on a shared encoder
-  model.py                student encoder/heads (TSMixer + light SSM + skewed-t MDN)
-  light_ssm_v2.py         Mamba-2/SSD state-space block
-  skewed_t_mdn.py         skewed-t mixture-density head
-  losses.py               multi-objective training loss
-  train.py, train_data.py walk-forward training loop and data pipeline
-  calibration.py          rolling conformal calibration (TCP / ACI)
-  wf_repro.py             walk-forward reproduction driver
-  data_loader.py, eval.py, inference.py   backend data loading and evaluation
-configs/
-  jobs_*.json             one entry per (domain, width, mode, seed) cell
-repro/scripts/
-  nyu_prep.py             NYUv2 (HF tanganke/nyuv2) parquet -> npz, 144x192
-  nyu_bmtl.py             NYUv2 dense benchmark: conv encoder, seg/depth/normal heads,
-                          proj and ae auxiliary tracks, probe-only calibration
-  collapse_phase.py       toy testbed: phase diagram and capacity law
-  wf_*.py, baseline_repro.py, plot_*.py    real-data finance experiments and figures
-  moo_combiners.py        copy of code/moo_combiners.py, kept beside its test
-  test_moo_combiners.py   differential + invariant test: our PCGrad is diffed
-                          against the vendored reference, every combiner is
-                          checked for shape/finiteness and for the "tasks agree
-                          -> stay on the common direction" property
-  _ref_pcgrad.py          vendored BSD-3 copy of WeiChengTseng/Pytorch-PCGrad
-                          pcgrad.py, used only as that differential reference
-results/
-  R2/ .. R6/              raw per-seed JSON behind the paper's tables
-  R7/                     NYUv2 dose grid, width calibration, and dense benchmark
-logs/
-  runner/                 job-queue ledgers: the job list, every launch with its
-                          pid, every exit code, and the wall-clock per cell
-  cert/                   stdout of the finite-batch certificate runs
-  smoke/                  reference output of run_smoke.sh
+## Start here
+
+From this directory, verify the extracted files and archived source/protocol links:
+
+```text
+python repro/scripts/verify_supplement.py
 ```
 
-Result JSONs keep per-seed values, not just aggregates, so every paired test in the
-paper can be recomputed from them. `_ref_pcgrad.py` is the only third-party file
-in the tree; it is BSD-3-Clause (Wei-Cheng Tseng, 2021) and is vendored verbatim
-with the license retained. Long trace arrays are stripped to keep the release
-small; they regenerate from the code. `logs/README.md` says what the ledgers
-record and which deployment paths were substituted on export.
+This first check uses the Python standard library and reads the shipped manifest.
+It does not download data or train a model.
 
-## Running
+For the structural tests, figure reconstruction, and manuscript build:
 
-Python >= 3.10, PyTorch >= 2.0, numpy, scipy. All runs in the paper used a single A100
-80 GB; the unified protocol is small enough for a consumer GPU (bf16 autocast optional).
-
-The quickest check that the code runs and the effect is real is the smoke test:
-
-```bash
-bash run_smoke.sh
+```text
+python -m pip install -r requirements-review.txt
+python repro/scripts/verify_supplement.py --tests --figures --paper
 ```
 
-One cell, about six seconds on CPU. It prints each mode's collapse rate and relative
-scatter, and `logs/smoke/run_smoke.log` is the reference output: `joint` collapses,
-the four STF variants do not.
-
-One unified-protocol cell:
-
-```bash
-python code/cross_domain_mtl.py --domain har --arch mlp \
-    --modes joint,stf0,stfhard,stfsoft,stfcal,stfcalrank \
-    --alphas 100.0 --seeds 0,1,2,3,4,5,6,7,8,9 --m 64 \
-    --epochs 60 --cal-warm-epochs 4 --rho-trace \
-    --out results/har_dose_hi.json
-```
-
-`--domain {har,radioml,battery,celeba,nyu}` selects the validation domain and
-`--arch {mlp,transformer}` the encoder. The `--modes` flag is the intervention:
-`joint` is plain summation, `stf0` is full `.detach()`, `stfhard` and `stfsoft` are the
-thresholded and differentiable spectral filters, and `stfcal`/`stfcalrank` use the
-one-probe calibrated gate and rank. `configs/jobs_*.json` enumerates every cell behind
-the paper's tables; `runner.py --jobs <json> --slots N` executes them.
-
-A real-auxiliary cell:
-
-```bash
-python code/real_aux_mtl.py --domain radioml --aux recon --alpha 3000.0 \
-    --m 64 --seeds 0,1,2,3,4,5,6,7,8,9 --epochs 25 --out results/rml_aux.json
-```
-
-The battery flagship and the A-share walk-forward follow the same pattern; see the
-`R2*`, `R5bat*`, and `R5fin*` entries in `configs/jobs_ALL2.json`.
-
-## Multi-task optimizer baselines
-
-Multi-task learning's standard answer to interfering gradients is to resolve
-*conflict*: project one task's gradient off another (PCGrad), solve a min-norm
-Pareto combination (MGDA, CAGrad), align the per-task gradients to a common
-geometry (Aligned-MTL, IMTL, Nash-MTL), or learn scalar loss weights (UW,
-GradNorm, FAMO). `code/moo_combiners.py` ports each of these from its authors'
-release, line for line, and names the file it came from in the routine's
-docstring; nothing is a proxy or a structured re-implementation of the idea.
-
-Task-gradient relations alone do not identify an update's projection onto the
-variance gradient. At the paper's predeclared high-dose operating points, all
-ten families retain the operational scatter-collapse label across the three
-tested domains, while primary accuracy varies and can remain good. This is a
-fixed-protocol comparison, not universal failure of conflict resolution. The
-paper reports variance, decodability, and frozen-consumer utility separately.
-
-```bash
-python code/cross_domain_mtl.py --domain har \
-    --ablate-methods pcgrad,cagrad,famo,uw,gradnorm,imtll,imtlg,nash,aligned,mgda \
-    --alphas 0.1 --seeds 0 --epochs 60 --m 128 --out results/MOO/har_s0.json
-python code/battery_bmtl_v3.py --dataset MATR --agg pcgrad --alpha-aux 10 \
-    --d 128 --epochs 150 --seeds 0 --out results/E2aFAITH/E2aF_MATR_pcgrad_s0.json
-python code/wf_conflict_ablate.py --fold 0 --method nash --out results/E2dMOO/fin_fold0_nash.json
-python repro/scripts/test_moo_combiners.py
-```
-
-`configs/jobs_P02_moo.json` is the full manifest behind the four tables
-(the three-domain family sweep, the numeric battery baselines, the
-filter x conflict composition grid, and the discovery-domain folds).
-`test_moo_combiners.py` diffs our PCGrad against the vendored reference on the
-same random problem and the same parameter set, and checks each combiner for
-the invariant that matters here: when the two tasks agree, the output must stay
-on their common direction rather than inventing a resolution.
-
-
-The failure was first observed on a production equity-ranking model built from the
-`model.py` stack: a pairwise-rank primary head sharing an encoder with an MDN
-distributional head, an autoencoder, and a view-contrastive head. Out of sample the
-model drifted to a near-constant ranking while each individual objective still reported
-a low training loss — the signature of collapse onto the constant attractor, invisible
-to the scalar losses. Appendix A of the paper gives the details; `repro/scripts/`
-reproduces the controlled version, and `repro/A_capacity_law_analysis.md` and
-`repro/B_pipeline_analysis.md` document the two write-ups behind it.
-
-```bash
-python repro/scripts/wf_collapse_v2.py      # real-data collapse sweep
-python repro/scripts/wf_stf_ablation.py     # STF-0 / hard / soft on the rank-loss path
-python repro/scripts/wf_toxicity_sweep.py   # auxiliary-weight sweep
-```
-
-## NYUv2 dense benchmark
-
-`repro/scripts/nyu_bmtl.py` is the fifth-domain harness: a four-block convolutional
-encoder with linear heads for 13-class segmentation, depth, and surface normals, plus
-two auxiliary tracks — `proj` (the controlled variance-shrinkage toxifier) and `ae` (a
-trainable reconstruction decoder, i.e. the production-style head). `joint3` runs the
-three primary tasks with no auxiliary head and is the reference row.
-
-```bash
-python repro/scripts/nyu_prep.py                      # parquet -> data_x/nyu/nyu_nyu.npz
-python repro/scripts/nyu_bmtl.py --configs joint3 --aux proj --alpha-aux 1.0 \
-    --seeds 0,1,2,3,4,5,6,7,8,9 --epochs 60 --batch 32 --d 128 \
-    --cal-warm-epochs 5 --out results/R7/R7_bmtl_joint3.json
-```
-
-`results/R7/` holds the nine-point dose grid (`R7_dose_nyu_a*.json`), the width
-calibration probes (`R7_calib_nyu_m*.json`), and the three-task benchmark. The harness
-reads the auxiliary track through `CFG_AUX`, so a config that is absent there runs
-aux-free.
-
-## Reference points
-
-A collapsed encoder is easy to miss. The collapse criterion is relative cross-sample
-scatter `S_h < 0.3 * S_single`, anchored per seed to that seed's own single-task
-ceiling, and on some domains the primary metric never registers the failure — HAR
-accuracy stays near 0.95 on a collapsed representation, and NYUv2 depth RMSE actually
-*improves*. Both are discussed in the paper's Scope and Failure Modes section, together
-with the regime where the estimated projector saturates and STF-0 (full deletion) is
-the correct choice.
-
-The toxifier is a variance-shrinkage projection over three seeded random projections,
-`L = Var_b[W_k h]` — a benign-sounding "feature invariance" objective whose exact
-constant attractor makes it a controlled stand-in for the real heads. All datasets are
-public (UCI-HAR, RadioML2016.10A, NASA PCoE and MATR battery archives, A-share daily
-bars, CelebA, NYUv2).
-
-## Post-submission audit and scope
-
-The reviews asked whether the operational scatter criterion can fall without a
-loss of useful information, and what the STF-cal rule and the margin certificate
-actually certify. The repository now ships the audits behind those questions:
-
-- `results/REPAUDIT/` (driver `repro/scripts/representation_audit.py`): on HAR at
-  `alpha=100` the covariance trace falls 4,600x and the paper's criterion records
-  10/10 collapses, while a per-dimension-standardised linear probe is unchanged
-  (0.947 -> 0.955), participation rank rises from 2.0 to 4.9, and a probe for a new
-  label space remains at ceiling. **The criterion is scale-sensitive; contraction
-  is not evidence of information loss.** The paper's axis should therefore be read
-  as variance contraction, and scale-invariant probes should be reported beside it.
-- `results/LOWALPHA/` (driver `repro/scripts/lowalpha_operator_audit.py`): at
-  `alpha=0.001` plain summation is healthy while the default MGDA/IMTL-G/Nash/FAMO
-  scalarizations contract in every seed. This is operator conditioning, not
-  evidence that the toxifier is responsible.
-- `results/CERTCOST/` (driver `repro/scripts/certificate_cost.py`): the exact
-  certificate costs 69.6x the exact signed flux at one HAR checkpoint. It is an
-  offline audit, not a cheap deployment substitute.
-- `results/RMLDOSE/` (driver `code/real_aux_mtl.py`): the RadioML dose--response
-  for the SNR and I/Q reconstruction heads. The SNR collapse onset is between
-  `alpha=3` and `10` and is total from `alpha=30`; the reconstruction head is
-  0/3 at every tested dose up to `alpha=10000`. The reported `alpha=3000` is
-  therefore inside a supercritical regime whose onset is two orders of
-  magnitude lower, not an isolated extreme.
-- `results/RMLSTF/` (driver `code/real_aux_mtl.py`): STF-cal at RadioML
-  `alpha=30/100/300`. At onset (`alpha=30`) it reaches 0.303 against joint
-  0.248 and detached 0.306 without collapse; the advantage shrinks to
-  0.278/0.236 at 100/300 although the gate opens. The reconstruction gate stays
-  shut at all three doses, so activation is head-specific.
-- `results/READOUT/` (driver `repro/scripts/readout_transfer_audit.py`): a head
-  and input statistics fitted on the healthy encoder, applied unchanged to a
-  contracted encoder, fall from 0.945 to 0.241 accuracy and ECE 0.031 to 0.430.
-  Refitting only the input statistics recovers 0.952 accuracy and most of ECE
-  (0.043), although NLL remains elevated; retraining recovers 0.955 / 0.034 ECE.
-  The healthy temperature map does not repair the frozen readout (ECE 0.512).
-  This historical audit trains the encoders separately and excludes calibration
-  examples from readout fitting, but not from supervised encoder fitting. Its
-  conformal coverage values are descriptive, not a split-conformal guarantee.
-  The same pattern holds at widths 32 and
-  128. Applying the same healthy readout to the STF-0 and STF-cal encoders
-  recovers 0.946/0.943, so the survival intervention protects the readout,
-  not only the scatter statistic. At `alpha=10` the real HAR subject-ID head
-  loses 0.11 primary accuracy without meeting the scatter criterion, while
-  `stfcal` recovers it. The information survives; the scale-dependent readout
-  does not. This is the operational cost that a scatter-only evaluation misses.
-- `results/READOUT/readout_scale_law.json` (driver
-  `repro/scripts/readout_scale_law.py`): a five-seed scale sweep of a linear
-  readout applied to `cH`, with `c` from 1 to 0.001. The frozen readout falls
-  from 0.944 to 0.169; input recalibration is flat at 0.944; the median
-  finite bias-exit scale is `0.054` of the healthy scale (median of five seed
-  medians, which range from `0.020` to `0.207`). It describes increasing scale
-  from zero, not generally the first class flip while shrinking from one.
-  `scale_boundaries.py` implements both distinct boundaries. Figure:
-  `paper/figures/fig_readout_scale_law.pdf`.
-- `results/READOUT/har_subject_readout.json` (driver
-  `repro/scripts/real_head_readout_transfer.py`): a real HAR subject-ID head at
-  `alpha=10` does not contract (relative `S = 0.93`), yet a readout fitted on
-  the healthy encoder falls from 0.944 to 0.384; input recalibration reaches
-  0.466 and retraining recovers 0.901. This is readout failure by
-  representation drift, not scale: contraction is sufficient, not necessary.
-- `results/READOUT/rml_snr_readout_a3000.json` (driver
-  `repro/scripts/real_head_readout_transfer.py`): the contracting RadioML SNR
-  head at `alpha=3000` (five seeds; supersedes the three-seed
-  `rml_snr_readout.json`). The healthy readout is 0.315; the frozen readout on
-  the joint encoder is 0.099, chance for 11 classes (1/11 = 0.091); input
-  recalibration does not recover it (0.094); retraining reaches 0.229, above
-  the joint head's own 0.205; STF-0 detachment preserves 0.315 at relative
-  `S = 1.00`. The gradient-flow signed flux is negative at 74/75 epoch ends.
-  This does not attribute the actual Adam trajectory; the new continuation
-  audit measures optimizer increments and counterfactuals separately.
-- `results/READOUT/rml_snr_readout_a{3,10,30,100,300}.json`: the five-seed
-  readout dose scan. The frozen readout is 0.176 at `alpha=3`, 0.121 at 10,
-  and near chance (0.099--0.106) from 30 to 3000; retraining recovers
-  0.322/0.283/0.256/0.240/0.234. The readout degrades before the 0.3 scatter
-  criterion fires at `alpha=3` (relative `S = 0.558`).
-- `results/READOUT/rml_iq_readout.json`: the I/Q reconstruction control (three
-  seeds). It does not contract (relative `S = 1.05`) and retrained accuracy
-  0.351 exceeds detached 0.312, yet the frozen readout falls to 0.195. A
-  non-contracting head can still invalidate a readout by drift.
-- `results/READOUT/rml_snr_flux*.json`, `rml_iq_flux.json`: per-epoch signed
-  flux (`V`, `r`, `c`, cosine) from `--flux-trace`. The SNR seed-median `c_t`
-  is `-3.97/-49.3/-66.1/-107.5` at epochs 1/5/10/25; I/Q gives `|c_t| < 1e-5`.
-- `results/READOUT/rml_snr_readout_stfcal.json` (driver
-  `repro/scripts/real_head_readout_transfer.py --stfcal`): the calibrated arm
-  at `alpha=3000`, three seeds. The gate opens and the deletion rank saturates
-  at 3 in every seed (calibrated `rho` 0.44--0.49), yet relative scatter stays
-  0.25--0.36 and the frozen readout rises only from 0.094 (joint) to 0.136;
-  recalibration gives 0.124 and retraining 0.212. Two orders of magnitude above
-  the onset, a rank-3 deletion is beyond the arm's reach, consistent with
-  STF-cal being a local heuristic without a trajectory guarantee.
-- `results/REPAUDIT_MLP/`: one-hidden-layer MLP probe at `alpha` 0/100 over five
-  seeds: 0.9449/0.9543 against the linear probe's 0.9439/0.9545.
-- `paper/figures/fig_probe_phase.pdf` (driver `repro/scripts/plot_probe_phase.py`):
-  four-panel transport audit. (a) Frozen margin against the transport envelope;
-  14/405 checkpoints are certified and none is wrong. (b) Slack-ratio histogram
-  (median 0.86, upper quartile 0.996). (c) Cell-level median restoration
-  alignment `d` against median signed mismatch `|a-q|`, coloured by sign
-  agreement (0.47 below the median `d`, 0.56 above). (d) Exact discrepancy
-  `|E|` against envelope `Delta_min` at the same optimized scale; the median
-  ratio is 0.885. Comparing canonical and optimized normalizations would not
-  be a valid bound-tightness test.
-- `paper/figures/fig_probe_arms.pdf` (driver `repro/scripts/plot_probe_arms.py`):
-  (a) fixed versus optimized scale, separating predictor correction and
-  residual cancellation; (b) retrospective exact-flux margin ROC. Canonical
-  corrected combined AUC is 0.60; optimized AUC is 0.80. These margins already
-  use the exact derivative and are not prospective cheap predictions.
-
-The calibrated arm is a local heuristic: the warm-up probe changes by orders of
-magnitude with the read time (`1/mean rho_hat = 1.34, 0.181, 0.00907, 1.7e-5` at
-`W = 1, 2, 4, 32`), the zero-dose control drifts without auxiliary contact, and the
-frozen probe agrees with the exact derivative on 51% of 405 audited checkpoints.
-The certificate is never wrong when it fires, but it fires on 2/405 checkpoints at
-the zero-trace scale, 15/405 for the frozen certificate at an optimal scale, and
-14/405 for the transport certificate with the drift term; it is sufficient, not
-universal. The corrected signed balance `psi = d - alpha*a` avoids dividing by
-weak restoration; `q* = a/d` is an equivalent ratio only when `d != 0`.
-Matched ablations distinguish the predictor, envelope, and scale. At canonical
-scale, the frozen triangle arm certifies 2/405; the corrected triangle arm 3/405;
-and the corrected combined residual 10/405. Per-checkpoint scale optimization
-raises those counts to 15, 121, and 154, respectively. All are retrospective
-certificates using exact flux. The corrected sign agreement is 0.58 (0.61 at
-positive dose); its optimized combined arm certifies 25% of contracting and 54%
-of expanding points. A direct exact-residual frozen control certifies 128/405
-even at canonical scale. This separates an audit's coverage from a cheap
-predictor's accuracy. `certificate_matched_audit.py` regenerates all arms. The
-canonical zero-trace-scale certificate needs the Jacobian trace (69.6x the exact
-flux); envelopes at an optimised scale need the exact flux but not the trace. In the
-corrected MATR battery table, joint training has
-relative `S = 3.55` (above the single-task anchor), so detachment's SOH improvement
-there is negative transfer, not repair of a contracted representation.
-
-## Paired CPU continuation evidence
-
-The first batch in `repro/results/CPUCONT/` contains 20 completed training runs: 10 HAR isotropic
-variance seeds, 5 HAR projected-variance seeds, and 5 RadioML real-SNR seeds.
-Each run clones one healthy model and its Adam state across 10 continuation
-branches, for 200 branch endpoints. The last five isotropic seeds replicate the
-fixed recipe after the initial five-seed batch; all outcomes are retained.
-Calibration examples are held out before any encoder or readout fitting.
-
-- HAR isotropic variance at dose 3: the frozen readout falls from 0.946 to
-  0.453 while input-statistic recalibration reaches 0.947, refitting 0.952, and
-  the jointly trained head 0.948. Detachment preserves 0.943. Relative trace
-  is 0.0037 of the initial reference. At dose 100, input recalibration reaches
-  only 0.829 versus 0.935 after refitting; the trained path is not pure scaling.
-- The projected-variance control retains substantial non-scalar drift: at
-  dose 3, frozen / recalibrated / refitted accuracy is 0.652 / 0.782 / 0.946.
-- In healthy-checkpoint SNR continuation at dose 30, frozen accuracy is 0.243
-  versus 0.304 detached, with relative scatter 0.870. The historical severe
-  from-initialization onset does not transfer to this different protocol.
-- On 75 sampled SNR updates, the gradient-flow variance sign and actual Adam
-  step disagree 33 times. Actual-step and primary-only counterfactual records
-  are included; checkpoints along a trajectory are not independent samples.
-
-The numerical driver forces CPU tensors and one PyTorch/BLAS thread. The run
-queue used at most four simultaneous workers. Writing, figures, statistics,
-and LaTeX compilation were performed locally. Connection details and local
-run-control mappings are excluded from the release.
-
-```bash
-python repro/scripts/paired_readout_continuation.py --domain har --aux variance \
-  --seed 0 --warm-epochs 60 --cont-epochs 30 --doses 0.1,3,100 \
-  --data-root /path/to/data_x --out repro/results/CPUCONT/example.json
-python repro/scripts/certificate_matched_audit.py
-python repro/scripts/summarize_cpu_evidence.py
-```
-
-`summary.json` includes seed-level descriptive intervals and source-record
-hashes. Calibration/test exchangeability is not assumed, so coverage values
-are reported empirically. Original-run checkpoints remain local numerical
-artifacts and are regenerated by the driver rather than distributed in Git.
-
-The mechanism revision adds 10 real-reconstruction training runs (five HAR,
-five RadioML), bringing the paired collection to **30 training runs and 300
-continuation endpoints**. It also evaluates nine fixed label-free repair arms
-on all 200 endpoints from the first batch. Results and source/checkpoint hashes
-are in `mechanism/`, `task_validation/`, `mechanism_summary.json`, and
-`mechanism_verification.json`.
-
-- HAR isotropic dose 3: mean-only repair reaches 0.813, global scale alone
-  0.938, mean plus scale 0.944, and per-feature statistics 0.947. Classification
-  repair does not imply recovery of the entire original representation.
-- HAR projected dose 3: global scale reaches 0.667, per-feature statistics
-  0.782, and paired ridge alignment 0.944. Paired alignment requires old/new
-  features of the same fitting anchors; it has more access than marginal stats.
-- HAR real reconstruction dose 100: frozen accuracy is 0.826 versus 0.941
-  detached; the current primary head reaches 0.941 versus 0.943 primary-only.
-  Held-out reconstruction MSE is 0.765 times the matched detached decoder's
-  error, yet no seed crosses the scatter-collapse criterion. This is progress
-  on the auxiliary objective, not evidence of a primary-task benefit.
-- RadioML I/Q reconstruction continuation is a near-null boundary case;
-  frozen accuracy at dose 3000 is 0.301 versus 0.304 detached. The stronger
-  historical independently trained result does not transfer to this protocol.
-
-```bash
-python -m pytest repro/scripts/test_scale_boundaries.py repro/scripts/test_readout_alignment.py -q
-python repro/scripts/summarize_readout_mechanism.py
-python repro/scripts/build_cpu_paper.py
-```
-
-These three commands use the shipped numerical records and local PDF tools;
-they do not need raw datasets or trained checkpoints. Additional rerun commands
-and the split/repair definitions are in `repro/README.md`. The RadioML cache
-exactly matches the documented per-modulation 50/50 `RandomState(0)` split;
-this is a seeded partition, not a unique official split.
-
-## Waveform CNN and unlabeled consumer audit
-
-The waveform extension adds five CNN reconstruction runs on the identical
-RadioML inputs/split. That fixed consumer bank contains **35 training
-runs, 335 continuation endpoints, and 370 locally verified model/optimizer
-checkpoints**. The CNN healthy readout reaches 0.424 versus the MLP's 0.297;
-its reconstruction continuation remains near-null at the fixed grid, with
-0.415 frozen accuracy versus 0.418 detached at dose 3000. This is an architecture
-boundary result, not evidence of universal real-auxiliary failure.
-
-A standard finite-corpus disagreement control separately audits all 3,015
-endpoint/repair candidates. With 1,024 unlabeled monitor inputs and bank-wide
-tail probability 0.05, the 10-percentage-point relative classification-error
-budget yields 49 certified choices among 105 joint endpoints: 12 unchanged
-consumers and 37 repaired consumers. It abstains on 56. No selected choice has
-an observed above-budget error increase. All 45 RadioML joint endpoints abstain,
-including near-null cases; this conservative coverage limit is explicit.
-
-The monitor needs healthy reference predictions, and repairs here use the full
-fitting feature set. The guarantee covers the fixed corpus and candidate family.
-NLL/ECE, future optimizer steps, and new populations require separate evidence.
-The method is reported as a standard control baseline, with relevant unlabeled
-performance-estimation and model-update literature acknowledged.
-
-```bash
-python repro/scripts/summarize_consumer_frontier.py
-python repro/scripts/render_paper_figures.py
-python -m pytest repro/scripts/test_consumer_risk.py repro/scripts/test_readout_alignment.py repro/scripts/test_scale_boundaries.py -q
-python repro/scripts/build_cpu_paper.py
-```
-
-These commands regenerate local figures/tables/PDF from the shipped numerical
-records and run 26 tests. `consumer_frontier_summary.json` and
-`consumer_frontier_verification.json` retain all choices, abstentions, scopes,
-and provenance. The build verifies the actual main-text ending, including
-continuation text and floats, against the nine-page limit. Detailed results and
-remaining gaps are in `docs/CONSUMER_CNN_REVISION_2026-11-09.md`.
-
-The new opening figure compares the controlled scale repair with real HAR
-reconstruction: paired linear alignment reaches 0.947 full-test accuracy versus
-0.826 frozen while leaving the learned auxiliary error unchanged. It uses paired
-training anchors and no new labels. All seventeen manuscript figures have vector
-PDF, editable SVG and PNG exports at final 5.5-inch width; data/font/bounds checks
-and input hashes accompany the local rendering pipeline.
-
-A separate five-seed SNR head-state factorial crosses auxiliary weights and
-auxiliary Adam state. Its 20 endpoint states include five bitwise archived
-replays and 15 conditional trajectories outside the consumer bank. None
-reproduces the historical severe scatter collapse; higher variance need not
-mean higher frozen-consumer accuracy. These null/adverse boundaries are retained
-in `head_state_summary.json` and `head_state_verification.json`.
-
-## Predeclared useful-auxiliary and retained-consumer confirmation
-
-The preceding study freezes its plan before development and its validation choice
-before ten new confirmation seeds. At 20% fitting primary labels, RadioML SNR
-dose 1 improves current-head accuracy by **0.97 percentage points** over
-detachment. A reference-anchored readout-nullspace control retains **0.89 points**
-of auxiliary gain over its guarded detachment control, with paired 95% interval
-**[0.60, 1.18]**, while preserving all healthy consumer logits/predictions.
-All five declared criteria pass, and independent saved-state replay reproduces
-all forty consumers exactly.
-
-The control emits one shared 64-vector for both heads, leaving 53 dimensions
-free for the tested rank-11 head. It retains a reference encoder and costs
-**2.37x** measured single-thread CPU batch inference. A dual-routing old/new-model
-baseline is discussed explicitly; this is a constructive positive control,
-not a new projection algorithm or a cheap single-encoder solution. The task gain
-is conditional on this one fixed split/recipe. All development outcomes remain
-in the artifact. Details: `docs/PROTECTED_BENEFIT_REVISION_2026-11-09.md`.
-
-```bash
-python repro/scripts/render_paper_figures.py
-python -m pytest repro/scripts/test_consumer_risk.py repro/scripts/test_readout_alignment.py repro/scripts/test_scale_boundaries.py repro/scripts/test_readout_nullspace.py -q
-python repro/scripts/build_cpu_paper.py
-```
-
-These commands reproduce seventeen figures, run 32 mathematical/control tests,
-and compile the local manuscript from shipped records. All figure diagrams use
-editable vector planes; their apparent depth encodes no measured performance.
-The positive study's 104 trained states remain local; the source artifact ships
-its full records, frozen plan/choice, summaries and independent replay results.
-
-## Single-encoder follow-up: compatibility is cheaper, useful adaptation is not established
-
-The separate committed follow-up uses ten new seeds each on RadioML SNR and
-HAR reconstruction, with six paired branches per seed. Freezing the nonlinear
-trunk permits the final affine output constraint to fold into one native
-encoder: no reference branch, inference projection or extra parameter shape.
-All 40 constrained consumers preserve old predictions/NLL/ECE; the worst logit
-error is **3.55e-14**. Batch-1024 CPU latency is about **1.006x** ordinary
-inference on SNR and **1.002x** on HAR, under matched mixed precision.
-
-**Neither task passes the full predeclared benefit/compatibility target.**
-SNR's unrestricted auxiliary gain replicates at **1.11 points [0.90, 1.32]**,
-but the compiled auxiliary gain is **0.01 [-0.02, 0.04]**. Compiled joint versus
-full joint is **-3.53 [-4.23, -2.83]**. The unconstrained frozen-trunk control
-accounts for -3.529 points; adding the compatibility constraint changes it by
--0.003 [-0.039, 0.033]. This isolates freezing as the dominant measured cost in
-this recipe. HAR confirms no auxiliary benefit in either full or compiled
-training. These conditional null/adverse results are retained, without a new
-dose search. Compatibility while continuing nonlinear learning at one-encoder
-cost remains open.
-
-All 180 healthy/model-Adam/compiled state files were locally verified and all
-120 endpoint consumers independently replayed exactly. The new finite-corpus
-bank has 120 candidates and is separate from both earlier families. Source
-packages include records/verification, not raw datasets or trained states.
-Details and statistical scope: `docs/COMPILED_INTERFACE_REVISION_2026-11-09.md`.
-
-```bash
-python repro/scripts/render_paper_figures.py
-python -m pytest repro/scripts/test_consumer_risk.py repro/scripts/test_readout_alignment.py repro/scripts/test_scale_boundaries.py repro/scripts/test_readout_nullspace.py repro/scripts/test_compiled_readout.py -q
-python repro/scripts/build_cpu_paper.py
-```
-
-This compiled-control check rebuilds 17 figures and runs 39 structural/control
-tests. Full state-dependent auditing is available locally through
-`summarize_compiled_interface.py` with the retrieved checkpoints present.
-
-## Nonlinear-channel development and remaining gaps
-
-The next separately declared study adds a trainable width-16/32 nonlinear
-channel inside the healthy readout's nullspace and fuses it with the retained
-base into a wider dense MLP. All 36 constrained validation consumers retain old
-outputs while their nonlinear prefix changes; all 87 saved validation endpoints
-replay exactly for accuracy/NLL/ECE. Fusion and all 165 state files are checked.
-The frozen base remains embedded, and encoder parameter ratios range from
-1.279 to 1.623. These are parameter counts, not empirical runtime savings.
-
-**Neither task qualifies for independent confirmation under the fixed gate.**
-The ranked RadioML candidate has +0.32 points of validation auxiliary gain but
--0.69 points versus ordinary detachment. HAR at a newly declared 1% primary
-label fraction has a +0.70-point matched validation auxiliary effect, while
-ordinary J-D is exactly tied in aggregate correct counts. Strict positivity is
-not met. All six candidates remain in the artifact; no full test confirmation
-or full-data latency claim follows from these three-seed development estimates.
-
-An exact-count arithmetic correction prevents a floating zero (3.7e-17) from
-passing the gate. The initial serialization and correction audit are retained;
-the grid/criterion were unchanged and no scientific confirmation started.
-Details: `docs/NONLINEAR_INTERFACE_REVISION_2026-11-09.md`. The broader review is
-`docs/MANUSCRIPT_GAPS_2026-11-09.md`, including generalization, prospective-policy,
-novelty and matched-nonlinear-prefix limitations.
-
-```bash
-python repro/scripts/render_paper_figures.py
-python -m pytest repro/scripts/test_consumer_risk.py repro/scripts/test_readout_alignment.py repro/scripts/test_scale_boundaries.py repro/scripts/test_readout_nullspace.py repro/scripts/test_compiled_readout.py repro/scripts/test_nonlinear_interface.py repro/scripts/test_nonlinear_selection.py -q
-python repro/scripts/build_cpu_paper.py
-```
-
-The full current check rebuilds 17 figures and runs 47 structural/control tests.
-State-dependent local verification is `summarize_nonlinear_interface.py`.
-
-## License and citation
-
-This repository is released under the **MIT License**. You may use, modify,
-and redistribute the code, results, and manuscript sources with the copyright
-and permission notice retained. Third-party files keep their own licenses; see
-[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
-
-If you use this code, data or figures, please cite the accompanying paper:
-
-> Anonymous Authors. *Silent Scale Shift: Variance Contraction Breaks Calibrated
-> Readouts.* ICLR 2027 (under review).
-
-Machine-readable citation metadata is in [`CITATION.cff`](CITATION.cff); it will
-carry the full author list once the paper is published.
+The optional checks run in a temporary copy, leaving the extracted release intact.
+The paper build also requires `pdflatex`, `bibtex`, and `pdftotext` on `PATH`.
+See [the reproduction guide](docs/REPRODUCIBILITY.md) for each check and its inputs.
+
+## Find the evidence
+
+- [Evidence index](docs/EVIDENCE_INDEX.md): manuscript figures and claims mapped to
+  recorded results, analysis scripts, and fixed protocols.
+- [`repro/results/CPUCONT/`](repro/results/CPUCONT/): paired continuation, repair,
+  real reconstruction, CNN, head-state, protected-benefit, compiled, and nonlinear
+  studies. Frozen development choices and the exact-count correction are included.
+- [`results/README.md`](results/README.md): detailed directory map for historical
+  benchmarks; [`repro/README.md`](repro/README.md): current script entry points.
+- [`docs/plans/`](docs/plans/): study protocols. Plans referenced by recorded hashes
+  are retained byte for byte.
+- [`paper/figures/`](paper/figures/): vector figures and editable SVG counterparts.
+
+## What can be reproduced
+
+The archive supports dataset-free file/provenance checks, 47 focused structural
+tests, reconstruction of all 17 included figures from recorded results, and a local
+LaTeX build. The validation choice and failed nonlinear development gate can be
+inspected without rerunning training.
+
+Raw datasets and trained tensor checkpoints are not included. Training and an
+independent replay of saved model states require those additional inputs; shipped
+replay records document the earlier completed checks. Dataset setup is described
+in [the reproduction guide](docs/REPRODUCIBILITY.md#data-and-training).
+Historical aggregate-only results are identified in `results/README.md`.
+
+`ARTIFACT_MANIFEST.json` records the manuscript hash and a SHA-256 digest for every
+payload file. `REVIEW_CHECKS.json` records the checks performed on this release.
+The MIT license and third-party terms are in [`LICENSE`](LICENSE) and
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md). Citation metadata is in
+[`CITATION.cff`](CITATION.cff).
