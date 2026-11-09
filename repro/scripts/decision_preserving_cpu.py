@@ -1,11 +1,14 @@
-"""Predeclared decision-preserving continuation arm.
+"""Predeclared decision-preserving continuation arms.
 
-Adds a hinge penalty on the frozen consumer's top-1 margin during continuation.
-The healthy encoder and readout enter fitting only; inference is the single
-shared encoder, so the deployed cost is the ordinary cost. Development uses
-validation only; confirmation scores the fixed recipe on the test corpus.
+Two training-time constraints on the frozen consumer, tested separately:
+a hinge on its top-1 margin (``--gamma``) and a squared-logit anchor on its
+function (``--anchor-gamma``). The healthy encoder and readout enter fitting
+only; inference is the single shared encoder, so the deployed cost is the
+ordinary cost. Development uses validation only; confirmation scores the fixed
+recipe on the test corpus.
 
-Protocol: docs/plans/2026-11-09-decision-preserving.md
+Protocols: docs/plans/2026-11-09-decision-preserving.md and
+docs/plans/2026-11-10-anchored-consumer.md
 """
 import os
 os.environ['CUDA_VISIBLE_DEVICES'] = ''
@@ -46,7 +49,14 @@ def margin_penalty(h, A, B, target):
     return F.relu(others - chosen).mean()
 
 
-def step(model, opt, x, y, a, mask, kind, alpha, detached, A, B, target, gamma):
+def anchor_penalty(h, h0, A, B):
+    z = h @ A.float().T + B.float()
+    z0 = h0 @ A.float().T + B.float()
+    return F.mse_loss(z, z0)
+
+
+def step(model, opt, x, y, a, mask, kind, alpha, detached, A, B, target, gamma,
+         anchor_gamma=0., frozen=None):
     h = model(x)
     lp = masked_primary_loss(bc.current_logits(model, h), y, mask)
     ha = h.detach() if detached else h
@@ -54,6 +64,10 @@ def step(model, opt, x, y, a, mask, kind, alpha, detached, A, B, target, gamma):
     loss = lp + alpha * la
     if gamma > 0:
         loss = loss + gamma * margin_penalty(h, A, B, target)
+    if anchor_gamma > 0:
+        with torch.no_grad():
+            h0 = frozen(x)
+        loss = loss + anchor_gamma * anchor_penalty(h, h0, A, B)
     if not torch.isfinite(loss):
         raise FloatingPointError('Non-finite operating loss')
     opt.zero_grad(set_to_none=True)
@@ -86,6 +100,10 @@ def run(args):
     model.eval()
     reference = copy.deepcopy(model.state_dict())
     moments = copy.deepcopy(opt.state_dict())
+    frozen = copy.deepcopy(model)
+    frozen.eval()
+    for parameter in frozen.parameters():
+        parameter.requires_grad_(False)
     base = paired.embed(model, x)
     head, mu, sd = fit_head(base[mask], y[mask])
     A, B = consumer_map(head, mu, sd)
@@ -103,6 +121,7 @@ def run(args):
         protocol='predeclared decision-preserving continuation, single shared encoder',
         plan_sha256=args.plan_sha256, phase=args.phase, seed=args.seed,
         domain=args.domain, auxiliary=kind, gamma=args.gamma, margin=0.,
+        anchor_gamma=args.anchor_gamma,
         device='cpu', cuda_visibility=os.environ['CUDA_VISIBLE_DEVICES'],
         torch_threads=torch.get_num_threads(), torch_version=torch.__version__,
         python_version=platform.python_version(), splits=splits,
@@ -121,8 +140,13 @@ def run(args):
     states.mkdir(exist_ok=True, parents=True)
     torch.save(dict(model=reference, optimizer=moments, head=head.state_dict(),
                     mean=mu, sd=sd, splits=splits), states / 'reference.pt')
-    arms = [('detach', 0., True), ('joint', 0., False), ('penalty', args.gamma, False)]
+    arms = [('detach', 0., True), ('joint', 0., False)]
+    if args.gamma > 0:
+        arms.append(('penalty', args.gamma, False))
+    if args.anchor_gamma > 0:
+        arms.append(('anchor', args.anchor_gamma, False))
     for mode, gamma, detached in arms:
+        anchor_gamma = args.anchor_gamma if mode == 'anchor' else 0.
         model.load_state_dict(reference)
         opt = torch.optim.Adam(model.parameters(), lr=1e-3)
         opt.load_state_dict(copy.deepcopy(moments))
@@ -138,7 +162,8 @@ def run(args):
             for j in range(0, len(order), 256):
                 idx = order[j:j + 256]
                 step(model, opt, x[idx], y[idx], a[idx], mask[idx], kind, args.dose,
-                     detached, A, B, target[idx], gamma)
+                     detached, A, B, target[idx], gamma,
+                     anchor_gamma=anchor_gamma, frozen=frozen)
             if epoch == 0 or (epoch + 1) % 5 == 0 or epoch + 1 == cont:
                 with torch.no_grad():
                     z = paired.embed(model, x[:2048]) @ A.T + B
@@ -176,6 +201,7 @@ def main():
     parser.add_argument('--seed', type=int, required=True)
     parser.add_argument('--dose', type=float, default=1.)
     parser.add_argument('--gamma', type=float, default=0.1)
+    parser.add_argument('--anchor-gamma', type=float, default=0.)
     parser.add_argument('--plan-sha256', required=True)
     parser.add_argument('--warm-epochs', type=int, default=0)
     parser.add_argument('--cont-epochs', type=int, default=0)

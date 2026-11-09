@@ -243,7 +243,7 @@ Real reconstruction tests repair while the auxiliary makes progress (Table~\ref{
 
 Let $A=W_0\operatorname{diag}(1/s_0)$ and let $P_\perp$ project onto $\ker A$. The reference-anchored control $H_0+(H_\theta-H_0)P_\perp$ preserves all healthy logits while emitting one shared $64$-vector (Proposition~\ref{prop:consumer_nullspace}, Figure~\ref{fig:nullspace_control}). Validation selects SNR dose $1$ from six fixed candidates using $20\%$ of fitting primary labels. Ten new seeds confirm an ordinary auxiliary gain J--D of $\BenefitJointGain$ percentage points, paired $95\%$ interval $[\BenefitJointGainLow,\BenefitJointGainHigh]$, and a guarded gain GJ--GD of $\BenefitGuardGain$, $[\BenefitGuardGainLow,\BenefitGuardGainHigh]$ (Table~\ref{tab:benefit_confirmation}). The guarded model clears the declared $0.5$-point noninferiority margin against J, and its predictions, NLL, and ECE match the reference to a maximum logit error of $\BenefitLogitError$; its ten endpoints also satisfy a separate five-point disagreement budget. Frozen accuracy barely moves, while ECE rises from $\BenefitHealthyECE$ to $\BenefitJointECE$. Both encoders remain at inference, at a measured $\BenefitLatencyRatio\times$ CPU cost (Appendix~\ref{app:benefit_confirmation}).
 
-With a frozen nonlinear trunk, the last-affine constraint folds into one encoder but loses the SNR gain; freezing accounts for $-3.53$ points, while the constraint adds $-0.003$ (Appendix~\ref{app:compiled_interface}). A nonlinear-side grid also fails its benefit screen. Fitting and folding a chart \emph{after} unrestricted learning instead retains a $\ChartGain$-point gain at $\ChartLatency\times$ native CPU cost. Old-reader accuracy improves by $\ChartOldGain$ points and its NLL and ECE fall, yet $\ChartDisagreement\%$ of its predictions change, and none of ten repaired consumers meets the fixed five-point disagreement budget (Appendix~\ref{app:posthoc_chart}). Every aggregate check can pass while the deployed interface changes. A training-time hinge on the frozen consumer's margin keeps one encoder and a $0.72$-point gain, against $0.97$ for joint training, while halving decision changes to $29.2\%$; it still misses the budget, and on a second corpus whose auxiliary barely moves the readout the same rule meets it with eight of ten certificates (Appendix~\ref{app:decision_preserving}). On a pretrained vision backbone, three epochs of primary-only continuation raise the frozen readout's accuracy by $8.5$ points and still change $42.1\%$ of its decisions (Appendix~\ref{app:vision_boundary}).
+With a frozen nonlinear trunk, the last-affine constraint folds into one encoder but loses the SNR gain; freezing accounts for $-3.53$ points, while the constraint adds $-0.003$ (Appendix~\ref{app:compiled_interface}). A nonlinear-side grid also fails its benefit screen. Fitting and folding a chart \emph{after} unrestricted learning instead retains a $\ChartGain$-point gain at $\ChartLatency\times$ native CPU cost. Old-reader accuracy improves by $\ChartOldGain$ points and its NLL and ECE fall, yet $\ChartDisagreement\%$ of its predictions change, and none of ten repaired consumers meets the fixed five-point disagreement budget (Appendix~\ref{app:posthoc_chart}). Every aggregate check can pass while the deployed interface changes. A training-time hinge on the frozen consumer's margin keeps one encoder and a $0.72$-point gain, against $0.97$ for joint training, while halving decision changes to $29.2\%$; it still misses the budget, and on a second corpus whose auxiliary barely moves the readout the same rule meets it with eight of ten certificates; pinning the consumer's logits instead of its margin traces the same frontier and certifies none (Appendix~\ref{app:decision_preserving}). On a pretrained vision backbone, three epochs of primary-only continuation raise the frozen readout's accuracy by $8.5$ points and still change $42.1\%$ of its decisions (Appendix~\ref{app:vision_boundary}).
 
 Detachment blocks auxiliary gradients to the encoder and provides the reference when the auxiliary brings no primary-task value. The spectral toxicity filter (\STF{}) instead removes a chosen component of the auxiliary channel. Its idealized backward form is
 \begin{equation}
@@ -1831,6 +1831,32 @@ inference, approximate compatibility costs gain, and the five-point budget sits
 beyond the strength at which the gain vanishes.
 
 \input{decision_preserving_har_table.tex}
+
+A second constraint tests whether the frontier belongs to the hinge. The anchor
+replaces $R$ by $\frac1n\sum_i\lVert z_i-z_{0i}\rVert^2$, the squared distance
+between the frozen consumer's logits on the current features and on the healthy
+features of the same example, so it penalises every logit change rather than
+only changes that would flip a decision. A separate pre-registration fixed the
+grid $\gamma\in\{0.1,1,10,100\}$ and reused the rule, splits, order and seeds.
+Development gives $+1.18,-0.16,-0.83,-1.10$ points with disagreement
+$29.4,11.8,4.6,2.8\%$; the rule selects $\gamma=10$. Ten confirmation seeds give
+$-1.59$ points $[-2.18,-0.99]$ against the detached control with no seed
+positive, and $-2.56$ against joint training. Mean disagreement is $5.0\%$, at
+most $6.4\%$ per seed, and no seed certifies because the exact upper bounds reach
+$0.10$ at that rate. Reconstruction error is $0.94$ of the control against $0.77$
+for joint training, so the anchor also gives up most of the auxiliary benefit.
+The directions the consumer reads are also directions in which both tasks want
+to move; holding them fixed removes learning capacity rather than isolating a
+separable subspace.
+
+The arms trace one requirement. Exact preservation at one encoder asks the
+update to satisfy $A h_\theta(x)=A h_0(x)$ on the deployment distribution, and
+any update with a nonzero component in $\operatorname{row}(A)$ violates it. An
+arm can hold that component at zero, paying in the directions the consumer
+reads, as both constraints do, or recompute $A h_0(x)$ at inference, which is
+the second encoder and its measured $\BenefitLatencyRatio\times$ cost. The
+five-point budget is an approximate version of the same condition, and the
+hinge buys that approximation at a rate set by how much of the gain it removes.
 
 \subsection{A Vision Boundary Screen}\label{app:vision_boundary}
 
