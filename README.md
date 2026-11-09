@@ -2,7 +2,7 @@
 
 **Silent Scale Shift: When Shared Updates Break Existing Readouts**
 
-This artifact accompanies the 72-page manuscript in
+This artifact accompanies the 74-page manuscript in
 [`paper/RepFix_ICLR2027.pdf`](paper/RepFix_ICLR2027.pdf), with nine main-text pages.
 It contains the source, complete recorded outcomes, analysis and figure scripts,
 fixed study protocols, and structural checks.
@@ -20,11 +20,18 @@ map certifies 9/10. The earlier HAR 9/10 and unsuccessful SNR studies remain
 separate. See [the fresh confirmation report](docs/FRESH_CONFIRMATION_20261110.md)
 and [the earlier audit](docs/PROTECTED_HEAD_AUDIT_20261109.md) for methods and scope.
 
+The final matched completion adds a competitive full-feature alignment control,
+complete OLS baselines and correct/wrong decision flows. Classification agreement
+does not retain either fixed selective consumer for auxiliary-learning readers.
+A distinct-consumer ResNet screen stops at its utility/numerical gates, without
+opening the official test split. See [the final review](docs/FINAL_REVIEW_20261110.md)
+and [reading guide](docs/REVIEWER_GUIDE.md) for the supported claims and open gaps.
+
 ## Paper and downloads
 
-- [Read the final paper](paper/RepFix_ICLR2027.pdf) — 9 main pages, 72 pages total.
-- [Download supplementary material](artifacts/2026-11-10/RepFix_FreshConfirmation_20261110_supplement.zip)
-- [Download manuscript source and evidence](artifacts/2026-11-10/RepFix_FreshConfirmation_20261110_source.zip)
+- [Read the final paper](paper/RepFix_ICLR2027.pdf) — 9 main pages, 74 pages total.
+- [Download supplementary material](artifacts/2026-11-10/RepFix_FinalEvidence_20261110_supplement.zip)
+- [Download manuscript source and evidence](artifacts/2026-11-10/RepFix_FinalEvidence_20261110_source.zip)
 - [Reproduction guide](docs/REPRODUCIBILITY.md) · [Evidence index](docs/EVIDENCE_INDEX.md)
 
 ![Readout compatibility overview](paper/figures/fig_readout_overview.png)
@@ -66,8 +73,8 @@ See [the reproduction guide](docs/REPRODUCIBILITY.md) for each check and its inp
 
 ## What can be reproduced
 
-The archive supports dataset-free file/provenance checks, 60 focused structural
-tests, reconstruction of all 20 included figures from recorded results, and a local
+The archive supports dataset-free file/provenance checks, 65 focused structural
+tests, reconstruction of all 21 included figures from recorded results, and a local
 LaTeX build. The validation choice and failed nonlinear development gate can be
 inspected without rerunning training.
 

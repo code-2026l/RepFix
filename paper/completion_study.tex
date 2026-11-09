@@ -1,0 +1,84 @@
+\subsection{Matched Strong Controls and Versioned Consumer Contracts}\label{app:completion_controls}
+
+This retrospective completion uses all ten saved fresh-confirmation checkpoints
+and a fixed plan published before the additional computations. It leaves the
+original development choice, confirmation bank and verdicts unchanged.
+From the earlier development grid, we choose the feature-map coefficient with
+the lowest reconstruction ratio among candidates with mean primary difference
+within $0.5$ points of detachment, mean reconstruction ratio at most $0.95$,
+and disagreement at most $5\%$ on every development seed. This utility-aware
+rule selects $\lambda=1$; the earlier compatibility-only rule selected
+$0.01$ and failed its primary gate. Both decisions remain reported.
+The new branch starts from each saved healthy model and Adam state and uses
+the same $30$ epochs, reconstruction dose $100$ and future minibatches.
+Both nonlinear encoder layers update. The full-feature map is folded into
+the float32 legacy reader for serving.
+
+We also fit the same standardized OLS reader on detached, joint, distilled and
+feature-aligned endpoints. Every fit uses fitting-set features and healthy
+teacher logits, without labels, test inputs or a coefficient search. The
+previously saved OLS reader and its identical new fit are counted once in
+comparisons: $100$ recorded endpoints contain $90$ distinct model/reader pairs.
+Learned and OLS readers use their actual float32 serving weights; raw detached
+and joint readers retain the original float64 diagnostic interface.
+
+\input{completion_controls_table.tex}
+
+The stronger feature-alignment baseline retains reconstruction progress
+(MSE $\CompleteFeatureMse$ of detachment) with primary difference
+$+\CompleteFeatureGain$ points $[\CompleteFeatureGainLow,\CompleteFeatureGainHigh]$.
+The distilled head is therefore one viable construction, without a claim of
+superiority over full-feature alignment. Unconstrained joint training followed
+by OLS reaches $\CompleteJointOlsChanged\%$ mean class disagreement, versus
+$\FreshDirectChanged\%$ for joint distillation. These retrospective intervals
+describe the matched comparison; they are not a new preregistered superiority
+test on an untouched benchmark.
+
+Decision disagreement counts several kinds of change. With labels available,
+we report negative flips (healthy-correct to updated-wrong), positive flips,
+and changes between two wrong classes~\citep{yan2021positive}. Their rates sum
+to total disagreement, while the change in legacy accuracy equals
+positive minus negative flips. Joint training's $27.66\%$ class disagreement
+contains $22.97\%$ negative flips; OLS lowers those to
+$\CompleteJointOlsNfr\%$. Joint distillation has
+$\CompleteDirectNfr\%$ negative flips and $0.91\%$ positive flips. Total
+agreement is a conservative compatibility contract, rather than a measure of
+harmful changes alone.
+
+For a probability-dependent consumer, define $q_\tau(x)=\arg\max_j p_j(x)$
+when $\max_jp_j(x)\ge\tau$, and $q_\tau(x)=-1$ otherwise. We freeze two
+thresholds at the $20$th and $50$th percentiles of healthy fitting-set confidence.
+They target $80\%$ and $50\%$ fitting coverage; healthy test coverage is
+$71.32\%$ and $42.65\%$. The new audit uses a fresh uniform $1{,}024$-input
+monitor and tail $0.05/1{,}000$, covering the declared new reader/contract bank.
+Its classification counts, including distilled $8/10$ and distilled-plus-OLS
+$9/10$, are separate from the earlier $10/10$ confirmation under its original
+monitor and $160$-consumer allocation. Neither monitor is selected by outcome.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{figures/fig_consumer_contracts.pdf}
+\caption{Consumer-specific retention on the ten saved HAR seeds. Left: the
+three disjoint contributions to class disagreement. Right: mean disagreement
+and certified seed counts for the class decision and two fixed selective
+consumers. Coverage labels name healthy-training targets, not test guarantees.
+The new monitor and family allocation leave earlier confirmation counts intact.}
+\label{fig:consumer_contracts}
+\end{figure}
+
+No tested reader certifies either selective consumer on all seeds. Among the
+auxiliary-learning readers, every selective count is $0/10$; detached-plus-OLS
+certifies $4/10$ and $3/10$, with no reconstruction gain. The distilled head's selective disagreement
+is $4.71\%$ and $6.51\%$, versus $1.67\%$ for classification; OLS reduces
+these to $3.51\%$ and $4.82\%$, without certifying the threshold contracts.
+Distilled-head coverage is $69.14\%$ and $39.86\%$, and OLS coverage is
+$70.61\%$ and $41.64\%$. Per-seed coverage, accepted-set accuracy, NLL, ECE,
+flows and bounds are retained in the numerical records. Class agreement alone
+does not retain probability-dependent decisions. Independent saved-state
+replay checks predictions, flow decomposition, thresholded decisions and bounds.
+An isolated native float32 audit returns both outputs in one encoder call.
+At batch $1{,}024$, joint-plus-OLS, feature alignment and feature-plus-OLS cost
+$1.064\times$, $1.057\times$ and $1.060\times$ current-only inference;
+at batch one their ratios are $1.109\times$, $1.102\times$ and $1.110\times$.
+The folded feature-map reader has the same $390$ serving parameters as the
+direct distilled head; its $4{,}096$ map weights are needed only during training.

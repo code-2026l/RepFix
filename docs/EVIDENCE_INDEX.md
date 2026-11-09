@@ -52,7 +52,8 @@ Every file below is under `paper/figures/`. Use the coordinated entry point
 | 17 | `fig_chart_confirmation.pdf` | `plot_chart_confirmation.py` | `C/chart_confirmation/`, `C/chart_confirmation_summary.json` |
 | 18 | `fig_protected_audit.pdf` | `plot_protected_audit.py` | `C/protected_head_audit/`, `C/protected_head_audit_summary.json` |
 | 19 | `fig_alignment_confirmation.pdf` | `plot_alignment_confirmation.py` | `C/alignment_confirmation/`, `C/alignment_confirmation_summary.json` |
-| 20 | `fig_consumer_audit.pdf` | `plot_readout_story.py` | `C/consumer_frontier_summary.json` |
+| 20 | `fig_consumer_contracts.pdf` | `plot_consumer_contracts.py` | `C/completion_har/`, `C/completion_summary.json` |
+| 21 | `fig_consumer_audit.pdf` | `plot_readout_story.py` | `C/consumer_frontier_summary.json` |
 
 Generator basenames are under `repro/scripts/`. Figure manifests retain source
 and numerical-artist hashes; diagrams are marked as schematics in their captions.
@@ -105,3 +106,26 @@ Fresh HAR direct and OLS readers each certify 10/10 with the primary 1024-input
 monitor and meet the complete fixed criterion. Logit-map 9/10 remains a failed
 primary decision despite 10/10 with additional monitoring inputs. No SNR
 candidate passes development. The original studies' decisions are unchanged.
+
+
+## Final matched controls and deployment contracts
+
+The fixed completion plan is `docs/plans/2026-11-10-final-evidence-completion.md`,
+published before the new computations. The HAR comparison is retrospective.
+
+| Question | Records under `repro/results/CPUCONT/` | Driver |
+|---|---|---|
+| Do strong feature and frozen-feature controls retain useful learning? | `completion_har/`, `completion_summary.json` | `complete_har_controls_cpu.py`, `summarize_completion.py` |
+| Do class agreement, negative flips and fixed selective consumers coincide? | Same complete records | `consumer_contracts.py`, `plot_consumer_contracts.py` |
+| Do all 100 recorded HAR readers replay? | `completion_replay/` | `verify_completion_cpu.py` |
+| What does actual native serving cost? | `completion_timing.json` | `benchmark_completion_cpu.py` |
+| Does a distinct coarse vision consumer retain compatibility? | `vision_consumer_screen/`, `vision_consumer_choice.json` | `vision_consumer_cpu.py`, `select_vision_consumer.py` |
+| Do the three completed vision endpoints replay? | `vision_consumer_replay/` | `verify_vision_consumer_cpu.py` |
+| Were sources, states, failure stops and resources verified? | `completion_execution_audit.json`, `logs/final_completion/` | Recorded SHA-256 inventories and bounded queue ledgers |
+
+The vision screen stops with three completed endpoints, two nonfinite branches,
+one interrupted branch and two unlaunched branches. No test confirmation follows.
+Full-feature HAR alignment is competitive; auxiliary-learning readers' selective
+counts remain 0/10 under the new monitor and bank. Detached + OLS has 4/10 and
+3/10 without reconstruction progress. Earlier confirmation counts are unchanged.
+See `docs/FINAL_REVIEW_20261110.md` and `docs/REVIEWER_GUIDE.md`.

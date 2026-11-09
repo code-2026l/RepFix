@@ -16,3 +16,9 @@ All archived versions match their recorded digest exactly. The source-recovery
 process did not alter numerical results. Current entry points remain under
 `repro/scripts/`; these snapshots preserve provenance rather than introduce
 additional experimental choices.
+
+
+The final completion retains source versions used by two stopped replay attempts.
+The final independent replays correct an inherited-state path and the metric
+precision used by a verifier. Training drivers and numerical outcomes are unchanged.
+Historical verifier snapshots make the corresponding execution hashes auditable.

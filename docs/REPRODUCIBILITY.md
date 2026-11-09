@@ -1,7 +1,7 @@
 # Reproducing the supplementary artifact
 
 Run commands from the extracted `repfix_supplementary` directory. The supplied
-PDF is the polished manuscript: nine main pages and 72 pages in total.
+PDF is the polished manuscript: nine main pages and 74 pages in total.
 
 ## File and record checks
 
@@ -37,7 +37,7 @@ thread. The hardware timings reported in the paper retain their original setup.
 python repro/scripts/verify_supplement.py --tests
 ```
 
-The 60 tests cover finite-corpus disagreement bounds, repair availability, affine
+The 65 tests cover finite-corpus disagreement bounds, repair availability, affine
 scale boundaries, normalized-head nullspaces, constrained affine folding,
 nonlinear fusion, exact-count selection at a zero-benefit tie, invertible chart folding,
 vision access/split controls, and teacher-head fitting on affine and nonlinear
@@ -52,7 +52,7 @@ python repro/scripts/verify_supplement.py --figures
 ```
 
 The helper runs `repro/scripts/render_paper_figures.py` in a temporary copy. The
-thirteen coordinated generators reconstruct all 20 included figures from shipped
+thirteen coordinated generators reconstruct all 21 included figures from shipped
 records. It compares plotted numerical artists and dimensions with the release
 manifest. Files are exported as PDF, PNG, and SVG at a 5.5-inch width.
 
@@ -158,3 +158,32 @@ links and preserved decisions; it does not replay tensors excluded from the
 compact archive. `alignment_execution_audit.json` records the completed CPU
 queues, verified transferred state hashes and uploaded numerical source hashes.
 See `docs/FRESH_CONFIRMATION_20261110.md` for all criteria and adverse outcomes.
+
+
+## Final completion and stopped vision screen
+
+`complete_har_controls_cpu.py` consumes the saved fresh-confirmation record and
+its original donor states. The lambda-1 feature control is chosen from prior
+development outcomes under the utility-aware rule in the final completion plan.
+`consumer_contracts.py` records disjoint correct/wrong flows and two fixed
+confidence-threshold consumers. `summarize_completion.py` rebuilds the matched
+table and paired intervals; `plot_consumer_contracts.py` rebuilds the vector figure.
+`verify_completion_cpu.py` replays all 100 recorded endpoints; there are 90
+distinct reader/model pairs because the inherited OLS fit is reproduced exactly.
+`benchmark_completion_cpu.py` measures native current-plus-legacy serving.
+
+`vision_consumer_cpu.py` decodes only the official CIFAR-100 training pickle
+for the fixed development screen. Its prepare stage caches healthy features and
+two heads; branch stages use the same seed-1800 checkpoint and minibatches.
+The released selection script reads the stopped queue: three endpoints complete,
+two coefficients become nonfinite, one branch is interrupted and two remain
+unlaunched. No further development or official test evaluation follows.
+`verify_vision_consumer_cpu.py` independently checks saved encoder/features,
+readers, metrics, selective decisions and OLS stationarity.
+
+`completion_execution_audit.json` records completed and deliberately stopped
+queues, all transferred file hashes and historical source versions. Original
+raw logs and 55 model-state files remain local outside the compact archive.
+Scrubbed review logs are in `logs/final_completion/`. The default verifier checks
+these recorded checks and preserved negative decisions; it does not load the
+excluded tensors or rerun training. See `docs/FINAL_REVIEW_20261110.md` for scope.

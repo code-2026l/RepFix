@@ -1,6 +1,6 @@
 # Reproduction scripts and archived results
 
-The current manuscript has **17 included figures**, rebuilt by ten coordinated
+The current manuscript has **21 included figures**, rebuilt by coordinated
 generators through one entry point. Start with the artifact-wide
 [reproduction guide](../docs/REPRODUCIBILITY.md) and
 [evidence index](../docs/EVIDENCE_INDEX.md).
@@ -21,7 +21,7 @@ dependencies, and keep the extracted release intact. They run on CPU.
 | Purpose | Script |
 |---|---|
 | Verify files, recorded protocol/source hashes, and optional review checks | `scripts/verify_supplement.py` |
-| Rebuild all 17 manuscript figures from shipped records | `scripts/render_paper_figures.py` |
+| Rebuild all 21 manuscript figures from shipped records | `scripts/render_paper_figures.py` |
 | Compile the supplied manuscript and check its page boundary | `scripts/build_cpu_paper.py` |
 | Paired checkpoint training | `scripts/paired_readout_continuation.py` |
 | Fixed readout repairs | `scripts/checkpoint_repair_audit.py`, `scripts/readout_alignment.py` |

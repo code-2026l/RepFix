@@ -24,6 +24,7 @@ TESTS = [
     'test_affine_chart.py', 'test_vision_chart.py',
     'test_legacy_head_fit.py',
     'test_alignment_objectives.py',
+    'test_consumer_contracts.py',
 ]
 
 def digest(path):
@@ -236,6 +237,69 @@ def verify_files(root):
             len(native['branches'])!=30 or len(native['native_primary_metrics'])!=50):
         raise ValueError('Native serving audit is incomplete')
 
+    completion=[name for name in files if re.fullmatch(base+r'completion_har/h\d{3}\.json',name)]
+    completion_replay=[name for name in files if re.fullmatch(base+r'completion_replay/r\d{3}\.json',name)]
+    if (len(completion),len(completion_replay))!=(10,10):
+        raise ValueError('The matched completion or replay is incomplete')
+    completion_hashes={digest(root/name) for name in completion}
+    for name in completion:
+        row=json.loads((root/name).read_text())
+        if (not row['complete'] or row['phase']!='retrospective_completion' or row['new_bank']!=1000 or
+                row['source_record_sha256'] not in confirmation_hashes or len(row['branches'])!=10 or
+                row['feature_training']['lam']!=1 or not all(row['feature_training']['nonlinear_layers_changed'].values())):
+            raise ValueError('Matched completion scope changed: '+name)
+        for b in row['branches']:
+            contracts=b['test']['contracts']
+            if set(contracts)!={'classification','coverage80','coverage50'}:
+                raise ValueError('A versioned consumer is missing: '+name)
+            flows=contracts['classification']['flows']
+            if (flows['changed']!=sum(flows[k] for k in ['correct_to_wrong','wrong_to_correct','wrong_to_wrong']) or
+                    flows['new_correct']-flows['old_correct']!=flows['wrong_to_correct']-flows['correct_to_wrong']):
+                raise ValueError('Decision flows do not conserve changes/correctness: '+name)
+            for c in contracts.values():
+                cert=c['certificate']
+                if cert['monitor_examples']!=1024 or cert['allocated_tail_probability']!=.05/1000:
+                    raise ValueError('The retrospective monitor allocation changed')
+    for name in completion_replay:
+        row=json.loads((root/name).read_text())
+        if (not row['complete'] or row['completion_record_sha256'] not in completion_hashes or
+                row['maximum_metric_error']!=0 or row['maximum_ols_stationarity_residual']>1e-6 or len(row['branches'])!=10):
+            raise ValueError('Expanded contract replay is incomplete: '+name)
+    completion_summary=json.loads((root/base/'completion_summary.json').read_text())
+    if not completion_summary['old_confirmation_verdicts_unchanged'] or completion_summary['distinct_endpoints']!=90:
+        raise ValueError('Retrospective evidence replaced earlier decisions or duplicated endpoints')
+    for mode,b in completion_summary['branches'].items():
+        if mode in ['detach','detach_ols']:continue
+        if any(b['contracts'][c]['certified'] for c in ['coverage80','coverage50']):
+            raise ValueError('A selective-consumer negative result was changed')
+    timing=json.loads((root/base/'completion_timing.json').read_text())
+    if not timing['complete'] or len(timing['branches'])!=40 or any(b['encoder_calls']!=1 for b in timing['branches']):
+        raise ValueError('Strong-control native serving evidence is incomplete')
+    vision_new=[name for name in files if re.fullmatch(base+r'vision_consumer_screen/v\d{3}\.json',name)]
+    vision_replay=[name for name in files if re.fullmatch(base+r'vision_consumer_replay/w\d{3}\.json',name)]
+    if (len(vision_new),len(vision_replay))!=(3,3):
+        raise ValueError('The stopped vision screen or its replay is incomplete')
+    vision_hashes={digest(root/name) for name in vision_new}
+    for name in vision_new:
+        row=json.loads((root/name).read_text())
+        if not row['complete'] or row['smoke'] or row['splits']['official_test_loaded'] or row['splits']['test_metrics_computed']:
+            raise ValueError('The vision screen opened test or included smoke outcomes')
+    for name in vision_replay:
+        row=json.loads((root/name).read_text())
+        if (not row['complete'] or row['source_record_sha256'] not in vision_hashes or
+                row['maximum_metric_error']!=0 or row['maximum_feature_error']>1e-4 or row['maximum_ols_stationarity_residual']>1e-6):
+            raise ValueError('The vision consumer replay is incomplete')
+    vision_choice=json.loads((root/base/'vision_consumer_choice.json').read_text())
+    if (vision_choice['continue_development'] or vision_choice['official_test_evaluated'] or vision_choice['full_grid_completed'] or
+            vision_choice['execution']['failed']!=2 or vision_choice['execution']['interrupted']!=1 or
+            vision_choice['execution']['unlaunched']!=2 or vision_choice['resource_scientific_gate']['primary_gain']):
+        raise ValueError('The stopped vision gate or unmeasured branches were rewritten')
+    execution=json.loads((root/base/'completion_execution_audit.json').read_text())
+    if (not execution['complete'] or not execution['all_owned_queues_stopped_or_finished'] or
+            execution['gpu_compute_used'] or execution['total_new_remote_bytes']>=4*2**30 or
+            any(q['running'] or not q['finished'] or q['max_workers']>2 for q in execution['queues'].values())):
+        raise ValueError('Completion resource/transport audit is incomplete')
+
     return manifest, dict(payload_files=len(files), manuscript_figures=len(figures),
         numerical_inputs=len(inputs), completed_cpu_records=records,
         recorded_source_hashes_checked=sources, recorded_plan_hashes_checked=plans,
@@ -244,6 +308,9 @@ def verify_files(root):
         recorded_protected_original_replays_checked=60,recorded_protected_control_replays_checked=140,
         alignment_development_records=6,fresh_training_confirmation_records=10,
         recorded_fresh_consumer_replays_checked=50,native_serving_consumers_measured=30,
+        matched_completion_records=10,expanded_consumer_endpoints_replayed=100,distinct_expanded_endpoints=90,
+        strong_control_native_serving_records=40,new_vision_completed_endpoints=3,new_vision_consumers_replayed=7,
+        new_vision_test_evaluated=False,
         nonlinear_development_records=len(development), nonlinear_confirmation_tasks=0,
         manuscript_pdf_sha256=manifest['pdf_sha256'])
 
@@ -263,7 +330,7 @@ def execute(command, root):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--tests', action='store_true', help='Run 60 structural checks on CPU')
+    parser.add_argument('--tests', action='store_true', help='Run 65 structural checks on CPU')
     parser.add_argument('--figures', action='store_true', help='Rebuild all included figures and compare numerical artists')
     parser.add_argument('--paper', action='store_true', help='Rebuild the manuscript and compare page text and pixels')
     args = parser.parse_args()
@@ -286,9 +353,9 @@ def main():
             stdout, elapsed = execute([sys.executable, '-m', 'pytest'] +
                 ['repro/scripts/' + name for name in TESTS] + ['-q'], copy)
             passed = re.search(r'(\d+) passed', stdout)
-            if not passed or int(passed.group(1)) != 60:
+            if not passed or int(passed.group(1)) != 65:
                 raise ValueError('Unexpected focused-test result: ' + stdout[-1000:])
-            report['checks']['structural_tests'] = dict(passed=60, elapsed_seconds=elapsed)
+            report['checks']['structural_tests'] = dict(passed=65, elapsed_seconds=elapsed)
         if args.figures:
             print('Rebuilding all included figures from recorded results...', flush=True)
             reference = json.loads((ROOT / 'paper/figures/publication_figure_manifest.json').read_text())

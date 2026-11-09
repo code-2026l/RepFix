@@ -1,0 +1,20 @@
+Traceback (most recent call last):
+  File "<runtime>/verify_completion_cpu.py", line 76, in <module>
+    p.add_argument('--out',type=Path,required=True);a=p.parse_args();torch.set_num_threads(4);torch.set_num_interop_threads(1);main(a)
+                                                                                                                               ^^^^^^^
+  File "<runtime>/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "<runtime>/verify_completion_cpu.py", line 38, in main
+    fitted=torch.load(folder/(b['mode']+'.pt'),map_location='cpu',weights_only=True);reader=fitted['reader']
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<runtime>/serialization.py", line 1479, in load
+    with _open_file_like(f, "rb") as opened_file:
+         ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<runtime>/serialization.py", line 759, in _open_file_like
+    return _open_file(name_or_buffer, mode)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<runtime>/serialization.py", line 740, in __init__
+    super().__init__(open(name, mode))
+                     ^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '<runtime>/direct_ols.pt'
