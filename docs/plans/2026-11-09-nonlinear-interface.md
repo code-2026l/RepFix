@@ -105,6 +105,10 @@ two-sided 95% t limits for J-D, TJ-TD and TJ-D; TJ-J lower limit above -0.005;
 TD/TJ logit error <1e-8 with zero changed old predictions; and fused/unfused
 feature difference <1e-10. Report all criteria, not only the successful ones.
 Intervals describe seed/mask variation conditional on this fixed split/recipe.
+As a corroborating real-objective criterion, require the paired 95% upper limit
+for TJ-minus-TD test auxiliary MSE to be below zero. This requirement is fixed
+before the first development calculation; implementation-only smoke outcomes
+are excluded from selection and claims.
 
 Explanatory contrasts: UJ-UD (unconstrained-side auxiliary benefit), TJ-UJ
 (constraint cost at matched capacity), TJ-CJ (added nonlinear-channel effect),
