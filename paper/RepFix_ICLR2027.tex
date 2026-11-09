@@ -70,7 +70,7 @@ This failure also occurs with a real auxiliary objective. HAR reconstruction low
 
 We study the failure through three complementary tests. First, exact affine-readout boundaries and a fixed repair hierarchy identify the contribution of scale. Second, a signed chain-rule audit explains what task-gradient relations and an unsigned radial probe leave unresolved. Methods such as PCGrad~\citep{yu2020pcgrad} and CAGrad~\citep{liu2021cagrad} act on task-gradient relations; variance change also depends on the update's alignment with the variance gradient. For Adam, we additionally measure the applied parameter increment. Third, we test whether useful auxiliary learning can coexist with an unchanged readout.
 
-For the third test, a reference-anchored readout-nullspace control~\citep{shen2020backward,farajtabar2020ogd} preserves healthy logits while leaving $53$ of $64$ feature directions free. Ten new seeds confirm a $\BenefitGuardGain$-point auxiliary gain at $\BenefitLatencyRatio\times$ CPU inference cost. Freezing the nonlinear trunk removes that cost but loses the gain. A post-hoc single-encoder chart retains the gain and improves old-reader accuracy, yet changes $\ChartDisagreement\%$ of old predictions. Decodability, aggregate utility, and decision compatibility require separate measurements.
+For the third test, a reference-anchored readout-nullspace control~\citep{shen2020backward,farajtabar2020ogd} preserves healthy logits while leaving $53$ of $64$ feature directions free. Ten new seeds confirm a $\BenefitGuardGain$-point auxiliary gain at $\BenefitLatencyRatio\times$ CPU inference cost. Freezing the nonlinear trunk removes that cost but loses the gain. A post-hoc single-encoder chart retains the gain and improves old-reader accuracy, yet changes $\ChartDisagreement\%$ of old predictions. Decodability, aggregate utility, and decision compatibility require separate measurements. A deployed consumer is a contract with everything downstream of it, including cached decisions, calibrated thresholds, and human review; aggregate accuracy does not measure whether that contract still holds.
 
 \begin{figure}[t]
 \centering
@@ -1834,15 +1834,17 @@ auxiliary branches above the primary-only branch, while the frozen readout ranks
 them below it; the largest accuracy gain of the four still arrives with a
 $43.4\%$ change of legacy decisions.
 
-We report both screens as a boundary rather than a contradiction. The affine law
-governs pure contraction, and the replay shows decisions accumulating as the
-scale falls. In a trained branch the same trace ratio arrives with a direction
-change the law does not model: that change raises the refit probe and offsets
-the scale damage to accuracy, but not to decisions. The silent regime needs
-contraction strong enough to reach the bias-only predictor while the features
-stay decodable. The HAR variance auxiliary contracts to $0.015$ of healthy
-against a median crossing scale of $0.054$ and lands there, whereas the vision
-branches that contract that far destroy the refit probe as well. Historical
+We report both screens as a boundary on accuracy, not on compatibility. The
+affine law governs pure contraction, and the replay shows decisions accumulating
+as the scale falls. In a trained branch the same trace ratio arrives with a
+direction change the law does not model: that change raises the refit probe and
+offsets the scale damage to accuracy, but not to decisions. The silent accuracy
+failure needs contraction strong enough to reach the bias-only predictor while
+the features stay decodable. The HAR variance auxiliary contracts to $0.015$ of
+healthy against a median crossing scale of $0.054$ and lands there, whereas the
+vision branches that contract that far destroy the refit probe as well. The
+compatibility failure is the more robust of the two: it appears in every branch
+whose features move, including the ones that improve accuracy. Historical
 CIFAR work in this project used a different protocol (from-scratch coarse/fine
 supervision), and its reader-confirmation gate also failed; we do not merge those
 reports with this screen.
