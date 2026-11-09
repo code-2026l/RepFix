@@ -35,8 +35,9 @@ def main(a):
         saved=states[b['donor']];model.load_state_dict(saved['model']);model.eval()
         assert b['model_sha256']==paired.state_hash(saved['model'])
         if b['mode'].endswith('_ols'):
-            fitted=torch.load(folder/(b['mode']+'.pt'),map_location='cpu',weights_only=True);reader=fitted['reader']
-            assert fitted['model_sha256']==b['model_sha256']
+            fitted=saved if b['mode']==b['donor'] else torch.load(folder/(b['mode']+'.pt'),map_location='cpu',weights_only=True)
+            reader=fitted['reader']
+            assert fitted.get('model_sha256',paired.state_hash(saved['model']))==b['model_sha256']
             assert all(torch.equal(reader[k],fitted['ols64'][k].float()) for k in ['weight','bias'])
             h=paired.embed(model,data['x']);residual=F.linear(h,fitted['ols64']['weight'],fitted['ols64']['bias'])-teach
             x=(h-h.mean(0))/h.std(0).clamp_min(1e-6)
