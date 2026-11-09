@@ -21,11 +21,14 @@ TESTS = [
     'test_scale_boundaries.py', 'test_readout_nullspace.py',
     'test_compiled_readout.py', 'test_nonlinear_interface.py',
     'test_nonlinear_selection.py',
+    'test_affine_chart.py', 'test_vision_chart.py',
 ]
 PLANS = {
     'benefit': '2026-11-09-prospective-benefit-compatibility.md',
     'compiled': '2026-11-09-compiled-interface.md',
     'nonlinear': '2026-11-09-nonlinear-interface.md',
+    'chart': '2026-11-09-deployment-chart.md',
+    'vision': '2026-11-09-deployment-chart.md',
 }
 
 
@@ -52,14 +55,23 @@ def verify_files(root):
         path = payload_path(root, name)
         if not path.is_file() or digest(path) != expected:
             raise ValueError('Missing or changed payload: ' + name)
-    tex = (root / 'paper/RepFix_ICLR2027.tex').read_text(encoding='utf-8')
-    inputs = re.findall(r'\\input\{([^}]+)\}', tex)
-    figures = re.findall(r'\\includegraphics(?:\[[^\]]*\])?\{([^}]+)\}', tex)
+    inputs, figures, seen = [], [], set()
+    def inspect_tex(name):
+        if name in seen:
+            return
+        seen.add(name)
+        tex = payload_path(root, 'paper/' + name).read_text(encoding='utf-8')
+        children = re.findall(r'\\input\{([^}]+)\}', tex)
+        figures.extend(re.findall(r'\\includegraphics(?:\[[^\]]*\])?\{([^}]+)\}', tex))
+        for child in children:
+            inputs.append(child)
+            inspect_tex(child)
+    inspect_tex('RepFix_ICLR2027.tex')
     for name in inputs + figures:
         if 'paper/' + name not in files:
             raise ValueError('Unmanifested manuscript input: ' + name)
-    if len(figures) != 17:
-        raise ValueError('Expected the 17 included manuscript figures')
+    if len(figures) != manifest['publication_figures']:
+        raise ValueError('Included manuscript figures differ from the release manifest')
     if manifest['pdf_sha256'] != digest(root / 'paper/RepFix_ICLR2027.pdf'):
         raise ValueError('The manuscript PDF does not match the manifest')
 
@@ -113,6 +125,27 @@ def verify_files(root):
         if row['splits']['test_metrics_computed'] or any('test' in b for b in row['branches']):
             raise ValueError('Development record contains test outcomes: ' + name)
 
+    chart_dev = [name for name in files if re.fullmatch(base+r'chart_development/a\d{3}\.json', name)]
+    chart_confirm = [name for name in files if re.fullmatch(base+r'chart_confirmation/c\d{3}\.json', name)]
+    chart_replay = [name for name in files if re.fullmatch(base+r'chart_replay/e\d{3}\.json', name)]
+    if len(chart_dev)!=6 or len(chart_confirm)!=10 or len(chart_replay)!=10:
+        raise ValueError('The fixed chart evidence family is incomplete')
+    selection_name=base+'chart_development_choice.json'
+    selection=json.loads((root/selection_name).read_text())
+    if selection['tasks']['har']['confirm'] or selection['tasks']['radioml']['selected']!='paired_ridge':
+        raise ValueError('The frozen chart choice changed')
+    for name in chart_confirm:
+        row=json.loads((root/name).read_text())
+        if row['selection_sha256']!=digest(root/selection_name):
+            raise ValueError('Confirmation choice hash differs: '+name)
+    for name in chart_dev:
+        row=json.loads((root/name).read_text())
+        if row['splits']['test_metrics_computed']:
+            raise ValueError('Chart development opened test outcomes')
+    chart_summary=json.loads((root/base/'chart_confirmation_summary.json').read_text())
+    if chart_summary['tasks']['radioml']['passes'] or chart_summary['tasks']['radioml']['metrics']['certified']!=0:
+        raise ValueError('The failed chart compatibility criterion was changed')
+
     return manifest, dict(payload_files=len(files), manuscript_figures=len(figures),
         numerical_inputs=len(inputs), completed_cpu_records=records,
         recorded_source_hashes_checked=sources, recorded_plan_hashes_checked=plans,
@@ -135,7 +168,7 @@ def execute(command, root):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--tests', action='store_true', help='Run 47 structural checks on CPU')
+    parser.add_argument('--tests', action='store_true', help='Run 52 structural checks on CPU')
     parser.add_argument('--figures', action='store_true', help='Rebuild all included figures and compare numerical artists')
     parser.add_argument('--paper', action='store_true', help='Rebuild the manuscript and compare page text and pixels')
     args = parser.parse_args()
@@ -158,11 +191,11 @@ def main():
             stdout, elapsed = execute([sys.executable, '-m', 'pytest'] +
                 ['repro/scripts/' + name for name in TESTS] + ['-q'], copy)
             passed = re.search(r'(\d+) passed', stdout)
-            if not passed or int(passed.group(1)) != 47:
+            if not passed or int(passed.group(1)) != 52:
                 raise ValueError('Unexpected focused-test result: ' + stdout[-1000:])
-            report['checks']['structural_tests'] = dict(passed=47, elapsed_seconds=elapsed)
+            report['checks']['structural_tests'] = dict(passed=52, elapsed_seconds=elapsed)
         if args.figures:
-            print('Rebuilding all 17 figures from recorded results...', flush=True)
+            print('Rebuilding all included figures from recorded results...', flush=True)
             reference = json.loads((ROOT / 'paper/figures/publication_figure_manifest.json').read_text())
             _, elapsed = execute([sys.executable, 'repro/scripts/render_paper_figures.py'], copy)
             rebuilt = json.loads((copy / 'paper/figures/publication_figure_manifest.json').read_text())
@@ -172,28 +205,29 @@ def main():
                 for field in ['width_inches', 'height_inches', 'numerical_artists_sha256']:
                     if original[field] != rebuilt['figures'][name][field]:
                         raise ValueError('Figure evidence differs: ' + name + '/' + field)
-            report['checks']['figures'] = dict(rebuilt=17, matching_numerical_artists=17,
+            report['checks']['figures'] = dict(rebuilt=len(reference['figures']), matching_numerical_artists=len(reference['figures']),
                 elapsed_seconds=elapsed)
         if args.paper:
-            print('Building and comparing the 62-page manuscript...', flush=True)
+            print('Building and comparing the manuscript...', flush=True)
+            expected_pages=manifest['manuscript_snapshot']['total_pages']
             _, elapsed = execute([sys.executable, 'repro/scripts/build_cpu_paper.py'], copy)
             build = json.loads((copy / 'tmp/cpu_build/build_report.json').read_text())
-            if build['warnings'] or build['main_text_pages'] != 9 or build['total_pages'] != 62:
+            if build['warnings'] or build['main_text_pages'] != 9 or build['total_pages'] != expected_pages:
                 raise ValueError('Unexpected manuscript build: ' + json.dumps(build))
             import fitz
             with fitz.open(ROOT / 'paper/RepFix_ICLR2027.pdf') as old, \
                     fitz.open(copy / 'paper/RepFix_ICLR2027.pdf') as new:
-                if len(old) != len(new) or len(new) != 62:
+                if len(old) != len(new) or len(new) != expected_pages:
                     raise ValueError('Manuscript page count changed')
                 text_matches = pixel_matches = 0
                 for a, b in zip(old, new):
                     text_matches += a.get_text() == b.get_text()
                     pixel_matches += a.get_pixmap(alpha=False).samples == b.get_pixmap(alpha=False).samples
-            if text_matches != 62 or pixel_matches != 62:
-                raise ValueError('Rendered manuscript differs: text %s/62, pixels %s/62. '
-                    'Check the LaTeX and figure font environment.' % (text_matches, pixel_matches))
-            report['checks']['paper'] = dict(main_text_pages=9,total_pages=62,warnings=[],
-                matching_page_text=62,matching_page_pixels_at_72dpi=62,elapsed_seconds=elapsed)
+            if text_matches != expected_pages or pixel_matches != expected_pages:
+                raise ValueError('Rendered manuscript differs: text %s, pixels %s of %s. '
+                    'Check the LaTeX and figure font environment.' % (text_matches, pixel_matches,expected_pages))
+            report['checks']['paper'] = dict(main_text_pages=9,total_pages=expected_pages,warnings=[],
+                matching_page_text=text_matches,matching_page_pixels_at_72dpi=pixel_matches,elapsed_seconds=elapsed)
     print(json.dumps(report, indent=2))
 
 

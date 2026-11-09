@@ -42,6 +42,7 @@
 \input{benefit_numbers.tex}
 \input{compiled_numbers.tex}
 \input{nonlinear_numbers.tex}
+\input{chart_numbers.tex}
 
 % ─── Compact table style (tighter spacing/format) ───
 \setlength{\tabcolsep}{4pt}          % default 6pt -> tighter column padding
@@ -56,7 +57,7 @@
 \maketitle
 
 \begin{abstract}
-Shared encoders can keep learning while breaking the readouts that depend on them. We study this failure under auxiliary-task updates and identify a scale-sensitive component, \emph{silent scale shift}: task information remains decodable, but an existing readout loses accuracy. In matched HAR continuations across ten seeds, frozen-readout accuracy falls from $\CpuHarHealthy$ to $\CpuHarJointMid$, while the current head reaches $\CpuHarOwnMid$; unlabeled scale correction restores $\MechHarScalarMid$. With a real reconstruction auxiliary, error falls to $\ReconHarMseRatioHigh$ of detachment while frozen accuracy drops to $\ReconHarFrozenHigh$; paired linear alignment restores $\ReconHarPairedLinearHigh$. Exact affine boundaries explain the scale mechanism, and a repair hierarchy separates it from richer drift. A signed update audit shows why task-gradient alignment and unsigned variance probes can miss these changes. Finally, an independently confirmed SNR experiment retains a $\BenefitGuardGain$-percentage-point auxiliary gain and the old logits under a reference-anchored constraint, at $\BenefitLatencyRatio\times$ CPU inference cost. Folding the constraint into a frozen-trunk encoder removes the reference cost but loses the gain. Together, these results make readout compatibility a distinct requirement for shared representation learning.
+Shared encoders can keep learning while breaking the readouts that depend on them. We study this failure under auxiliary-task updates and identify a scale-sensitive component, \emph{silent scale shift}: task information remains decodable, but an existing readout loses accuracy. In matched HAR continuations across ten seeds, frozen-readout accuracy falls from $\CpuHarHealthy$ to $\CpuHarJointMid$, while the current head reaches $\CpuHarOwnMid$; unlabeled scale correction restores $\MechHarScalarMid$. With a real reconstruction auxiliary, error falls to $\ReconHarMseRatioHigh$ of detachment while frozen accuracy drops to $\ReconHarFrozenHigh$; paired linear alignment restores $\ReconHarPairedLinearHigh$. Exact affine boundaries explain the scale mechanism, and a repair hierarchy separates it from richer drift. A signed update audit shows why task-gradient alignment and unsigned variance probes can miss these changes. Finally, an independently confirmed SNR experiment retains a $\BenefitGuardGain$-percentage-point auxiliary gain and the old logits under a reference-anchored constraint, at $\BenefitLatencyRatio\times$ CPU inference cost; folding that constraint into the encoder removes the cost but loses the gain. A coordinate map fitted after unrestricted learning avoids both penalties, keeping a $\ChartGain$-point gain at $\ChartLatency\times$ native cost and improving old-reader accuracy, yet it changes $\ChartDisagreement\%$ of legacy decisions and no repaired consumer meets a five-point disagreement budget. Readout compatibility is therefore a separate acceptance criterion, not a corollary of accuracy.
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
@@ -69,7 +70,7 @@ This failure also occurs with a real auxiliary objective. HAR reconstruction low
 
 We study the failure through three complementary tests. First, exact affine-readout boundaries and a fixed repair hierarchy identify the contribution of scale. Second, a signed chain-rule audit explains what task-gradient relations and an unsigned radial probe leave unresolved. Methods such as PCGrad~\citep{yu2020pcgrad} and CAGrad~\citep{liu2021cagrad} act on task-gradient relations; variance change also depends on the update's alignment with the variance gradient. For Adam, we additionally measure the applied parameter increment. Third, we test whether useful auxiliary learning can coexist with an unchanged readout.
 
-For the third test, a reference-anchored readout-nullspace control~\citep{shen2020backward,farajtabar2020ogd} preserves healthy logits while leaving $53$ of $64$ feature directions free. After validation fixes the SNR recipe, ten new seeds confirm a $\BenefitGuardGain$-percentage-point auxiliary gain at $\BenefitLatencyRatio\times$ CPU inference cost. A single-encoder follow-up preserves the logits but loses the gain when its nonlinear trunk is frozen. The resulting picture is concrete: task decodability, existing-readout compatibility, and the cost of preserving both require separate measurements.
+For the third test, a reference-anchored readout-nullspace control~\citep{shen2020backward,farajtabar2020ogd} preserves healthy logits while leaving $53$ of $64$ feature directions free. Ten new seeds confirm a $\BenefitGuardGain$-point auxiliary gain at $\BenefitLatencyRatio\times$ CPU inference cost. Freezing the nonlinear trunk removes that cost but loses the gain. A post-hoc single-encoder chart retains the gain and improves old-reader accuracy, yet changes $\ChartDisagreement\%$ of old predictions. Decodability, aggregate utility, and decision compatibility require separate measurements.
 
 \begin{figure}[t]
 \centering
@@ -107,7 +108,7 @@ The imposed-scale sweep in Figure~\ref{fig:scale_law} tests the scale mechanism 
 The matched HAR trajectory in Figure~\ref{fig:paired_dose}a starts from one healthy checkpoint and excludes calibration examples from encoder and readout fitting. At $\alpha=3$, the current head recovers while the frozen consumer remains inaccurate. Repairs fitted to training features without new labels distinguish mean and scale changes: mean correction reaches $\MechHarMeanMid$, global scale correction $\MechHarScalarMid$, and their combination $\MechHarMeanScalarMid$, close to per-feature recalibration ($\CpuHarRecalMid$). At $\alpha=100$, per-feature repair reaches $\CpuHarRecalHigh$ versus $\CpuHarRetrainHigh$ after refitting. Scale explains much of the moderate-dose failure; stronger or projected contraction requires richer alignment (Appendix~\ref{app:repair_hierarchy}).
 
 
-Separately trained encoders show the same decodability--compatibility gap at $m=32,128$ and with a Transformer (Appendix~\ref{app:readout}). Those historical studies include calibration examples in encoder fitting. We report negative log-likelihood (NLL) and expected calibration error (ECE), using $15$ equal-width bins for ECE. Positive temperature scaling preserves predicted classes; input normalization can repair their scale dependence.
+Repairs operate upstream of the frozen weights, through a versioned encoder output or consumer-input adapter. Marginal repairs need cached healthy statistics and unlabeled new features; paired alignment also needs old features of the same anchors. A supervised refit can reuse existing training labels and is a valid, stronger-access baseline. We report NLL and $15$-bin ECE alongside accuracy.
 
 \section{Auditing Shared Updates}\label{sec:theory}\label{sec:diagnosis}
 
@@ -243,7 +244,7 @@ Real reconstruction tests repair while the auxiliary makes progress (Table~\ref{
 
 Let $A=W_0\operatorname{diag}(1/s_0)$ and let $P_\perp$ project onto $\ker A$. The reference-anchored control $H_0+(H_\theta-H_0)P_\perp$ preserves all healthy logits while emitting one shared $64$-vector (Proposition~\ref{prop:consumer_nullspace}, Figure~\ref{fig:nullspace_control}). Validation selects SNR dose $1$ from six fixed candidates, using $20\%$ of fitting primary labels. Ten new seeds confirm ordinary auxiliary gain J--D of $\BenefitJointGain$ percentage points, paired $95\%$ interval $[\BenefitJointGainLow,\BenefitJointGainHigh]$, and guarded gain GJ--GD of $\BenefitGuardGain$, $[\BenefitGuardGainLow,\BenefitGuardGainHigh]$ (Table~\ref{tab:benefit_confirmation}). The guarded model meets the declared $0.5$-point noninferiority margin against J. All guarded predictions, NLL, and ECE match the reference; maximum logit error is $\BenefitLogitError$. The ten guarded joint endpoints also pass a separate five-point disagreement budget. Ordinary frozen accuracy barely changes, but ECE rises from $\BenefitHealthyECE$ to $\BenefitJointECE$. Both encoders remain at inference, at a measured $\BenefitLatencyRatio\times$ CPU cost (Appendix~\ref{app:benefit_confirmation}).
 
-With a frozen nonlinear trunk, the last-affine constraint folds into one encoder. Ten new seeds per task on SNR and HAR retain logits but confirm no compiled auxiliary benefit (Appendix~\ref{app:compiled_interface}). On SNR, compiled joint training (CJ) falls below full joint training (J) by $\CompileRmlJointCost$ points, $[\CompileRmlJointCostLow,\CompileRmlJointCostHigh]$: freezing accounts for $-3.53$, and the added constraint changes accuracy by $-0.003$. A separately fixed nonlinear-side development grid also fails its benefit screen (Appendix~\ref{app:nonlinear_interface}). These controls locate the practical difficulty in retaining useful adaptation at lower deployment cost.
+With a frozen nonlinear trunk, the last-affine constraint folds into one encoder but loses the SNR gain; freezing accounts for $-3.53$ points, while the constraint adds $-0.003$ (Appendix~\ref{app:compiled_interface}). A nonlinear-side grid also fails its benefit screen. Fitting and folding a chart \emph{after} unrestricted learning instead retains a $\ChartGain$-point gain at $\ChartLatency\times$ native CPU cost. Old-reader accuracy improves by $\ChartOldGain$ points and its NLL and ECE fall, yet $\ChartDisagreement\%$ of its predictions change, and none of ten repaired consumers meets the fixed five-point disagreement budget (Appendix~\ref{app:posthoc_chart}). Accuracy, calibration, current-head preservation, and cost can all pass while the deployed interface still changes.
 
 Detachment blocks auxiliary gradients to the encoder and provides the reference when the auxiliary brings no primary-task value. The spectral toxicity filter (\STF{}) instead removes a chosen component of the auxiliary channel. Its idealized backward form is
 \begin{equation}
@@ -302,7 +303,7 @@ The checks have different scopes. The signed flux diagnoses the current gradient
 
 Multi-task learning~\citep{caruana1997multitask} and task grouping~\citep{standley2020tasks} ask when shared training helps. PCGrad and CAGrad address gradient conflict~\citep{yu2020pcgrad,liu2021cagrad}; MGDA, Nash-MTL, and FAMO optimize Pareto, bargaining, or progress-balancing criteria~\citep{sener2018multi,navon2022multi,liu2023famo}. Other methods adapt task-gradient geometry or loss weights~\citep{senushkin2023aligned,liu2021imtl,chen2018gradnorm,kendall2018multi,wang2021gradient,limarenko2026gcond,zhou2025imgrad}. We add the variance gradient to this picture: task-gradient relations alone leave the sign of variance change unidentified.
 
-Backward-compatible representation learning explicitly studies model-version compatibility~\citep{shen2020backward}, including jointly trained transformations~\citep{hu2022backward}. We examine the scale-sensitive component of compatibility loss during auxiliary updates. CORAL-style covariance alignment~\citep{sun2016coral}, paired linear alignment, calibration under shift~\citep{guo2017calibration,ovadia2019trust}, normalization~\citep{ioffe2015batchnorm}, and linear probes~\citep{alain2016probe} provide established diagnostic controls. Negative transfer~\citep{wang2019negative} concerns task performance; here the old readout can fail while a current or refitted head succeeds. Our fixed-corpus consumer check complements work on unlabeled performance estimation~\citep{garg2022unlabeled} and update certification~\citep{usama2026envelopes} through reference disagreement and abstention.
+Backward-compatible learning studies model-version compatibility~\citep{shen2020backward,hu2022backward}. LDC~\citep{gomezvilla2024ldc} already shows retained discrimination behind drifting class prototypes and learns label-agnostic feature maps. Our question concerns fixed affine consumers under auxiliary updates, separating scale, useful learning, and preserved decisions. CORAL~\citep{sun2016coral}, AdaBN~\citep{li2016adabn}, and Tent~\citep{wang2021tent} establish alignment and unlabeled adaptation controls; our anchor-fitted repairs evaluate model drift without adapting on test inputs. Shift and model-selection assumptions matter~\citep{zhao2023pitfalls}. Calibration~\citep{guo2017calibration,ovadia2019trust}, probes~\citep{alain2016probe}, and unlabeled performance estimation~\citep{garg2022unlabeled} complement the fixed-corpus disagreement check.
 
 Self-supervised learning studies collapse through stop-gradient mechanisms~\citep{grill2020bootstrap,chen2021simsiam,caron2021emerging}, variance and covariance regularization~\citep{zbontar2021barlow,bardes2022vicreg,ermolov2021whitening}, and spectral dynamics~\citep{jing2022understanding,dong2021attention,kim2025taxonomy}. RankMe evaluates representations by effective rank~\citep{garrido2023rankme}. Our observable is variation across examples, distinct from terminal classifier geometry in neural collapse~\citep{papyan2020prevalence,wang2026neuralcollapse}. Input repair shows how reduced variation can coexist with retained decodability and lost readout compatibility.
 
@@ -1770,7 +1771,37 @@ The strict-positive gate is evaluated from integer correct counts and exact rati
 
 All $165$ saved state files are locally checked: six healthy states, $87$ endpoint model--Adam states and $72$ deployed side models. A separate tensor-only process reconstructs all $87$ validation consumers; accuracy, NLL and ECE replay exactly, with auxiliary errors also checked. All $36$ constrained-side consumers retain their old validation predictions/NLL/ECE; maximum logit error is $\NonlinearLogitError$. Fused/unfused feature error is at most $\NonlinearFusionError$. The nonlinear prefix changes in every constrained branch, and frozen base weights and Adam states remain unchanged. Structural tests include arbitrary nonlinear changes, native-precision fusion, full-rank/no-nullspace and unconstrained/base-drift negative controls.
 
-The construction supports nonlinear updates with retained affine-consumer outputs, but the tested candidates do not close the utility and cost target. A matched side with its prefix frozen would be needed to isolate the prefix's contribution to performance. Broader architectures, nonlinear downstream consumers, new populations, and adaptive warning policies remain open extensions.
+The construction supports nonlinear updates with retained affine-consumer outputs, but the tested candidates do not close the utility and cost target. A matched side with its prefix frozen would be needed to isolate the prefix's contribution to performance. A prespecified screen on a pretrained vision backbone did not reproduce the failure at a mild auxiliary dose (Appendix~\ref{app:vision_boundary}); nonlinear downstream consumers, stronger vision auxiliaries, new populations, and adaptive warning policies remain open extensions.
+
+\input{chart_study.tex}
+
+\subsection{A Vision Boundary Screen}\label{app:vision_boundary}
+
+The failure requires an update that changes the scale of the features; a mild
+auxiliary on a pretrained vision backbone need not. We ran one prespecified
+development screen and did not open the official test split. The model is an
+ImageNet-pretrained ResNet-18 on CIFAR-100 at $64\times64$ input, continued for
+three epochs with SGD at $10^{-3}$ for the encoder and $10^{-2}$ for the heads,
+momentum $0.9$, weight decay $5\times10^{-4}$, batch $128$, and frozen
+batch-normalization running statistics. Three branches cloned the same pretrained
+model and shared minibatches: primary-only, and a rotation auxiliary at dose $1$
+and dose $10$. A linear readout fitted on the healthy features reached $0.513$
+validation accuracy. After continuation it did not degrade: the frozen readout
+reached $0.598$ in the primary-only branch and $0.588$ under the rotation
+auxiliary, while the corresponding current heads reached $0.616$ and $0.615$. The
+auxiliary also gave no measurable primary benefit ($-0.0006$). The dose-$10$
+branch produced a non-finite loss in its first epoch and was not retuned or
+rerun. The prespecified failure criterion was a loss of at least five points, so
+this screen is negative and no unlabeled repair is credited: the fixed
+diagonal-statistics family stayed near $0.61$--$0.62$, and the paired-ridge
+family was unstable across anchor budgets ($0.17$--$0.58$). We report the screen
+as a boundary rather than a contradiction. Continuation training need not produce
+the failure, and this run does not identify which property of the update
+prevented it; where the update leaves the usable scale intact, the existing
+readout keeps working, which is what the affine boundary predicts. Historical
+CIFAR work in this project used a different protocol (from-scratch coarse/fine
+supervision), and its reader-confirmation gate also failed; we do not merge those
+reports with this screen.
 
 \subsection{A Fixed-Corpus Unlabeled Consumer Check}\label{app:consumer_audit}
 

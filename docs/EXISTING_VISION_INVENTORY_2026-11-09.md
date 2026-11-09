@@ -1,6 +1,6 @@
 # Existing vision work: inventory before further computation
 
-The adjacent local tree `D:/csy/csy/RepFix/anonymous_code/paper/research_upgrade`
+The adjacent local tree `../anonymous_code/paper/research_upgrade`
 contains an extensive earlier CIFAR-100/ResNet-18 research sequence. It was missed
 by the initial search restricted to the current worktree. No old experiment should
 be relaunched merely because it is absent from the current paper.

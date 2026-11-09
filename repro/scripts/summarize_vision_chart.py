@@ -9,13 +9,19 @@ def summarize(path):
     record=json.loads(path.read_text())
     assert record['complete'] and record['phase']=='development' and record['seed']==900
     assert not record['splits']['official_test_loaded'] and not record['splits']['test_metrics_computed']
-    assert [b['mode'] for b in record['branches']]==['D','J1','J10']
+    training_complete=record.get('training_complete',True)
+    expected=['D','J1','J10'] if training_complete else ['D','J1']
+    assert [b['mode'] for b in record['branches']]==expected
+    if not training_complete:
+        assert record['numerical_failure']['mode']=='J10' and not record['numerical_failure']['endpoint_scored']
     assert len({b['minibatch_order_sha256'] for b in record['branches']})==1
     assert len({b['rotation_order_sha256'] for b in record['branches']})==1
     healthy=record['healthy']['acc']
     detached=record['branches'][0]
     result=dict(phase='development',seed=900,plan_sha256=record['plan_sha256'],
         record_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),test_opened=False,
+        training_complete=training_complete,endpoint_comparison_complete=training_complete,
+        numerical_failure=record.get('numerical_failure'),
         healthy=record['healthy'],branches=[],promising=False,selected=None,
         selection_order='J1 then J10; budgets 128/512/1024/2048; diagonal then paired ridge')
     for branch in record['branches']:
