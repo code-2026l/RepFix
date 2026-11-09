@@ -351,6 +351,46 @@ python -m pytest repro/scripts/test_consumer_risk.py repro/scripts/test_readout_
 python repro/scripts/build_cpu_paper.py
 ```
 
+## Compiled single-encoder boundary test
+
+The new plan is `docs/plans/2026-11-09-compiled-interface.md`, committed before
+the new calculations. Seeds 400--409 per task test RadioML SNR (dose 1, 20%
+fitting labels) and HAR reconstruction (dose 10, 10%). Six branches separate
+full continuation, frozen-trunk continuation and constrained frozen-trunk
+continuation, each with detached/joint auxiliary gradients.
+
+`compiled_readout.py` parameterizes and folds the final affine map. Its
+single-encoder identity requires an unchanged deterministic nonlinear trunk,
+normalized healthy head and constrained final bias. All arms use a native
+float64 final encoder affine map and float32 trunk; this follow-up is not pooled
+with the earlier encoder-fp32 confirmation. `compiled_interface_cpu.py` is the
+bounded CPU driver. `verify_compiled_consumers_cpu.py` reconstructs all 120
+endpoint consumers independently from their tensors. The fixed new bank has
+120 candidates, not the previous 40 or 3,015 candidates.
+
+The full benefit conjunction fails on both tasks. Exact compatibility and
+near-baseline deployment cost are achieved; useful primary adaptation is not.
+SNR freezing alone accounts for the dominant observed performance loss. All
+six branches, nine planned contrasts per task, adverse results and failed
+criteria are preserved in `compiled_interface_summary.json` and its verification
+JSON. No post-confirmation dose/seed/endpoint tuning is performed.
+
+The local `summarize_compiled_interface.py` requires the 180 retrieved healthy,
+endpoint/optimizer and compiled state files and the complete independent replay
+records. The source ZIP excludes those trained states and raw data, but ships
+the full records, plan, generated tables, diagram/chart inputs and independent
+replay results. Figure regeneration requires only shipped numerical records.
+
+```bash
+python repro/scripts/render_paper_figures.py
+python -m pytest repro/scripts/test_consumer_risk.py repro/scripts/test_readout_alignment.py repro/scripts/test_scale_boundaries.py repro/scripts/test_readout_nullspace.py repro/scripts/test_compiled_readout.py -q
+python repro/scripts/build_cpu_paper.py
+```
+
+These current commands rebuild 15 included figures, run all 39 structural/control
+tests and compile the nine-page main text locally. The detailed latest report is
+`docs/COMPILED_INTERFACE_REVISION_2026-11-09.md`.
+
 ## Reproduce
 
 ### Current manuscript evidence audit (2026-09-21)

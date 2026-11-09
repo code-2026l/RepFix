@@ -1,5 +1,10 @@
 # Useful real auxiliary learning with a retained shared interface
 
+Historical report for the two-encoder positive confirmation. The later
+single-encoder follow-up and its failed benefit target are documented in
+`docs/COMPILED_INTERFACE_REVISION_2026-11-09.md`; the earlier artifacts and
+results below are preserved within their original scope.
+
 This revision follows the user's request for both stronger evidence and layered,
 more expressive figures. The previous source/PDF artifacts are preserved. All
 source authoring, statistical analysis, figure rendering, writing, compilation

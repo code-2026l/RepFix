@@ -40,6 +40,7 @@
 \input{story_numbers.tex}
 \input{head_state_numbers.tex}
 \input{benefit_numbers.tex}
+\input{compiled_numbers.tex}
 
 % ─── Compact table style (tighter spacing/format) ───
 \setlength{\tabcolsep}{4pt}          % default 6pt -> tighter column padding
@@ -54,7 +55,7 @@
 \maketitle
 
 \begin{abstract}
-An encoder update can improve an auxiliary objective and preserve primary-task decodability, yet invalidate a previously fitted consumer. We call its scale-sensitive component \emph{silent scale shift}. In a ten-seed paired HAR experiment, branches share a healthy model, Adam state, and future minibatches. Frozen accuracy falls from $\CpuHarHealthy$ to $\CpuHarJointMid$ while the current task head reaches $\CpuHarOwnMid$; one unlabeled global scale correction recovers $\MechHarScalarMid$. A real reconstruction auxiliary lowers held-out reconstruction error to $\ReconHarMseRatioHigh$ of detachment, yet frozen accuracy falls to $\ReconHarFrozenHigh$. Paired linear input alignment recovers $\ReconHarPairedLinearHigh$ without changing the encoder or auxiliary head. Exact affine boundaries isolate the scale mechanism; a fixed repair hierarchy exposes drift beyond it. Task-gradient relations alone do not identify variance contraction. A signed chain-rule audit reveals the limits of an unsigned probe, and flow signs disagree with $\CpuRmlAuditDisagree/\CpuRmlAuditN$ sampled Adam increments. A validation-frozen, ten-seed SNR confirmation retains a $\BenefitGuardGain$-point auxiliary accuracy gain with unchanged healthy logits under a reference-anchored nullspace control, at $\BenefitLatencyRatio\times$ CPU inference cost. Conservative unlabeled checks permit current-checkpoint decisions with abstention. Variance, task decodability, and retained-consumer utility are separate evaluation axes: readout validity must be audited.
+An encoder update can improve an auxiliary objective and preserve primary-task decodability, yet invalidate a previously fitted consumer. We call its scale-sensitive component \emph{silent scale shift}. In a ten-seed paired HAR experiment, branches share a healthy model, Adam state, and future minibatches. Frozen accuracy falls from $\CpuHarHealthy$ to $\CpuHarJointMid$ while the current head reaches $\CpuHarOwnMid$; unlabeled global scale correction recovers $\MechHarScalarMid$. Real reconstruction lowers held-out auxiliary error to $\ReconHarMseRatioHigh$ of detachment, yet frozen accuracy falls to $\ReconHarFrozenHigh$; paired linear alignment recovers $\ReconHarPairedLinearHigh$ without changing either learned model. Exact affine boundaries isolate scaling; a fixed repair hierarchy exposes richer drift. Task-gradient relations alone do not identify contraction. A signed audit reveals the limits of an unsigned probe, and flow signs disagree with $\CpuRmlAuditDisagree/\CpuRmlAuditN$ sampled Adam increments. A validation-frozen, ten-seed SNR confirmation retains a $\BenefitGuardGain$-point auxiliary accuracy gain and healthy logits under a reference-anchored constraint, at $\BenefitLatencyRatio\times$ CPU inference cost. A separate frozen-trunk control compiles away the reference but loses the SNR benefit. Conservative unlabeled checks permit checkpoint decisions with abstention. Variance, task decodability, and retained-consumer utility are separate axes: readout validity must be audited.
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
@@ -67,7 +68,7 @@ The issue also occurs when the auxiliary learns a real objective. HAR reconstruc
 
 Why does conventional monitoring miss this distinction? Task-gradient relations, used by PCGrad~\citep{yu2020pcgrad}, CAGrad~\citep{liu2021cagrad}, and related methods, do not identify the update's projection onto the variance gradient. Even variance contraction does not determine consumer utility. For pure scaling we derive exact boundaries for bias domination and the first prediction flip; learned drift can require richer repairs. A signed chain-rule audit then identifies where an unsigned radial probe misstates the local update. Its sufficient certificates are retrospective, and Adam requires a separate applied-step audit.
 
-We also test a constructive endpoint: useful auxiliary learning with exactly retained healthy logits. A standard readout-nullspace construction~\citep{shen2020backward,farajtabar2020ogd} leaves $53$ of $64$ feature directions free in the tested head. A validation-frozen SNR recipe confirms a $\BenefitGuardGain$-percentage-point auxiliary gain across ten new seeds while preserving the old consumer. The construction retains a reference encoder and costs $\BenefitLatencyRatio\times$ CPU inference. Paired effects, exact boundaries, and signed audits thus support both a failure diagnosis and an explicitly priced compatibility control.
+We also test useful auxiliary learning with exactly retained healthy logits. A standard readout-nullspace construction~\citep{shen2020backward,farajtabar2020ogd} leaves $53$ of $64$ feature directions free. A validation-frozen SNR recipe confirms a $\BenefitGuardGain$-point auxiliary gain across ten new seeds, at $\BenefitLatencyRatio\times$ CPU inference cost. A separately declared single-encoder follow-up preserves compatibility but loses the SNR gain when the nonlinear trunk is frozen. Paired effects and exact boundaries therefore support both a failure diagnosis and a measured compatibility--plasticity tradeoff.
 
 \begin{figure}[t]
 \centering
@@ -237,9 +238,10 @@ Real reconstruction provides a matched test beyond variance penalties (Table~\re
 \end{figure}
 
 \paragraph{Retain useful auxiliary learning and the old consumer.}
-For a healthy affine consumer, let $A=W_0\operatorname{diag}(1/s_0)$ and project onto its nullspace with $P_\perp$. The reference-anchored representation $H_0+(H_\theta-H_0)P_\perp$ preserves all healthy logits in exact arithmetic (Proposition~\ref{prop:consumer_nullspace}). This standard projection control~\citep{shen2020backward,farajtabar2020ogd} emits one shared $64$-vector and retains the reference encoder (Figure~\ref{fig:nullspace_control}); it tests coexistence of auxiliary benefit and compatibility.
+Let $A=W_0\operatorname{diag}(1/s_0)$ and let $P_\perp$ project onto $\ker A$. The standard reference-anchored control $H_0+(H_\theta-H_0)P_\perp$ preserves all healthy logits (Proposition~\ref{prop:consumer_nullspace}), emitting one shared $64$-vector with both encoders retained (Figure~\ref{fig:nullspace_control}). Validation selects SNR dose $1$ from six fixed candidates, using $20\%$ of fitting primary labels. Ten new seeds confirm J--D of $\BenefitJointGain$ points, paired $95\%$ interval $[\BenefitJointGainLow,\BenefitJointGainHigh]$, and guarded auxiliary benefit of $\BenefitGuardGain$, $[\BenefitGuardGainLow,\BenefitGuardGainHigh]$, meeting the declared $0.5$-point noninferiority margin (Table~\ref{tab:benefit_confirmation}). All guarded predictions, NLL and ECE are retained; maximum logit error is $\BenefitLogitError$. All ten guarded joint endpoints certify under the separate five-point budget. Ordinary frozen accuracy barely changes, but ECE rises from $\BenefitHealthyECE$ to $\BenefitJointECE$. The $\BenefitLatencyRatio\times$ CPU cost is part of this fixed-split result (Appendix~\ref{app:benefit_confirmation}).
 
-Validation selects SNR dose $1$ from six declared domain/dose candidates, with $20\%$ of fitting primary labels. Ten new seeds confirm an ordinary joint-training gain of $\BenefitJointGain$ points over detachment (paired $95\%$ interval $[\BenefitJointGainLow,\BenefitJointGainHigh]$). Under the constraint, the auxiliary still adds $\BenefitGuardGain$ points over guarded detachment, $[\BenefitGuardGainLow,\BenefitGuardGainHigh]$, and the joint model meets the predeclared $0.5$-point noninferiority margin against ordinary joint training (Table~\ref{tab:benefit_confirmation}). All guarded consumers retain their predictions, NLL and ECE, with maximum logit error $\BenefitLogitError$; all ten guarded joint endpoints certify under the separate five-point finite-corpus budget. Ordinary frozen accuracy is nearly unchanged, but ECE rises from $\BenefitHealthyECE$ to $\BenefitJointECE$. The control costs $\BenefitLatencyRatio\times$ CPU inference and leaves $53$ feature directions free. This is a fixed-split positive control, not a cheap single-encoder remedy or a forecasting result (Appendix~\ref{app:benefit_confirmation}).
+\paragraph{Compiling the constraint exposes a plasticity cost.}
+With a frozen nonlinear trunk, the last-affine constraint folds into one encoder. A fixed SNR/HAR follow-up, ten new seeds per task, preserves logits but confirms no compiled auxiliary benefit (Appendix~\ref{app:compiled_interface}). On SNR, compiled joint (CJ) versus full joint (J) is $\CompileRmlJointCost$ points, $[\CompileRmlJointCostLow,\CompileRmlJointCostHigh]$. Freezing alone accounts for $-3.53$; the further constraint adds $-0.003$. Exact compatibility at near-baseline cost therefore does not ensure useful feature adaptation.
 
 \paragraph{Restrict the auxiliary update.}
 Detachment blocks all auxiliary gradients to the encoder and is the reference intervention when the auxiliary adds no primary-task value. \STF{} instead restricts the auxiliary channel. Its idealized backward form removes a radial projection,
@@ -308,11 +310,11 @@ A frozen readout is a classifier under a changed feature distribution. Backward-
 
 Representation collapse has been studied extensively in self-supervised learning, including stop-gradient mechanisms~\citep{grill2020bootstrap,chen2021simsiam,caron2021emerging}, variance and covariance regularization~\citep{zbontar2021barlow,bardes2022vicreg,ermolov2021whitening}, and spectral dynamics~\citep{jing2022understanding,dong2021attention,kim2025taxonomy}. RankMe evaluates learned representations through effective rank~\citep{garrido2023rankme}. Here collapse refers to reduced variation across examples, distinct from terminal classifier geometry in neural collapse~\citep{papyan2020prevalence,wang2026neuralcollapse}. Our contribution connects an update-level signed observable to the validity of the cheap probe used to approximate it.
 
-Auxiliary-gradient projection is also established. ATTITTUD and GradOPS choose subspaces from task influence or task-gradient spans~\citep{dery2021attittud,zhu2025gradops}; other approaches select or combine auxiliary tasks~\citep{navon2021auxiliary,jiang2023forkmerge,shin2024dgr}. Our time-series domains are activity recognition~\citep{ucihar}, modulation recognition~\citep{radioml}, and battery health~\citep{nasa_battery,severson2019data,attia2020closed,pradhan2022soh}. We use filtering to test the contraction diagnosis against detachment; the contribution is the diagnostic scope, not a new optimizer.
+Auxiliary-gradient projection is established~\citep{dery2021attittud,zhu2025gradops}, as are auxiliary selection~\citep{navon2021auxiliary,jiang2023forkmerge,shin2024dgr}, weight-space nullspace adaptation~\citep{pham2026ness} and mergeable frozen-backbone updates~\citep{hu2022lora}. Our domains are activity recognition~\citep{ucihar}, modulation recognition~\citep{radioml}, and battery health~\citep{nasa_battery,severson2019data,attia2020closed,pradhan2022soh}. These controls test diagnostic scope and compatibility costs; they are not new optimizers.
 
 \section{Conclusion}\label{sec:conclusion}
 
-Paired continuation separates task decodability from retained-consumer utility. Fixed repairs isolate a strong scale channel and its limits. Exact affine boundaries and signed audits delimit the mechanism; Adam requires an applied-step check. A predeclared SNR confirmation retains real auxiliary gains with exact legacy logits under an explicitly priced reference-anchored constraint. Observed real-head boundaries depend on the training regime. Variance, decodability, and consumer compatibility should be reported together.
+Paired continuation separates task decodability from retained-consumer utility. Fixed repairs isolate scaling and its limits; signed audits require an applied-step check for Adam. A predeclared SNR confirmation retains auxiliary gains and legacy logits at an explicit reference-encoder cost. Folding removes that cost under a frozen trunk, but loses the tested SNR benefit. Compatibility, adaptation and deployment cost must therefore be audited together, alongside variance.
 
 \clearpage
 \section*{AI Use Statement}
@@ -1734,6 +1736,59 @@ All ten heads have protected rank $11$ and $53$ free dimensions. A full-column-r
 An alternative baseline retains both encoders and routes the legacy consumer directly to $h_0$, while serving the current head from J. It has J's primary metric and the reference legacy metrics by construction, using separate feature vectors. The guarded control emits one shared fixed-width vector for both heads and adds a projection; it establishes no efficiency advantage over that dual-routing baseline. Its minimum-distance property concerns raw feature coordinates, not minimum task loss. This distinction and the retained-reference cost are part of the positive-control interpretation.
 
 The full study verifies $104$ development/confirmation model--Adam states, shared initial states, primary-label masks, future-order hashes, and all consumer bounds. An independent process reconstructs all forty saved consumers and replays their accuracy/NLL/ECE and bounds exactly. Numerical drivers are \texttt{benefit\_compatibility\_cpu.py} and \texttt{verify\_benefit\_consumers\_cpu.py}; local analysis is \texttt{summarize\_benefit\_compatibility.py}. The committed plan, frozen validation choice, full records, verification and all negative development cases accompany the artifact.
+
+\subsection{Folding Compatibility into a Single Encoder}\label{app:compiled_interface}
+
+The reference branch raises a practical question: can its exact compatibility be retained at ordinary inference cost? A frozen nonlinear trunk provides a direct construction. It also removes the ability to learn new nonlinear features. We test both sides with a new plan committed before numerical execution, after observing the earlier confirmation. This follow-up is a separate study, not additional seeds pooled into that result.
+
+\begin{corollary}[Foldable affine compatibility]\label{cor:compiled_interface}
+Let $h_0(x)=B_0\phi_0(x)+c_0$, with a retained deterministic trunk $\phi_0$. For arbitrary trainable $B,c$, set
+\begin{equation}
+ \overline B=B_0+P_\perp(B-B_0),\qquad
+ \overline c=c_0+P_\perp(c-c_0).
+ \label{eq:compiled_affine}
+\end{equation}
+Then $\overline h(x)=\overline B\phi_0(x)+\overline c$ has the reference affine-consumer logits for every input in real arithmetic. Deploying $\overline B,\overline c$ needs one trunk and one final affine map of the original shapes, with no reference branch or projection. If the trunk has $d$ outputs, this parameterization leaves $(m-\operatorname{rank}A)(d+1)$ affine degrees of freedom. Changing the trunk is outside this guarantee.
+\end{corollary}
+\begin{proof}
+Both $A(\overline B-B_0)$ and $A(\overline c-c_0)$ vanish. Folding is a substitution of one weight and bias, not a second inference operation. Each of the $d+1$ weight/bias columns can vary in $\ker A$.
+\end{proof}
+
+This is elementary constrained affine adaptation. Nullspace updates and mergeable frozen-backbone adaptation are established~\citep{farajtabar2020ogd,pham2026ness,hu2022lora}; we do not claim a new adaptation algorithm. With a linear current head, this construction remains a linear predictor of the fixed trunk features and cannot add nonlinear feature capacity. The parameter fold preserves its arithmetic features; it does not imply preservation of task benefit.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/fig_compiled_control.pdf}
+\caption{\textbf{Single-encoder compatibility requires a fixed nonlinear trunk in this control.} With $\Delta B=B-B_0$ and $\Delta c=c-c_0$, constrained weights and biases fold into their native shapes (Equation~\ref{eq:compiled_affine}); $b'_0=b_0-A\mu_0$ is the consumer bias. Only one encoder remains at inference; the healthy output constraint is unchanged. Planes are schematic. This resolves reference-computation cost, while the frozen trunk restricts feature learning.}
+\label{fig:compiled_control}
+\end{figure}
+
+\paragraph{Fixed protocol and controls.}
+RadioML uses SNR regression, dose $1$ and $20\%$ of fitting primary labels, inherited from the prior validation choice. HAR uses input reconstruction, dose $10$ and $10\%$ labels, the positive max-min candidate in the previously archived three-seed HAR validation grid. No new grid is searched. Each task uses ten new seeds $400$--$409$, the same prepared test split, a stratified $20\%$ training reservation before any model/head fit, width $64$, Adam $10^{-3}$ and batch $256$. HAR has $60$ healthy plus $30$ continuation epochs; RadioML has $25+25$. The last encoder affine map is natively float64 in every arm, as are classification logits; trunk and auxiliary parameters are fp32. The healthy consumer is fitted to that same mixed-precision interface. This explicit precision change prevents pooling with the earlier encoder-fp32 experiment.
+
+Six branches clone each healthy model and full Adam state, with identical fitting-label masks and future minibatches: full-network D/J; frozen-trunk, unconstrained-last-layer LD/LJ; and frozen-trunk, constrained-last-layer CD/CJ. Heads continue learning in every branch. The constraint is fixed before continuation; the fixed training-anchor diagnostic is not an adaptive policy. Validation/test inputs never train the encoder or healthy consumer. Frozen trunk parameters \emph{and their Adam states} are checked unchanged. Every branch uses the declared endpoint and every seed is retained.
+
+\input{compiled_interface_table.tex}
+\input{compiled_contrasts_table.tex}
+
+\paragraph{The complete benefit target fails.}
+The five declared criteria are J--D, CJ--CD and CJ--D lower paired $95\%$ limits above zero; CJ--J above $-0.5$ point; and preserved old logits/predictions. Neither task passes their conjunction. On SNR, unrestricted auxiliary benefit replicates at $\CompileRmlJointGain$ points, $[\CompileRmlJointGainLow,\CompileRmlJointGainHigh]$, but compiled auxiliary benefit is $\CompileRmlAuxGain$, $[\CompileRmlAuxGainLow,\CompileRmlAuxGainHigh]$. CJ--J is $\CompileRmlJointCost$, $[\CompileRmlJointCostLow,\CompileRmlJointCostHigh]$, failing noninferiority. The no-constraint frozen-trunk control LJ--J is $-3.529$ points, $[-4.213,-2.846]$, whereas CJ--LJ is $-0.003$, $[-0.039,0.033]$. In this recipe the dominant observed cost is freezing, not an additional large projection penalty. This is a conditional comparison, not a universal claim about projection methods. LJ--LD is a small positive $0.028$ points, $[0.0006,0.0554]$, but does not preserve the unrestricted gain or pass the compiled criteria.
+
+HAR's J--D is $\CompileHarJointGain$ points, $[\CompileHarJointGainLow,\CompileHarJointGainHigh]$; CJ--CD is $\CompileHarAuxGain$, $[\CompileHarAuxGainLow,\CompileHarAuxGainHigh]$. Neither establishes auxiliary benefit. CJ--J meets the half-point margin, but that alone cannot establish retained useful learning. All intervals are descriptive paired t intervals over ten seeds conditional on each fixed dataset/split/recipe. The full planned explanatory contrasts, including adverse and near-null outcomes, appear in Table~\ref{tab:compiled_contrasts}.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/fig_compiled_frontier.pdf}
+\caption{\textbf{Exact compatibility does not ensure useful adaptation.} All four declared primary-accuracy contrasts and all ten new seeds per task. Diamonds/bars show means and paired descriptive $95\%$ intervals. D/J update the full encoder; CD/CJ additionally freeze the nonlinear trunk and constrain the last map. The dotted $-0.5$ marker applies only to CJ--J. The panels have different horizontal scales. SNR retains an unrestricted benefit but loses it in the compiled control; HAR confirms no auxiliary benefit. Neither passes the five-criterion conjunction.}
+\label{fig:compiled_frontier}
+\end{figure}
+
+\paragraph{Compatibility, deployment cost and replay.}
+All $40$ CD/CJ consumers preserve their old predictions, NLL and ECE, with maximum logit error $\CompileLogitError$. Folded and training-time feature vectors are bitwise identical on the scored corpus. The separate fixed $120$-consumer family uses total $\delta=0.05$, a uniformly sampled $1{,}024$-input monitor per seed and a five-point relative-error budget; all $40$ compiled consumers certify. This bank is separate from both earlier families and supplies no future-update or new-population guarantee. No monitor information enters training.
+
+Deployed encoders retain exactly three affine evaluations and the baseline parameter shapes, with no reference or projector parameters. At batch $1$, mean ratios of per-seed median CPU latency are $\CompileRmlSingleLatency\times$ for SNR and $\CompileHarSingleLatency\times$ for HAR. At batch $1{,}024$, they are $\CompileRmlLatency\times$ and $\CompileHarLatency\times$. Measurements cover the encoder and current head, using one Xeon Platinum 8570 thread, five warm-ups and $21$ alternating timed repetitions per path; the baseline uses the same mixed precision. The corresponding two-encoder paths average $2.22\times$ and $2.16\times$ at batch $1{,}024$. These deployment measurements establish the cost reduction, not useful adaptation.
+
+All $180$ healthy, endpoint model--Adam and compiled states are retrieved and checked locally. A separately launched process reconstructs all $120$ saved consumers from their tensors; accuracy, NLL, ECE and sampling bounds replay exactly. Local tests cover normalized-head/bias constraints, Adam steps, native-shape folding, reference/projector removal, useful gradients and the negative trunk-drift case. Drivers, the committed pre-calculation plan, all records, verification and complete failed criteria accompany the artifact. This boundary test rules out the simple frozen-trunk shortcut in the confirmed SNR recipe; compatibility with continuing nonlinear learning at one-encoder cost remains open.
 
 \subsection{A Fixed-Corpus Unlabeled Consumer Check}\label{app:consumer_audit}
 

@@ -1,0 +1,25 @@
+\begin{table}[t]
+\centering
+\caption{Folded single-encoder continuation, ten new seeds per task. D/J update the full encoder; LD/LJ freeze the nonlinear trunk; CD/CJ additionally constrain the last affine map to preserve the normalized healthy consumer. All use the same native float64 final affine and float32 trunk. Means with population seed SD; the 120-consumer bank uses a five-point relative-error budget.}
+\label{tab:compiled_full}
+\small
+\begin{tabular}{llrrrrr}
+\toprule
+Task & arm & own accuracy & frozen accuracy & frozen NLL & ECE & certified \\
+\midrule
+SNR & D & $0.267\pm0.008$ & $0.243\pm0.032$ & $2.262$ & $0.169$ & 0/10 \\
+ & J & $0.278\pm0.009$ & $0.248\pm0.026$ & $2.198$ & $0.166$ & 0/10 \\
+ & LD & $0.242\pm0.015$ & $0.221\pm0.025$ & $2.261$ & $0.139$ & 0/10 \\
+ & LJ & $0.242\pm0.015$ & $0.219\pm0.029$ & $2.255$ & $0.132$ & 0/10 \\
+ & CD & $0.242\pm0.015$ & $0.244\pm0.015$ & $2.061$ & $0.039$ & 10/10 \\
+ & CJ & $0.242\pm0.015$ & $0.244\pm0.015$ & $2.061$ & $0.039$ & 10/10 \\
+\midrule
+HAR recon. & D & $0.918\pm0.008$ & $0.913\pm0.012$ & $0.482$ & $0.062$ & 6/10 \\
+ & J & $0.919\pm0.005$ & $0.898\pm0.019$ & $0.540$ & $0.069$ & 2/10 \\
+ & LD & $0.918\pm0.006$ & $0.913\pm0.011$ & $0.440$ & $0.059$ & 6/10 \\
+ & LJ & $0.918\pm0.006$ & $0.906\pm0.015$ & $0.450$ & $0.062$ & 5/10 \\
+ & CD & $0.918\pm0.006$ & $0.918\pm0.005$ & $0.355$ & $0.052$ & 10/10 \\
+ & CJ & $0.918\pm0.007$ & $0.918\pm0.005$ & $0.355$ & $0.052$ & 10/10 \\
+\bottomrule
+\end{tabular}
+\end{table}

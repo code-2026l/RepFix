@@ -41,6 +41,8 @@ result=dict(copied_baseline_figures=copied,warnings=warnings,
             labels={k:labels[k] for k in ['sec:conclusion','app:boundary_proof','fig:overview','fig:paired_dose',
                 'fig:nullspace_control','fig:benefit_confirmation','tab:benefit_confirmation',
                 'app:benefit_confirmation','prop:consumer_nullspace','tab:benefit_contrasts',
+                'app:compiled_interface','cor:compiled_interface','fig:compiled_control',
+                'fig:compiled_frontier','tab:compiled_full','tab:compiled_contrasts',
                 'fig:scale_law','app:cpu_paired','tab:cpu_paired','tab:cpu_adam',
                 'app:head_state','tab:head_state','app:consumer_audit','tab:consumer_audit','tab:cnn_continuation'] if k in labels},
             output=str(PAPER/'RepFix_ICLR2027.pdf'))

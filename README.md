@@ -459,7 +459,7 @@ remaining gaps are in `docs/CONSUMER_CNN_REVISION_2026-11-09.md`.
 The new opening figure compares the controlled scale repair with real HAR
 reconstruction: paired linear alignment reaches 0.947 full-test accuracy versus
 0.826 frozen while leaving the learned auxiliary error unchanged. It uses paired
-training anchors and no new labels. All thirteen manuscript figures have vector
+training anchors and no new labels. All fifteen manuscript figures have vector
 PDF, editable SVG and PNG exports at final 5.5-inch width; data/font/bounds checks
 and input hashes accompany the local rendering pipeline.
 
@@ -472,7 +472,7 @@ in `head_state_summary.json` and `head_state_verification.json`.
 
 ## Predeclared useful-auxiliary and retained-consumer confirmation
 
-The latest study freezes its plan before development and its validation choice
+The preceding study freezes its plan before development and its validation choice
 before ten new confirmation seeds. At 20% fitting primary labels, RadioML SNR
 dose 1 improves current-head accuracy by **0.97 percentage points** over
 detachment. A reference-anchored readout-nullspace control retains **0.89 points**
@@ -495,11 +495,48 @@ python -m pytest repro/scripts/test_consumer_risk.py repro/scripts/test_readout_
 python repro/scripts/build_cpu_paper.py
 ```
 
-These commands reproduce thirteen figures, run 32 mathematical/control tests,
+These commands reproduce fifteen figures, run 32 mathematical/control tests,
 and compile the local manuscript from shipped records. All figure diagrams use
 editable vector planes; their apparent depth encodes no measured performance.
 The positive study's 104 trained states remain local; the source artifact ships
 its full records, frozen plan/choice, summaries and independent replay results.
+
+## Single-encoder follow-up: compatibility is cheaper, useful adaptation is not established
+
+The separate committed follow-up uses ten new seeds each on RadioML SNR and
+HAR reconstruction, with six paired branches per seed. Freezing the nonlinear
+trunk permits the final affine output constraint to fold into one native
+encoder: no reference branch, inference projection or extra parameter shape.
+All 40 constrained consumers preserve old predictions/NLL/ECE; the worst logit
+error is **3.55e-14**. Batch-1024 CPU latency is about **1.006x** ordinary
+inference on SNR and **1.002x** on HAR, under matched mixed precision.
+
+**Neither task passes the full predeclared benefit/compatibility target.**
+SNR's unrestricted auxiliary gain replicates at **1.11 points [0.90, 1.32]**,
+but the compiled auxiliary gain is **0.01 [-0.02, 0.04]**. Compiled joint versus
+full joint is **-3.53 [-4.23, -2.83]**. The unconstrained frozen-trunk control
+accounts for -3.529 points; adding the compatibility constraint changes it by
+-0.003 [-0.039, 0.033]. This isolates freezing as the dominant measured cost in
+this recipe. HAR confirms no auxiliary benefit in either full or compiled
+training. These conditional null/adverse results are retained, without a new
+dose search. Compatibility while continuing nonlinear learning at one-encoder
+cost remains open.
+
+All 180 healthy/model-Adam/compiled state files were locally verified and all
+120 endpoint consumers independently replayed exactly. The new finite-corpus
+bank has 120 candidates and is separate from both earlier families. Source
+packages include records/verification, not raw datasets or trained states.
+Details and statistical scope: `docs/COMPILED_INTERFACE_REVISION_2026-11-09.md`.
+
+```bash
+python repro/scripts/render_paper_figures.py
+python -m pytest repro/scripts/test_consumer_risk.py repro/scripts/test_readout_alignment.py repro/scripts/test_scale_boundaries.py repro/scripts/test_readout_nullspace.py repro/scripts/test_compiled_readout.py -q
+python repro/scripts/build_cpu_paper.py
+```
+
+This current complete check rebuilds 15 figures and runs 39 structural/control
+tests. Full state-dependent auditing is available locally through
+`summarize_compiled_interface.py` with the retrieved checkpoints present.
 
 ## License and citation
 
