@@ -387,9 +387,44 @@ python -m pytest repro/scripts/test_consumer_risk.py repro/scripts/test_readout_
 python repro/scripts/build_cpu_paper.py
 ```
 
-These current commands rebuild 15 included figures, run all 39 structural/control
+These compiled-control commands rebuild 17 included figures and run 39 structural/control
 tests and compile the nine-page main text locally. The detailed latest report is
 `docs/COMPILED_INTERFACE_REVISION_2026-11-09.md`.
+
+## Compatible nonlinear-channel development
+
+`nonlinear_interface.py` implements a trainable nonlinear side inside the
+normalized consumer kernel, retaining the frozen base once inside a wider dense
+deployed MLP. All feature encoders use native float64, while head parameters
+are fp32. This is a separate protocol from previous precision/label regimes.
+`nonlinear_interface_cpu.py` implements the fixed plan in
+`docs/plans/2026-11-09-nonlinear-interface.md`: seeds 500--502, six domain/width/
+dose candidates, validation-only selection. HAR uses 1% primary labels; SNR 20%.
+
+Both tasks fail the declared positive-score gate. No independent confirmation
+or full-data latency campaign is launched. `select_nonlinear_configuration.py`
+refuses reselection; exact integer counts/rational means avoid treating an
+aggregate tie as a tiny positive float. The initial float serialization and
+correction audit are preserved, with no changed grid or criterion.
+
+`verify_nonlinear_consumers_cpu.py` independently reconstructs 87 saved validation
+endpoints, including fusion, from tensors. `summarize_nonlinear_interface.py`
+locally checks all 165 healthy/model-Adam/deployed states, common initial states,
+frozen-base parameters and Adam state, shared orders, nonlinear-prefix updates,
+the gate and all records. Accuracy/NLL/ECE replay exactly; auxiliary losses are
+also checked. No 200-consumer confirmation family is instantiated. Trained
+states and raw data remain excluded from the source artifact; all records,
+choice/correction, numerical summaries and figure inputs are shipped.
+
+```bash
+python repro/scripts/render_paper_figures.py
+python -m pytest repro/scripts/test_consumer_risk.py repro/scripts/test_readout_alignment.py repro/scripts/test_scale_boundaries.py repro/scripts/test_readout_nullspace.py repro/scripts/test_compiled_readout.py repro/scripts/test_nonlinear_interface.py repro/scripts/test_nonlinear_selection.py -q
+python repro/scripts/build_cpu_paper.py
+```
+
+The full current check runs 47 structural/control tests and rebuilds 17 figures.
+See `docs/NONLINEAR_INTERFACE_REVISION_2026-11-09.md` for the development-only
+interpretation and unclosed utility/cost and generalization gaps.
 
 ## Reproduce
 

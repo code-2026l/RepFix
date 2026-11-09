@@ -43,6 +43,8 @@ result=dict(copied_baseline_figures=copied,warnings=warnings,
                 'app:benefit_confirmation','prop:consumer_nullspace','tab:benefit_contrasts',
                 'app:compiled_interface','cor:compiled_interface','fig:compiled_control',
                 'fig:compiled_frontier','tab:compiled_full','tab:compiled_contrasts',
+                'app:nonlinear_interface','fig:nonlinear_interface','fig:nonlinear_validation',
+                'tab:nonlinear_development',
                 'fig:scale_law','app:cpu_paired','tab:cpu_paired','tab:cpu_adam',
                 'app:head_state','tab:head_state','app:consumer_audit','tab:consumer_audit','tab:cnn_continuation'] if k in labels},
             output=str(PAPER/'RepFix_ICLR2027.pdf'))

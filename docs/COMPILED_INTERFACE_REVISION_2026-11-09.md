@@ -1,5 +1,10 @@
 # Compiled compatibility: a measured plasticity boundary
 
+Historical report for the compiled frozen-trunk confirmation. The later
+nonlinear-channel development and its decision not to start confirmation are
+documented in `docs/NONLINEAR_INTERFACE_REVISION_2026-11-09.md`. Prior results
+and deliverables below are preserved within their original scope.
+
 This round follows the user's explicit request to keep advancing the paper.
 It tests the main practical gap left by the preceding positive result:
 whether exact old-consumer compatibility can be retained in one encoder while

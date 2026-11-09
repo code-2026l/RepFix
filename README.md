@@ -459,7 +459,7 @@ remaining gaps are in `docs/CONSUMER_CNN_REVISION_2026-11-09.md`.
 The new opening figure compares the controlled scale repair with real HAR
 reconstruction: paired linear alignment reaches 0.947 full-test accuracy versus
 0.826 frozen while leaving the learned auxiliary error unchanged. It uses paired
-training anchors and no new labels. All fifteen manuscript figures have vector
+training anchors and no new labels. All seventeen manuscript figures have vector
 PDF, editable SVG and PNG exports at final 5.5-inch width; data/font/bounds checks
 and input hashes accompany the local rendering pipeline.
 
@@ -495,7 +495,7 @@ python -m pytest repro/scripts/test_consumer_risk.py repro/scripts/test_readout_
 python repro/scripts/build_cpu_paper.py
 ```
 
-These commands reproduce fifteen figures, run 32 mathematical/control tests,
+These commands reproduce seventeen figures, run 32 mathematical/control tests,
 and compile the local manuscript from shipped records. All figure diagrams use
 editable vector planes; their apparent depth encodes no measured performance.
 The positive study's 104 trained states remain local; the source artifact ships
@@ -534,9 +534,43 @@ python -m pytest repro/scripts/test_consumer_risk.py repro/scripts/test_readout_
 python repro/scripts/build_cpu_paper.py
 ```
 
-This current complete check rebuilds 15 figures and runs 39 structural/control
+This compiled-control check rebuilds 17 figures and runs 39 structural/control
 tests. Full state-dependent auditing is available locally through
 `summarize_compiled_interface.py` with the retrieved checkpoints present.
+
+## Nonlinear-channel development and remaining gaps
+
+The next separately declared study adds a trainable width-16/32 nonlinear
+channel inside the healthy readout's nullspace and fuses it with the retained
+base into a wider dense MLP. All 36 constrained validation consumers retain old
+outputs while their nonlinear prefix changes; all 87 saved validation endpoints
+replay exactly for accuracy/NLL/ECE. Fusion and all 165 state files are checked.
+The frozen base remains embedded, and encoder parameter ratios range from
+1.279 to 1.623. These are parameter counts, not empirical runtime savings.
+
+**Neither task qualifies for independent confirmation under the fixed gate.**
+The ranked RadioML candidate has +0.32 points of validation auxiliary gain but
+-0.69 points versus ordinary detachment. HAR at a newly declared 1% primary
+label fraction has a +0.70-point matched validation auxiliary effect, while
+ordinary J-D is exactly tied in aggregate correct counts. Strict positivity is
+not met. All six candidates remain in the artifact; no full test confirmation
+or full-data latency claim follows from these three-seed development estimates.
+
+An exact-count arithmetic correction prevents a floating zero (3.7e-17) from
+passing the gate. The initial serialization and correction audit are retained;
+the grid/criterion were unchanged and no scientific confirmation started.
+Details: `docs/NONLINEAR_INTERFACE_REVISION_2026-11-09.md`. The broader review is
+`docs/MANUSCRIPT_GAPS_2026-11-09.md`, including generalization, prospective-policy,
+novelty and matched-nonlinear-prefix limitations.
+
+```bash
+python repro/scripts/render_paper_figures.py
+python -m pytest repro/scripts/test_consumer_risk.py repro/scripts/test_readout_alignment.py repro/scripts/test_scale_boundaries.py repro/scripts/test_readout_nullspace.py repro/scripts/test_compiled_readout.py repro/scripts/test_nonlinear_interface.py repro/scripts/test_nonlinear_selection.py -q
+python repro/scripts/build_cpu_paper.py
+```
+
+The full current check rebuilds 17 figures and runs 47 structural/control tests.
+State-dependent local verification is `summarize_nonlinear_interface.py`.
 
 ## License and citation
 

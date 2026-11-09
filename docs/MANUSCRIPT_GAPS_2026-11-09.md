@@ -57,3 +57,14 @@ The causal control is a matched unconstrained nonlinear side path. Frozen-base
 weights embedded in a wider deployed encoder and dense zero blocks count toward
 both parameter/memory and runtime reporting. Full target failure remains a
 possible and reportable outcome.
+
+## Outcome of this declared round
+
+Both tasks fail the development gate, so no scientific test confirmation is
+launched. The new evidence verifies compatible nonlinear changes and dense
+fusion; it does not close the joint utility/cost gap. A matched side with its
+own nonlinear prefix frozen was not tested, so altered prefix weights alone
+do not establish a causal benefit from prefix learning. The matched U/T control
+isolates the output constraint at equal added capacity. Full records, the
+exact-count zero-boundary correction and all 87 independently replayed
+validation consumers are preserved in the new revision report.

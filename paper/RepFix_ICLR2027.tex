@@ -41,6 +41,7 @@
 \input{head_state_numbers.tex}
 \input{benefit_numbers.tex}
 \input{compiled_numbers.tex}
+\input{nonlinear_numbers.tex}
 
 % ─── Compact table style (tighter spacing/format) ───
 \setlength{\tabcolsep}{4pt}          % default 6pt -> tighter column padding
@@ -241,7 +242,7 @@ Real reconstruction provides a matched test beyond variance penalties (Table~\re
 Let $A=W_0\operatorname{diag}(1/s_0)$ and let $P_\perp$ project onto $\ker A$. The standard reference-anchored control $H_0+(H_\theta-H_0)P_\perp$ preserves all healthy logits (Proposition~\ref{prop:consumer_nullspace}), emitting one shared $64$-vector with both encoders retained (Figure~\ref{fig:nullspace_control}). Validation selects SNR dose $1$ from six fixed candidates, using $20\%$ of fitting primary labels. Ten new seeds confirm J--D of $\BenefitJointGain$ points, paired $95\%$ interval $[\BenefitJointGainLow,\BenefitJointGainHigh]$, and guarded auxiliary benefit of $\BenefitGuardGain$, $[\BenefitGuardGainLow,\BenefitGuardGainHigh]$, meeting the declared $0.5$-point noninferiority margin (Table~\ref{tab:benefit_confirmation}). All guarded predictions, NLL and ECE are retained; maximum logit error is $\BenefitLogitError$. All ten guarded joint endpoints certify under the separate five-point budget. Ordinary frozen accuracy barely changes, but ECE rises from $\BenefitHealthyECE$ to $\BenefitJointECE$. The $\BenefitLatencyRatio\times$ CPU cost is part of this fixed-split result (Appendix~\ref{app:benefit_confirmation}).
 
 \paragraph{Compiling the constraint exposes a plasticity cost.}
-With a frozen nonlinear trunk, the last-affine constraint folds into one encoder. A fixed SNR/HAR follow-up, ten new seeds per task, preserves logits but confirms no compiled auxiliary benefit (Appendix~\ref{app:compiled_interface}). On SNR, compiled joint (CJ) versus full joint (J) is $\CompileRmlJointCost$ points, $[\CompileRmlJointCostLow,\CompileRmlJointCostHigh]$. Freezing alone accounts for $-3.53$; the further constraint adds $-0.003$. Exact compatibility at near-baseline cost therefore does not ensure useful feature adaptation.
+With a frozen nonlinear trunk, the last-affine constraint folds into one encoder. A fixed SNR/HAR follow-up, ten new seeds per task, preserves logits but confirms no compiled auxiliary benefit (Appendix~\ref{app:compiled_interface}). SNR compiled joint (CJ) versus full joint (J) is $\CompileRmlJointCost$ points, $[\CompileRmlJointCostLow,\CompileRmlJointCostHigh]$: freezing accounts for $-3.53$, and the further constraint adds $-0.003$. A separately declared nonlinear-side development grid also fails its benefit screen (Appendix~\ref{app:nonlinear_interface}). Exact compatibility does not ensure useful adaptation.
 
 \paragraph{Restrict the auxiliary update.}
 Detachment blocks all auxiliary gradients to the encoder and is the reference intervention when the auxiliary adds no primary-task value. \STF{} instead restricts the auxiliary channel. Its idealized backward form removes a radial projection,
@@ -1789,6 +1790,57 @@ All $40$ CD/CJ consumers preserve their old predictions, NLL and ECE, with maxim
 Deployed encoders retain exactly three affine evaluations and the baseline parameter shapes, with no reference or projector parameters. At batch $1$, mean ratios of per-seed median CPU latency are $\CompileRmlSingleLatency\times$ for SNR and $\CompileHarSingleLatency\times$ for HAR. At batch $1{,}024$, they are $\CompileRmlLatency\times$ and $\CompileHarLatency\times$. Measurements cover the encoder and current head, using one Xeon Platinum 8570 thread, five warm-ups and $21$ alternating timed repetitions per path; the baseline uses the same mixed precision. The corresponding two-encoder paths average $2.22\times$ and $2.16\times$ at batch $1{,}024$. These deployment measurements establish the cost reduction, not useful adaptation.
 
 All $180$ healthy, endpoint model--Adam and compiled states are retrieved and checked locally. A separately launched process reconstructs all $120$ saved consumers from their tensors; accuracy, NLL, ECE and sampling bounds replay exactly. Local tests cover normalized-head/bias constraints, Adam steps, native-shape folding, reference/projector removal, useful gradients and the negative trunk-drift case. Drivers, the committed pre-calculation plan, all records, verification and complete failed criteria accompany the artifact. This boundary test rules out the simple frozen-trunk shortcut in the confirmed SNR recipe; compatibility with continuing nonlinear learning at one-encoder cost remains open.
+
+\subsection{A Compatible Nonlinear Channel: Development Gate and Limits}\label{app:nonlinear_interface}
+
+The frozen-trunk result motivates a trainable narrow nonlinear channel rather than another unconstrained final-affine update. Side networks and summation-based adaptation are established~\citep{zhang2020sidetuning}; projection-based compatibility is also established~\citep{farajtabar2020ogd,shen2020backward}. We use their elementary combination as a control:
+\begin{equation}
+ \widetilde h(x)=f_0(x)+P_\perp g_\psi(x),\qquad
+ A\widetilde h(x)=Af_0(x).
+ \label{eq:nonlinear_side}
+\end{equation}
+The healthy base $f_0$ stays fixed, while the two-ReLU side MLP $g_\psi$ learns its own nonlinear prefix. Its output is still one shared $64$-vector. This permits nonlinear updates with exact affine-consumer logits, but does not guarantee useful adaptation or a runtime saving.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{figures/fig_nonlinear_interface.pdf}
+\caption{\textbf{A nonlinear channel preserves the affine interface while adding capacity.} (a) The base is frozen and the narrow side learns, with $AP_\perp g_\psi=0$. (b) Equal-depth paths fuse into a width-$64+k$ dense MLP with a block-diagonal middle matrix and a projected final side block. Base weights remain embedded once; dense zero blocks still count toward storage and computation. The output remains $64$-dimensional. Planes are schematic, and this diagram makes no task-benefit or measured-latency claim.}
+\label{fig:nonlinear_interface}
+\end{figure}
+
+\paragraph{Fusion and its explicit capacity cost.}
+For base weights $(U_1,U_2,U_3)$ and side weights $(V_1,V_2,V_3)$, the fused matrices are
+\begin{equation}
+ \overline U_1=\begin{bmatrix}U_1\\V_1\end{bmatrix},\quad
+ \overline U_2=\begin{bmatrix}U_2&0\\0&V_2\end{bmatrix},\quad
+ \overline U_3=\begin{bmatrix}U_3&P_\perp V_3\end{bmatrix}.
+ \label{eq:nonlinear_fusion}
+\end{equation}
+The first two biases are stacked and the final bias is $b_3+P_\perp c_3$. This evaluates the same function with three affine layers and two ReLUs. It removes a separate inference projection, while retaining the frozen base weights inside a wider model. For side widths $16/32$, dense encoder parameter counts are $1.301/1.623$ times baseline on SNR and $1.279/1.569$ on HAR, all at native float64. These are parameter ratios, not runtime measurements. There is no same-size-encoder claim. The side's last weight and bias start at zero; prefix weights copy the first $k$ healthy units and the $k\times k$ healthy second-layer block.
+
+\paragraph{A development screen fixed before outcomes.}
+The new plan was committed before numerical execution, after observing the earlier studies. Development uses seeds $500$--$502$, the original width-$64$ base, Adam $10^{-3}$, batch $256$, and the same stratified $20\%$ training reservation before model/head fitting. SNR uses $20\%$ of fitting primary labels, dose $1$, and $25+25$ healthy/continuation epochs. HAR uses a new $1\%$ fitting-label reconstruction regime, doses $1,10$, and $60+30$ epochs. Both test side widths $16,32$. All feature-encoder arithmetic is float64, with fp32 head parameters and float64 classification logits. These changes prevent pooling with earlier confirmation results.
+
+Each candidate compares full-network D/J, unconstrained side UD/UJ, and constrained side TD/TJ, with detached/joint auxiliary gradients. Healthy base/head parameters and their Adam states are retained; new side Adam states start empty. The common parameter ordering, paired side initialization, fitting-label masks and future minibatches are checked. The declared score is the minimum of three mean validation gains (J--D, TJ--TD, TJ--D) and the mean TJ--J contrast plus $0.5$ point; ties prefer smaller width, then dose. A task enters ten-new-seed test confirmation only if its best score is strictly positive. No development test outcomes are computed.
+
+\input{nonlinear_development_table.tex}
+
+\paragraph{Neither task qualifies for confirmation.}
+The ranked SNR candidate has $k=\NonlinearRmlWidth$, dose $1$: its validation auxiliary contrast TJ--TD is $\NonlinearRmlAuxGain$ points, descriptive paired $95\%$ interval $[\NonlinearRmlAuxGainLow,\NonlinearRmlAuxGainHigh]$, but TJ--D is $\NonlinearRmlTotalGain$, $[\NonlinearRmlTotalGainLow,\NonlinearRmlTotalGainHigh]$. Its score is negative. The ranked HAR candidate has $k=\NonlinearHarWidth$, dose $1$: TJ--TD is $\NonlinearHarAuxGain$, $[\NonlinearHarAuxGainLow,\NonlinearHarAuxGainHigh]$, while ordinary J--D is exactly zero in aggregate correct counts, giving score zero. Neither passes the strict positive gate. These are selected development estimates from three seeds, not independent confirmation or evidence of population benefit. All six candidates and their adverse/near-null contrasts are retained.
+
+Exact integer correct counts and rational means enforce the gate. An initial floating-point mean of about $3.7\times10^{-17}$ for the tied HAR J--D count was corrected before any scientific confirmation. Both serializations and the correction audit remain in the artifact; the grid and decision rule were unchanged. No new candidate or seed search followed. The planned independent-test, auxiliary-MSE and CPU-budget conjunction was therefore not evaluated, and the planned $200$-consumer confirmation family was not instantiated.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/fig_nonlinear_validation.pdf}
+\caption{\textbf{Complete validation grid for the nonlinear-channel control.} All three seed points and descriptive paired $95\%$ intervals for all six candidates, showing auxiliary gain and total gain. Row labels identify task, side width and dose. The complete screen also requires ordinary J--D and the TJ--J margin, as reported in Table~\ref{tab:nonlinear_development}. A positive plotted contrast alone does not pass that screen. No test confirmation or full-data latency experiment is performed.}
+\label{fig:nonlinear_validation}
+\end{figure}
+
+\paragraph{What the audit establishes.}
+All $165$ saved state files are locally checked: six healthy states, $87$ endpoint model--Adam states and $72$ deployed side models. A separate tensor-only process reconstructs all $87$ validation consumers; accuracy, NLL and ECE replay exactly, with auxiliary errors also checked. All $36$ constrained-side consumers retain their old validation predictions/NLL/ECE; maximum logit error is $\NonlinearLogitError$. Fused/unfused feature error is at most $\NonlinearFusionError$. The nonlinear prefix changes in every constrained branch, and frozen base weights and Adam states remain unchanged. Structural tests include arbitrary nonlinear changes, native-precision fusion, full-rank/no-nullspace and unconstrained/base-drift negative controls.
+
+This establishes a compatible nonlinear function class and verified deployment construction, while leaving its joint utility/cost target unestablished. It does not show that nonlinear-prefix learning alone causes an improvement: a matched side with its own prefix frozen was not tested. Broader architectures, downstream nonlinear consumers, independent populations and adaptive warning policies remain separate gaps. The development/confirmation boundary is part of the result, not evidence that all nonlinear compatible updates must fail.
 
 \subsection{A Fixed-Corpus Unlabeled Consumer Check}\label{app:consumer_audit}
 
