@@ -1,0 +1,102 @@
+{
+ "protocol": "predeclared protected-head continuation, single encoder one pass",
+ "plan_sha256": "866bec53bd43e044d8ae07691947948159418b9cd1f4a94ff8e65bc508922870",
+ "domain": "radioml",
+ "dose": 1.0,
+ "selection_rule": "smallest lambda with development disagreement <= 0.05, else the largest",
+ "lambda_grid": [
+  0.1,
+  1.0,
+  10.0
+ ],
+ "selected_lambda": 10.0,
+ "development_frontier": [
+  {
+   "lam": 0.1,
+   "seeds": 3,
+   "gain_pp": 1.3757575757575746,
+   "joint_gain_pp": 1.0590909090909075,
+   "disagreement": 0.32227272727272727,
+   "disagreement_max": 0.37018181818181817,
+   "fixed_weight_disagreement": 0.4239545454545454,
+   "protected_auxiliary_mse_ratio": 0.7690326801876902,
+   "joint_auxiliary_mse_ratio": 0.7847113181427089
+  },
+  {
+   "lam": 1.0,
+   "seeds": 3,
+   "gain_pp": 0.20000000000000018,
+   "joint_gain_pp": 1.0590909090909075,
+   "disagreement": 0.14865151515151515,
+   "disagreement_max": 0.17786363636363636,
+   "fixed_weight_disagreement": 0.2520909090909091,
+   "protected_auxiliary_mse_ratio": 0.8153999112408113,
+   "joint_auxiliary_mse_ratio": 0.7847113181427089
+  },
+  {
+   "lam": 10.0,
+   "seeds": 3,
+   "gain_pp": -0.6499999999999988,
+   "joint_gain_pp": 1.0590909090909075,
+   "disagreement": 0.04587878787878788,
+   "disagreement_max": 0.051954545454545455,
+   "fixed_weight_disagreement": 0.09675757575757575,
+   "protected_auxiliary_mse_ratio": 0.8796743278566376,
+   "joint_auxiliary_mse_ratio": 0.7847113181427089
+  }
+ ],
+ "confirmation": {
+  "selected": {
+   "lam": 10.0,
+   "seeds": [
+    300,
+    301,
+    302,
+    303,
+    304,
+    305,
+    306,
+    307,
+    308,
+    309
+   ],
+   "protected_minus_detach": {
+    "mean": -0.012881818181818185,
+    "sd": 0.00685716264372502,
+    "ci95": [
+     -0.017787136834246875,
+     -0.007976499529389496
+    ],
+    "n": 10,
+    "positive": 1
+   },
+   "joint_minus_detach": {
+    "mean": 0.009507272727272725,
+    "sd": 0.004440476235844738,
+    "ci95": [
+     0.006330747386242909,
+     0.012683798068302542
+    ],
+    "n": 10,
+    "positive": 10
+   },
+   "protected_disagreement": 0.05000909090909091,
+   "protected_disagreement_sd": 0.008145218926967386,
+   "fixed_weight_disagreement": 0.1176390909090909,
+   "joint_disagreement": 0.5938127272727273,
+   "detach_disagreement": 0.5421909090909092,
+   "certified": 0,
+   "max_upper_bound": 0.1090423579503744,
+   "frozen_acc": 0.25888000000000005,
+   "detach_frozen_acc": 0.2587218181818182,
+   "joint_frozen_acc": 0.25736454545454546,
+   "reference_acc": 0.2583581818181818,
+   "max_logit_error": 1.2133974813321444,
+   "protected_auxiliary_mse_ratio": 0.8911992923250404,
+   "joint_auxiliary_mse_ratio": 0.7633760299536881,
+   "encoder_at_inference": 1,
+   "forward_passes_at_inference": 1
+  }
+ },
+ "note": "Protected-head disagreement is measured against the healthy consumer on the same examples; fixed_weight_disagreement applies the original consumer weights to the new feature."
+}

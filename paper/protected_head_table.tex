@@ -1,0 +1,20 @@
+\begin{table}[H]
+\centering
+\caption{Protected-head continuation on the two corpora. The arm trains a linear head, initialised to the healthy consumer map, to reproduce the frozen consumer's logits during continuation; inference is one encoder and one forward pass. \emph{primary} is the absolute accuracy for the detached control and the change against it in points for the other arms; \emph{MSE} is test reconstruction error relative to detachment; \emph{changed} is the fraction of healthy consumer predictions that differ; \emph{certified} counts seeds whose exact finite-population bound is at most $0.05$. HAR uses the dose-$100$ reconstruction auxiliary with the selected $\lambda=0.1$; SNR uses the benefit protocol with the selected $\lambda=10$. Each row aggregates ten confirmation seeds. The arm preserves the old function where the update is geometric and loses primary accuracy where the auxiliary changes the information.}
+\label{tab:protected_head}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{llrrrrr}
+\toprule
+Corpus & Arm & primary & MSE & changed & certified & passes \\
+\midrule
+HAR & Detach & $0.912$ & $1.000$ & $2.2\%$ & --- & $1$ \\
+HAR & Joint & $+0.20$ & $0.767$ & $21.8\%$ & $0/10$ & $1$ \\
+HAR & Protected, $\lambda=0.1$ & $+0.44$ & $0.767$ & $1.8\%$ & $9/10$ & $1$ \\
+\midrule
+SNR & Detach & $0.259$ & $1.000$ & $54.2\%$ & --- & $1$ \\
+SNR & Joint & $+0.95$ & $0.763$ & $59.4\%$ & $0/10$ & $1$ \\
+SNR & Protected, $\lambda=10$ & $-1.29$ & $0.891$ & $5.0\%$ & $0/10$ & $1$ \\
+\bottomrule
+\end{tabular}
+\end{table}
