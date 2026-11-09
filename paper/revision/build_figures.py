@@ -8,6 +8,7 @@ import hashlib
 import json
 import math
 import re
+import sys
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
@@ -17,6 +18,8 @@ from matplotlib.lines import Line2D
 
 PAPER = Path(__file__).resolve().parents[1]
 ROOT = PAPER.parent
+sys.path.insert(0, str(ROOT / 'repro/scripts'))
+from figure_style import apply_style, polish, save as export
 OUT = PAPER / 'figures'
 SOURCES = {}
 REPORT = {}
@@ -49,21 +52,10 @@ def title(ax, letter, label):
     ax.set_title(f'{letter}  {label}', loc='left', fontweight='bold', pad=9)
 
 def save(fig, name):
-    fig.canvas.draw()
-    renderer=fig.canvas.get_renderer()
-    # Visible labels must be inside the final canvas. Tick labels outside view
-    # limits are not drawn by Matplotlib and are excluded from this check.
-    for ax in fig.axes:
-        for t in [ax.title, ax._left_title, ax.xaxis.label, ax.yaxis.label, *ax.texts]:
-            if not t.get_text() or not t.get_visible(): continue
-            bb=t.get_window_extent(renderer)
-            if bb.width and bb.height:
-                assert bb.x0 >= -1 and bb.y0 >= -1, (name,t.get_text(),bb)
-                assert bb.x1 <= fig.bbox.width+1 and bb.y1 <= fig.bbox.height+1, (name,t.get_text(),bb)
-    for ext in ['pdf','svg','png']:
-        fig.savefig(OUT/f'{name}.{ext}', dpi=300, facecolor='white')
-    assert b'/Subtype /Type3' not in (OUT/f'{name}.pdf').read_bytes()
+    polish(fig)
+    export(fig, OUT / name)
     plt.close(fig)
+
 
 def crossing(rows):
     pts=sorted((float(r['alpha']),float(r['rel_scatter_mean'])) for r in rows)
@@ -97,7 +89,8 @@ def probe_cells():
     return cells
 
 def fig_gap():
-    fig,(a,b)=plt.subplots(1,2,figsize=(5.5,2.60),gridspec_kw={'width_ratios':[1.05,1]})
+    apply_style()
+    fig,(a,b)=plt.subplots(1,2,figsize=(5.5,3.15),gridspec_kw={'width_ratios':[1.05,1]})
     fig.subplots_adjust(left=.105,right=.99,bottom=.20,top=.87,wspace=.63)
     real=[]
     specs=[('har_recon','HAR reconstruction','o'),('har_clf','HAR subject-ID','s'),
@@ -165,14 +158,15 @@ def fig_gap():
     b.set_xticks(np.arange(-.5,3,1),minor=True); b.set_yticks(np.arange(-.5,len(names),1),minor=True)
     b.grid(which='minor',color='white',lw=1.5);b.tick_params(which='minor',length=0)
     for spine in b.spines.values():spine.set_visible(False)
-    title(b,'b','High-dose collapse counts')
+    title(b,'b','High-dose collapse')
     REPORT['real_head_alignment']=real
     REPORT['optimizer_collapse_counts']={'methods':names,'domains':['har','battery','radioml'],'rates':mat}
     REPORT['optimizer_audit']=optimizer_audit
     save(fig,'fig_survival_gap')
 
 def fig_boundary(cells):
-    fig,axs=plt.subplots(2,2,figsize=(5.5,4.50))
+    apply_style()
+    fig,axs=plt.subplots(2,2,figsize=(5.5,5.05))
     fig.subplots_adjust(left=.12,right=.97,bottom=.105,top=.91,hspace=.68,wspace=.39)
     a,b,c,d=axs.ravel()
     ratios=np.array([x['ratio'] for x in cells]).reshape(4,4)
@@ -283,7 +277,8 @@ def fig_intervention():
     records=dose_records()
     # Stack the dose responses on a shared x axis; reserve the full right
     # column for seed-level survival/utility and collision-free labels.
-    fig=plt.figure(figsize=(5.5,3.25))
+    apply_style()
+    fig=plt.figure(figsize=(5.5,3.8))
     gs=fig.add_gridspec(2,2,width_ratios=[1.08,1],left=.115,right=.985,
                         bottom=.145,top=.81,wspace=.43,hspace=.40)
     a=fig.add_subplot(gs[0,0])

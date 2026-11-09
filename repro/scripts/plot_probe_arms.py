@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from certificate_matched_audit import auc
+from figure_style import apply_style, polish, save
 
 ROOT = Path(__file__).resolve().parents[2]
 RAW = ROOT / 'repro/results/PBA/PBA_har.json'
@@ -22,7 +23,8 @@ plt.rcParams.update({'font.family': 'serif', 'font.serif': ['Times New Roman', '
 summary = json.loads(MATCHED.read_text())['arms']
 raw = json.loads(RAW.read_text())
 points = [dict(p, B=r['audit_batch']) for r in raw['runs'] for p in r['points'] if not p.get('degenerate')]
-fig, axes = plt.subplots(1, 2, figsize=(6.9, 2.65))
+apply_style()
+fig, axes = plt.subplots(1, 2, figsize=(5.5, 2.8))
 x = np.arange(3)
 fixed = [summary[k]['fired'] for k in ['frozen_canonical_triangle', 'corrected_canonical_triangle', 'corrected_canonical_combined']]
 optimized = [summary[k]['fired'] for k in ['frozen_optimized_triangle', 'corrected_optimized_triangle', 'corrected_optimized_combined']]
@@ -34,7 +36,7 @@ for offset, values, color, label in [(-.18, fixed, '#8C9BAB', 'canonical scale')
 axes[0].set_xticks(x, ['frozen\ntriangle', 'corrected\ntriangle', 'corrected\ncombined'])
 axes[0].set_ylabel('certified checkpoints (of 405)')
 axes[0].set_ylim(0, 180)
-axes[0].set_title('(a) predictor, envelope, and scale separated')
+axes[0].set_title('(a) Matched certificate ablations', loc='left')
 axes[0].legend(loc='upper left', frameon=False)
 
 
@@ -69,9 +71,9 @@ for kind, color, label in [('frozen', '#4C72B0', 'frozen, canonical'),
     axes[1].plot(fpr, tpr, color=color, lw=1.4, label=f'{label} ({auc(score, correct):.2f})')
 axes[1].plot([0, 1], [0, 1], '--', color='#999999', lw=.8)
 axes[1].set(xlabel='false-positive rate', ylabel='true-positive rate',
-            title='(b) retrospective margin (uses exact flux)')
+            title='(b) Retrospective sign ranking')
 axes[1].legend(loc='lower right', frameon=False, fontsize=7)
-fig.tight_layout(pad=.5, w_pad=1.1)
-fig.savefig(OUT.with_suffix('.pdf'), bbox_inches='tight')
-fig.savefig(OUT.with_suffix('.png'), dpi=220, bbox_inches='tight')
+polish(fig)
+fig.tight_layout(pad=.7, w_pad=1.2)
+save(fig, OUT)
 print('counts', fixed, optimized)

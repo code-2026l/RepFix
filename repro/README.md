@@ -241,6 +241,78 @@ regenerated at their recorded paths. The released verification JSON records
 the checks on the original saved numerical artifacts; large trained states and
 raw datasets are not distributed. Analysis and PDF compilation are local.
 
+## Waveform CNN and unlabeled consumer decisions
+
+The next extension holds the prepared RadioML inputs/split, task heads, and
+paired engine fixed while replacing the encoder with two convolution/pooling
+blocks and a width-64 feature layer. Five seeds use 25 healthy plus 15
+continuation epochs, reconstruction doses `30,300,3000`, joint/detached arms,
+and primary-only continuation. No STF-cal CNN result is claimed.
+
+```bash
+python repro/scripts/cnn_reconstruction_continuation.py --seed 0 \
+  --data-root /path/to/data_x --out repro/results/CPUCONT/frontier/c000.json
+```
+
+With `REPFIX_DATA_X` set to the same input root, the independent audit is:
+
+```bash
+python repro/scripts/checkpoint_consumer_audit.py \
+  --record repro/results/CPUCONT/frontier/c000.json --family-size 3015 \
+  --out repro/results/CPUCONT/cnn_consumer/n000.json
+```
+
+The fixed bank contains all 300 earlier endpoints plus 35 CNN endpoints, each
+with nine repair candidates. Every corpus supplies 1,024 uniformly sampled
+unlabeled monitor inputs; the rest is scored afterward. Monitor selection
+requires healthy reference predictions. Paired repair fitting separately needs
+paired old/new training anchors. A hypergeometric tail bound with total bank
+error probability 0.05 supports relative-loss budgets 0.05 and 0.10. Selection
+uses only the certificate and fixed repair order, with abstention when no arm
+passes. Disagreement control is a standard baseline, not absolute accuracy
+estimation, future-step prediction, or a new population guarantee.
+
+The release keeps candidate-level bounds, all choices/abstentions and remainder
+scores, the CNN grid, and exact source/checkpoint links. Reproduce their local
+summary and figures without raw data or trained checkpoints:
+
+```bash
+python repro/scripts/summarize_consumer_frontier.py
+python repro/scripts/render_paper_figures.py
+python -m pytest repro/scripts/test_consumer_risk.py repro/scripts/test_readout_alignment.py repro/scripts/test_scale_boundaries.py -q
+python repro/scripts/build_cpu_paper.py
+```
+
+`verify_consumer_frontier.py` additionally needs the locally regenerated model
+states. Its verification JSON is shipped. The finite-population tests enumerate
+every possible disagreement count on small corpora, rather than merely checking
+the inversion implementation against itself. Branch counts are descriptive;
+multiple branches of the same seed are not independent trials.
+
+### Publication figures and head-state boundary
+
+`render_paper_figures.py` regenerates all eleven included figures locally from
+the shipped records, including editable SVGs. It uses a final 5.5-inch canvas,
+checks label bounds and vector fonts, and verifies that legacy text styling
+does not change plotted numerical artists. The manifest contains physical
+sizes, source/output hashes and plotted-data hashes. The opening real-HAR panel
+uses full-test repair scores from `CPUCONT/recon_repairs/`, with all 450 map
+hashes checked against the fixed consumer bank; remainder scores are not mixed
+into it. Paired linear alignment needs paired training-feature anchors.
+
+`auxiliary_state_factorial.py` runs the separately declared dose-30 SNR control:
+warm/initial auxiliary weights by retained/reset auxiliary Adam state, fixed
+encoder/primary state and future batches, five archived references. Its 20
+endpoints include five exact archived replays and 15 new conditional paths.
+It is outside the fixed consumer certificate bank. All four cells retain zero
+scatter-collapse endpoints; no significant frozen-accuracy ordering is claimed.
+Records, seed-paired summaries and checkpoint verification are shipped under
+`CPUCONT/head_state_first/`, `CPUCONT/head_state/`, `head_state_summary.json`
+and `head_state_verification.json`. Running `summarize_head_state.py` again
+performs full model/Adam checks and therefore requires the large local trained
+states, which are excluded from the source ZIP. The generated tables/macros
+and numerical summaries are included for a data-free local LaTeX rebuild.
+
 ## Reproduce
 
 ### Current manuscript evidence audit (2026-09-21)

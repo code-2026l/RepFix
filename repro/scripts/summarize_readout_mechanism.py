@@ -157,47 +157,12 @@ def tables(summary):
 
 
 def figure(summary):
+    from figure_style import apply_style
+    from plot_readout_story import paired
     old = [json.loads(p.read_text()) for folder, prefix in [('har', 'h'), ('replication', 'v')]
            for p in sorted((BASE / folder).glob(prefix + '???.json'))]
-    plt.rcParams.update({'font.family': 'serif', 'font.serif': ['Times New Roman', 'DejaVu Serif'],
-        'font.size': 9.5, 'axes.labelsize': 10, 'axes.titlesize': 10,
-        'xtick.labelsize': 9, 'ytick.labelsize': 9, 'legend.fontsize': 8.5,
-        'pdf.fonttype': 42, 'ps.fonttype': 42})
-    fig, axes = plt.subplots(1, 2, figsize=(6.9, 2.8), gridspec_kw={'width_ratios': [1.05, 1]})
-    epochs = [e['epoch'] for e in get_branch(old[0], 'joint', 3)['trajectory']]
-    for mode, field, color, label in [('joint', 'frozen', '#B54749', 'joint, frozen'),
-                                     ('joint', 'recalibrated', '#37805C', 'joint, input recal.'),
-                                     ('detach', 'frozen', '#326AA0', 'detached, frozen')]:
-        values = np.array([[e[field]['acc'] for e in get_branch(r, mode, 3)['trajectory']] for r in old])
-        mean, sd = values.mean(0), values.std(0)
-        axes[0].plot(epochs, mean, color=color, lw=1.7, label=label)
-        axes[0].fill_between(epochs, mean - sd, mean + sd, color=color, alpha=.13, lw=0)
-    axes[0].set(xlabel='epochs after shared checkpoint', ylabel='test accuracy', ylim=(.2, 1),
-                title=r'(a) paired HAR, $\alpha=3$')
-    axes[0].legend(loc='lower right', frameon=False)
-    selected = ['frozen', 'mean_only', 'scalar_only', 'mean_scalar', 'diagonal_stats', 'paired_ridge']
-    y = np.arange(len(selected))
-    for case, delta, color, label, marker in [('har_variance', -.11, '#37805C', 'isotropic (10 seeds)', 'o'),
-                                            ('har_projected', .11, '#8557A0', 'projected (5 seeds)', 's')]:
-        b = get_branch(summary['repairs'][case], 'joint', 3)
-        means = [b['repairs'][arm]['acc']['mean'] for arm in selected]
-        sd = [b['repairs'][arm]['acc']['sd'] for arm in selected]
-        axes[1].errorbar(means, y + delta, xerr=sd, fmt=marker, color=color, ms=4,
-                         lw=1, capsize=2, label=label)
-    axes[1].set_yticks(y, ['frozen', 'mean only', 'scale only', 'mean + scale', 'per-feature', 'paired linear*'])
-    axes[1].invert_yaxis()
-    axes[1].set(xlabel='test accuracy after repair', xlim=(.25, 1),
-                title=r'(b) what repairs the readout? $\alpha=3$')
-    axes[1].legend(loc='lower left', frameon=False, fontsize=7.5)
-    axes[1].set_ylim(len(selected) + .8, -.6)
-    for ax in axes:
-        ax.spines[['top', 'right']].set_visible(False)
-        ax.grid(axis='x', alpha=.12)
-    fig.tight_layout(pad=.5, w_pad=1)
-    out = ROOT / 'paper/figures/fig_paired_and_repair'
-    fig.savefig(out.with_suffix('.pdf'), bbox_inches='tight')
-    fig.savefig(out.with_suffix('.png'), dpi=220, bbox_inches='tight')
-    plt.close(fig)
+    apply_style()
+    paired(old, summary)
 
 
 def main():

@@ -38,7 +38,23 @@ aux=(PAPER/'RepFix_ICLR2027.aux').read_text(encoding='utf-8',errors='replace')
 labels={m.group(1):dict(number=m.group(2),page=int(m.group(3)))
         for m in re.finditer(r'\\newlabel\{([^}]+)\}\{\{([^}]*)\}\{(\d+)\}',aux)}
 result=dict(copied_baseline_figures=copied,warnings=warnings,
-            labels={k:labels[k] for k in ['sec:conclusion','app:boundary_proof','fig:paired_dose','app:cpu_paired','tab:cpu_paired','tab:cpu_adam'] if k in labels},
+            labels={k:labels[k] for k in ['sec:conclusion','app:boundary_proof','fig:overview','fig:paired_dose',
+                'fig:scale_law','app:cpu_paired','tab:cpu_paired','tab:cpu_adam',
+                'app:head_state','tab:head_state','app:consumer_audit','tab:consumer_audit','tab:cnn_continuation'] if k in labels},
             output=str(PAPER/'RepFix_ICLR2027.pdf'))
+extraction=subprocess.run(['pdftotext','-layout',str(PAPER/'RepFix_ICLR2027.pdf'),'-'],
+                          capture_output=True,check=True)
+pages=[p for p in extraction.stdout.decode('utf-8',errors='replace').split('\f') if p.strip()]
+def heading_pages(title):
+    return [i+1 for i,p in enumerate(pages) if any(
+        re.sub('[^A-Z]','',line.upper())==title for line in p.splitlines())]
+statements=heading_pages('AIUSESTATEMENT')
+references=heading_pages('REFERENCES')
+if len(statements)!=1 or not references:
+    raise RuntimeError('Cannot identify the main-text boundary or reference heading')
+result.update(total_pages=len(pages),main_text_pages=statements[0]-1,
+              references_start_page=references[0])
+if result['main_text_pages']>9:
+    raise RuntimeError('Main text exceeds nine pages, including continuation text and floats')
 (QA/'build_report.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
 print(json.dumps(result,indent=2))

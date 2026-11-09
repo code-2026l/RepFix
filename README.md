@@ -418,6 +418,58 @@ and the split/repair definitions are in `repro/README.md`. The RadioML cache
 exactly matches the documented per-modulation 50/50 `RandomState(0)` split;
 this is a seeded partition, not a unique official split.
 
+## Waveform CNN and unlabeled consumer audit
+
+The latest extension adds five waveform-CNN reconstruction runs on the identical
+RadioML inputs/split. The complete paired collection now contains **35 training
+runs, 335 continuation endpoints, and 370 locally verified model/optimizer
+checkpoints**. The CNN healthy readout reaches 0.424 versus the MLP's 0.297;
+its reconstruction continuation remains near-null at the fixed grid, with
+0.415 frozen accuracy versus 0.418 detached at dose 3000. This is an architecture
+boundary result, not evidence of universal real-auxiliary failure.
+
+A standard finite-corpus disagreement control separately audits all 3,015
+endpoint/repair candidates. With 1,024 unlabeled monitor inputs and bank-wide
+tail probability 0.05, the 10-percentage-point relative classification-error
+budget yields 49 certified choices among 105 joint endpoints: 12 unchanged
+consumers and 37 repaired consumers. It abstains on 56. No selected choice has
+an observed above-budget error increase. All 45 RadioML joint endpoints abstain,
+including near-null cases; this conservative coverage limit is explicit.
+
+The monitor needs healthy reference predictions, and repairs here use the full
+fitting feature set. The guarantee covers the fixed corpus and candidate family.
+NLL/ECE, future optimizer steps, and new populations require separate evidence.
+The method is reported as a standard control baseline, with relevant unlabeled
+performance-estimation and model-update literature acknowledged.
+
+```bash
+python repro/scripts/summarize_consumer_frontier.py
+python repro/scripts/render_paper_figures.py
+python -m pytest repro/scripts/test_consumer_risk.py repro/scripts/test_readout_alignment.py repro/scripts/test_scale_boundaries.py -q
+python repro/scripts/build_cpu_paper.py
+```
+
+These commands regenerate local figures/tables/PDF from the shipped numerical
+records and run 26 tests. `consumer_frontier_summary.json` and
+`consumer_frontier_verification.json` retain all choices, abstentions, scopes,
+and provenance. The build verifies the actual main-text ending, including
+continuation text and floats, against the nine-page limit. Detailed results and
+remaining gaps are in `docs/CONSUMER_CNN_REVISION_2026-11-09.md`.
+
+The new opening figure compares the controlled scale repair with real HAR
+reconstruction: paired linear alignment reaches 0.947 full-test accuracy versus
+0.826 frozen while leaving the learned auxiliary error unchanged. It uses paired
+training anchors and no new labels. All eleven manuscript figures have vector
+PDF, editable SVG and PNG exports at final 5.5-inch width; data/font/bounds checks
+and input hashes accompany the local rendering pipeline.
+
+A separate five-seed SNR head-state factorial crosses auxiliary weights and
+auxiliary Adam state. Its 20 endpoint states include five bitwise archived
+replays and 15 conditional trajectories outside the consumer bank. None
+reproduces the historical severe scatter collapse; higher variance need not
+mean higher frozen-consumer accuracy. These null/adverse boundaries are retained
+in `head_state_summary.json` and `head_state_verification.json`.
+
 ## License and citation
 
 This repository is released under the **MIT License**. You may use, modify,

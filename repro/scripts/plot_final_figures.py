@@ -12,6 +12,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
+from figure_style import apply_style, polish, save as export
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'paper/figures'
@@ -54,18 +55,8 @@ def title(ax, letter, text):
 
 
 def save(fig, name):
-    fig.canvas.draw()
-    renderer = fig.canvas.get_renderer()
-    # Check text stays within the exported canvas; final overlaps are checked visually.
-    for text in fig.findobj(matplotlib.text.Text):
-        if text.get_visible() and text.get_text().strip():
-            box = text.get_window_extent(renderer)
-            if box.width and box.height:
-                assert box.x0 >= -1 and box.y0 >= -1, text.get_text()
-                assert box.x1 <= fig.bbox.width + 1 and box.y1 <= fig.bbox.height + 1, text.get_text()
-    for ext in ('pdf', 'png', 'svg'):
-        fig.savefig(OUT / f'{name}.{ext}', dpi=320, facecolor='white')
-    assert b'/Type3' not in (OUT / f'{name}.pdf').read_bytes()
+    polish(fig)
+    export(fig, OUT / name)
     plt.close(fig)
 
 
@@ -92,7 +83,8 @@ def sweeps():
 
 
 def unified():
-    fig, axes = plt.subplots(2, 3, figsize=(5.5, 3.48))
+    apply_style()
+    fig, axes = plt.subplots(2, 3, figsize=(5.5, 4.2))
     fig.subplots_adjust(left=.092, right=.985, bottom=.12, top=.87, wspace=.64, hspace=.85)
     a, b, c, d, e, f = axes.flat
     data = sweeps()
@@ -120,7 +112,7 @@ def unified():
                for col, mk, lab in zip(DCOL, MARKERS, DNAMES)]
     fig.legend(handles=handles, loc='upper left', bbox_to_anchor=(.078, .992),
                ncol=3, columnspacing=1.4, handlelength=1.6)
-    b.set(xlabel=r'Width $m$', ylabel=r'Half-height $\alpha_c$')
+    b.set(xlabel=r'Width $m$', ylabel=r'Half-height $\alpha_{1/2}$')
     b.set_xticks([16, 64, 256], ['16', '64', '256'])
     b.set_yticks([1e-3, 1e-1, 1e1])
     b.minorticks_off()
@@ -186,7 +178,8 @@ def unified():
 def battery():
     data = read('repro/results/xrep2_battery.json')
     summary = {r['mode']: r for r in data['results']}
-    fig, (a, b, c) = plt.subplots(1, 3, figsize=(5.5, 2.05))
+    apply_style()
+    fig, (a, b, c) = plt.subplots(1, 3, figsize=(5.5, 2.7))
     fig.subplots_adjust(left=.085, right=.985, top=.81, bottom=.23, wspace=.62)
     for i, mode in enumerate(MODES):
         rows = [r for r in data['raw'] if r['mode'] == mode]

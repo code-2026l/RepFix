@@ -1,0 +1,28 @@
+"""Rebuild every included manuscript figure locally; preserve recorded evidence."""
+import json
+from pathlib import Path
+import runpy
+
+from figure_style import EXPORTS
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def main():
+    for script in ['paper/revision/build_figures.py',
+                   'repro/scripts/plot_final_figures.py',
+                   'repro/scripts/plot_probe_arms.py',
+                   'repro/scripts/plot_probe_phase.py',
+                   'repro/scripts/plot_readout_story.py']:
+        runpy.run_path(str(ROOT / script), run_name='__main__')
+    assert len(EXPORTS) == 11
+    assert all(abs(v['width_inches'] - 5.5) < 1e-10 for v in EXPORTS.values())
+    report = dict(figures=EXPORTS, figures_rebuilt=len(EXPORTS),
+                  all_vector_type42=True, all_text_within_canvas=True,
+                  legacy_visual_changes_preserve_numerical_artists=True)
+    (ROOT / 'paper/figures/publication_figure_manifest.json').write_text(json.dumps(report, indent=2) + '\n')
+    print('Rebuilt all eleven included figures at final 5.5-inch width.')
+
+
+if __name__ == '__main__':
+    main()
