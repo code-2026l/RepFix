@@ -303,7 +303,7 @@ The checks have different scopes. The signed flux diagnoses the current gradient
 
 Multi-task learning~\citep{caruana1997multitask} and task grouping~\citep{standley2020tasks} ask when shared training helps. PCGrad and CAGrad address gradient conflict~\citep{yu2020pcgrad,liu2021cagrad}; MGDA, Nash-MTL, and FAMO optimize Pareto, bargaining, or progress-balancing criteria~\citep{sener2018multi,navon2022multi,liu2023famo}. Other methods adapt task-gradient geometry or loss weights~\citep{senushkin2023aligned,liu2021imtl,chen2018gradnorm,kendall2018multi,wang2021gradient,limarenko2026gcond,zhou2025imgrad}. We add the variance gradient to this picture: task-gradient relations alone leave the sign of variance change unidentified.
 
-Backward-compatible learning studies model-version compatibility~\citep{shen2020backward,hu2022backward}. LDC~\citep{gomezvilla2024ldc} already shows retained discrimination behind drifting class prototypes and learns label-agnostic feature maps. Our question concerns fixed affine consumers under auxiliary updates, separating scale, useful learning, and preserved decisions. CORAL~\citep{sun2016coral}, AdaBN~\citep{li2016adabn}, and Tent~\citep{wang2021tent} establish alignment and unlabeled adaptation controls; our anchor-fitted repairs evaluate model drift without adapting on test inputs. Shift and model-selection assumptions matter~\citep{zhao2023pitfalls}. Calibration~\citep{guo2017calibration,ovadia2019trust}, probes~\citep{alain2016probe}, and unlabeled performance estimation~\citep{garg2022unlabeled} complement the fixed-corpus disagreement check.
+Backward-compatible learning studies model-version compatibility~\citep{shen2020backward,hu2022backward}. LDC~\citep{gomezvilla2024ldc} already shows retained discrimination behind drifting class prototypes and learns label-agnostic feature maps. Two of the arms we measure implement these controls directly: recomputing per-feature input statistics is the AdaBN operation, and the paired linear map is a label-free old-to-new feature map of the LDC family. We report both on the same endpoints as our repairs. Our question concerns fixed affine consumers under auxiliary updates, separating scale, useful learning, and preserved decisions. CORAL~\citep{sun2016coral}, AdaBN~\citep{li2016adabn}, and Tent~\citep{wang2021tent} establish alignment and unlabeled adaptation controls; our anchor-fitted repairs evaluate model drift without adapting on test inputs. Shift and model-selection assumptions matter~\citep{zhao2023pitfalls}. Calibration~\citep{guo2017calibration,ovadia2019trust}, probes~\citep{alain2016probe}, and unlabeled performance estimation~\citep{garg2022unlabeled} complement the fixed-corpus disagreement check.
 
 Self-supervised learning studies collapse through stop-gradient mechanisms~\citep{grill2020bootstrap,chen2021simsiam,caron2021emerging}, variance and covariance regularization~\citep{zbontar2021barlow,bardes2022vicreg,ermolov2021whitening}, and spectral dynamics~\citep{jing2022understanding,dong2021attention,kim2025taxonomy}. RankMe evaluates representations by effective rank~\citep{garrido2023rankme}. Our observable is variation across examples, distinct from terminal classifier geometry in neural collapse~\citep{papyan2020prevalence,wang2026neuralcollapse}. Input repair shows how reduced variation can coexist with retained decodability and lost readout compatibility.
 
@@ -1875,6 +1875,14 @@ $55.8\%$ (Table~\ref{tab:vision_boundary}). The standardized refit ranks the two
 auxiliary branches above the primary-only branch, while the frozen readout ranks
 them below it; the largest accuracy gain of the four still arrives with a
 $42.1\%$ change of legacy decisions.
+
+Standard unlabeled baselines fail the same way. Recomputing per-feature input
+statistics, the AdaBN operation, raises the old readout from $0.606$ to $0.622$
+on the primary-only branch and from $0.557$ to $0.630$ on the selected scale
+branch, yet $40.4\%$ and $41.7\%$ of its decisions still differ. The paired
+linear map, the label-free old-to-new map of the LDC family, reaches $0.585$ and
+$0.580$ with $42.2\%$ and $44.0\%$ changed. Alignment recovers accuracy; it does
+not recover the interface.
 
 We report both screens as a boundary on accuracy, not on compatibility. The
 affine law governs pure contraction, and the replay shows decisions accumulating
