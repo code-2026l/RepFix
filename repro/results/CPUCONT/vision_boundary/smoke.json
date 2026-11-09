@@ -1,0 +1,105 @@
+{
+  "protocol": "prespecified ResNet-18 CIFAR-100 boundary crossing, fp32, development",
+  "phase": "development",
+  "seed": 900,
+  "plan_sha256": "ac2f773c77ceb46fff2c9cdc057c56921bd67af1bf99e80a030416e8970225b1",
+  "device": "cpu",
+  "cuda_visibility": "",
+  "torch_threads": 8,
+  "torch_version": "2.7.1+cu128",
+  "python_version": "3.11.18",
+  "source_sha256": {
+    "vision_boundary_cpu.py": "3f6c3917c3a7e2f54acdda2745162a43ba9afebca0bc1df32a0932c179b1c49d",
+    "readout_alignment.py": "437256fdd10ec0025e19236ea2f46b6d16073e2900b8e28aa038c08e39e7b93e",
+    "readout_transfer_audit.py": "c53870f0179aa8b902767b3df6f84d9267afcb5d624c178f623ef683876ab27a",
+    "paired_readout_continuation.py": "b395215409a276cafcc074c452be0842dbc6d2197c22c49a449261b8afbb1df5"
+  },
+  "configuration": {
+    "pretrained_weights": "torchvision ResNet18_Weights.IMAGENET1K_V1",
+    "image_size": 64,
+    "batch": 128,
+    "epochs": 1,
+    "encoder_lr": 0.001,
+    "heads_lr": 0.01,
+    "momentum": 0.9,
+    "weight_decay": 0.0005,
+    "train_dtype": "float32",
+    "eval_dtype": "float64",
+    "bn_running_statistics_frozen": true
+  },
+  "splits": {
+    "fitting": 42952,
+    "anchors": 2048,
+    "validation": 5000,
+    "official_test_loaded": false,
+    "test_metrics_computed": false,
+    "fitting_sha256": "7f5bfa343a30f9e5737074f88edc124ee4cab53abca82890d0a3709bf5c2bd50",
+    "anchor_sha256": "17030c2c46417b9cf35033dcfdf6883e48e4a55bb7ce2b26e5d75c462d285627",
+    "validation_sha256": "183f33c6cb595033fff22b6cda96d671c699c182edb36f94d0509120cafaaa8a",
+    "anchors_excluded_from_training": true
+  },
+  "reference_encoder_sha256": "2648b89b4c67dadfa23702f5d08265f8a96c9e0678486f413ad45fbfb22df990",
+  "reference_bn_sha256": "631a53cb8972d5d7db903b82c31bd344510351eda0fd4f87f802d9783885fd07",
+  "healthy": {
+    "metrics": {
+      "acc": 0.5134,
+      "nll": 1.9570441943077477,
+      "ece": 0.1323030022650553,
+      "largest_prediction_fraction": 0.012799999676644802
+    },
+    "trace_V": 851.4793629371062,
+    "scatter_S": 1.7678234816767697,
+    "median_first_flip_c": 0.4322361674519732,
+    "first_flip_defined": 2496,
+    "first_flip_positive": 3886
+  },
+  "branches": [
+    {
+      "mode": "D",
+      "dose": 0.0,
+      "trace": [
+        {
+          "epoch": 1,
+          "primary_loss": 0.9481478631496429,
+          "aux_loss": 0.0
+        }
+      ],
+      "epoch_trace_ratio": [],
+      "initial_encoder_sha256": "2648b89b4c67dadfa23702f5d08265f8a96c9e0678486f413ad45fbfb22df990",
+      "bn_buffers_unchanged": true,
+      "minibatch_order_sha256": "be477ba63373180e362f9b6733f88a630b034572630e68d353adb791fa88d91f",
+      "rotation_order_sha256": "95d0c7cceed07bfb908b8d29d834dc6d11c0648dc6b236d82d3a0cbce7f4b7aa",
+      "final_encoder_sha256": "ca4ed7090938f2812b260bf2c4e1d79ebdac7f2a76fce2854ca8590b96f81f3b",
+      "trace_V": 951.5087152631804,
+      "trace_ratio": 1.1174771306036488,
+      "scale_ratio": 1.0571079086846569,
+      "scatter_S": 1.8649107926024788,
+      "frozen": {
+        "acc": 0.514,
+        "nll": 2.028050153646615,
+        "ece": 0.14773864678745785,
+        "largest_prediction_fraction": 0.01679999940097332
+      },
+      "current": {
+        "acc": 0.51,
+        "nll": 2.0482788040867446,
+        "ece": 0.1520955542908227,
+        "largest_prediction_fraction": 0.02319999970495701
+      },
+      "refit": {
+        "acc": 0.524,
+        "nll": 1.9179767962620096,
+        "ece": 0.12780038781372105,
+        "largest_prediction_fraction": 0.013000000268220901
+      },
+      "recalibrated": {
+        "acc": 0.514,
+        "nll": 1.9605767030593881,
+        "ece": 0.13322642542715984,
+        "largest_prediction_fraction": 0.01360000018030405
+      }
+    }
+  ],
+  "complete": true,
+  "elapsed_s": 69.50712299346924
+}
