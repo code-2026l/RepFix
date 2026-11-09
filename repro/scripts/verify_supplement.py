@@ -22,15 +22,8 @@ TESTS = [
     'test_compiled_readout.py', 'test_nonlinear_interface.py',
     'test_nonlinear_selection.py',
     'test_affine_chart.py', 'test_vision_chart.py',
+    'test_legacy_head_fit.py',
 ]
-PLANS = {
-    'benefit': '2026-11-09-prospective-benefit-compatibility.md',
-    'compiled': '2026-11-09-compiled-interface.md',
-    'nonlinear': '2026-11-09-nonlinear-interface.md',
-    'chart': '2026-11-09-deployment-chart.md',
-    'vision': '2026-11-09-deployment-chart.md',
-}
-
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -75,8 +68,16 @@ def verify_files(root):
     if manifest['pdf_sha256'] != digest(root / 'paper/RepFix_ICLR2027.pdf'):
         raise ValueError('The manuscript PDF does not match the manifest')
 
-    sources = plans = records = 0
+    sources = plans = records = versioned_sources = repr_sources = 0
     python_hashes = {value for name, value in files.items() if name.endswith('.py')}
+    # Some historical vision replay records called state_hash(bytes), which
+    # hashes repr(bytes). Preserve that convention and the exact source bytes.
+    legacy_repr_names = {'vision_scale_replay.py', 'vision_boundary_cpu.py'}
+    for name in files:
+        if PurePosixPath(name).name in legacy_repr_names:
+            python_hashes.add(hashlib.sha256(repr((root/name).read_bytes()).encode()).hexdigest())
+    plan_hashes = {value for name, value in files.items()
+                   if name.startswith('docs/plans/') and name.endswith('.md')}
     base = 'repro/results/CPUCONT/'
     for name in sorted(files):
         if not name.startswith(base) or not name.endswith('.json'):
@@ -103,16 +104,30 @@ def verify_files(root):
             path = payload_path(root, source)
             if not path.is_file():
                 path = payload_path(root, 'repro/scripts/' + source)
-            if not path.is_file() or digest(path) != expected:
+            candidates=[path,payload_path(root,'repro/source_versions/'+expected+'/'+PurePosixPath(source).name)]
+            matched=None
+            for candidate in candidates:
+                if not candidate.is_file():continue
+                if digest(candidate)==expected:
+                    matched=candidate
+                    break
+                if candidate.name in legacy_repr_names and hashlib.sha256(repr(candidate.read_bytes()).encode()).hexdigest()==expected:
+                    matched=candidate
+                    repr_sources+=1
+                    break
+            if matched is None:
                 raise ValueError('Recorded source mismatch in ' + name + ': ' + source)
+            versioned_sources+=matched!=path
             sources += 1
-        if 'plan_sha256' in row:
-            families = [family for family in PLANS if family in name]
-            if len(families) == 1:
-                path = root / 'docs/plans' / PLANS[families[0]]
-                if digest(path) != row['plan_sha256']:
-                    raise ValueError('Recorded plan mismatch: ' + name)
-                plans += 1
+        for field,expected in row.items():
+            if field.endswith('plan_sha256') and isinstance(expected,str):
+                if expected not in plan_hashes:
+                    raise ValueError('Recorded plan unavailable: '+name+'/'+field)
+                plans+=1
+        if isinstance(row.get('source'),dict) and 'script_sha256' in row['source']:
+            if row['source']['script_sha256'] not in python_hashes:
+                raise ValueError('Nested recorded script unavailable: '+name)
+            sources+=1
 
     choice = json.loads((root / base / 'nonlinear_development_choice.json').read_text(encoding='utf-8'))
     if any(v['confirm'] for v in choice['selected'].values()):
@@ -146,9 +161,39 @@ def verify_files(root):
     if chart_summary['tasks']['radioml']['passes'] or chart_summary['tasks']['radioml']['metrics']['certified']!=0:
         raise ValueError('The failed chart compatibility criterion was changed')
 
+    protected_original = [name for name in files if re.fullmatch(base+r'protected_head/ph_(?:har_)?conf_30\d\.json', name)]
+    protected_audits = [name for name in files if re.fullmatch(base+r'protected_head_audit/r\d{3}\.json', name)]
+    protected_replays = [name for name in files if re.fullmatch(base+r'protected_head_reader_replay/v\d{3}\.json', name)]
+    if any(len(family)!=20 for family in [protected_original,protected_audits,protected_replays]):
+        raise ValueError('The protected-head audit family is incomplete')
+    original_hashes={digest(root/name) for name in protected_original}
+    audit_hashes={digest(root/name) for name in protected_audits}
+    for name in protected_audits:
+        row=json.loads((root/name).read_text())
+        if not row['complete'] or row['original_record_sha256'] not in original_hashes or row['maximum_original_metric_error']!=0:
+            raise ValueError('Original protected-head replay changed: '+name)
+        if row['new_family_size']!=140 or not row['no_encoder_updates'] or row['labels_used_for_fitting']:
+            raise ValueError('Fixed retrospective fit protocol changed: '+name)
+    for name in protected_replays:
+        row=json.loads((root/name).read_text())
+        if (not row['complete'] or row['audit_sha256'] not in audit_hashes or
+                len(row['branches'])!=7 or row['maximum_metric_error']!=0 or
+                row['maximum_stationarity_residual']>1e-6 or row['refitting_performed']):
+            raise ValueError('Frozen reader verification changed: '+name)
+    protected_summary=json.loads((root/base/'protected_head_audit_summary.json').read_text())
+    if protected_summary['original_gate_replaced']:
+        raise ValueError('Retrospective results replaced original decisions')
+    for domain,original_count,ols_count in [('har',9,10),('radioml',0,0)]:
+        row=protected_summary['domains'][domain]
+        if row['original']['passes'] or row['original']['certified']!=original_count or row['frozen_controls']['protected_ols']['certified']!=ols_count:
+            raise ValueError('Protected-head verdict changed: '+domain)
+
     return manifest, dict(payload_files=len(files), manuscript_figures=len(figures),
         numerical_inputs=len(inputs), completed_cpu_records=records,
         recorded_source_hashes_checked=sources, recorded_plan_hashes_checked=plans,
+        historical_source_versions_checked=versioned_sources,
+        historical_repr_bytes_digests_checked=repr_sources,
+        recorded_protected_original_replays_checked=60,recorded_protected_control_replays_checked=140,
         nonlinear_development_records=len(development), nonlinear_confirmation_tasks=0,
         manuscript_pdf_sha256=manifest['pdf_sha256'])
 
@@ -168,7 +213,7 @@ def execute(command, root):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--tests', action='store_true', help='Run 52 structural checks on CPU')
+    parser.add_argument('--tests', action='store_true', help='Run 55 structural checks on CPU')
     parser.add_argument('--figures', action='store_true', help='Rebuild all included figures and compare numerical artists')
     parser.add_argument('--paper', action='store_true', help='Rebuild the manuscript and compare page text and pixels')
     args = parser.parse_args()
@@ -191,9 +236,9 @@ def main():
             stdout, elapsed = execute([sys.executable, '-m', 'pytest'] +
                 ['repro/scripts/' + name for name in TESTS] + ['-q'], copy)
             passed = re.search(r'(\d+) passed', stdout)
-            if not passed or int(passed.group(1)) != 52:
+            if not passed or int(passed.group(1)) != 55:
                 raise ValueError('Unexpected focused-test result: ' + stdout[-1000:])
-            report['checks']['structural_tests'] = dict(passed=52, elapsed_seconds=elapsed)
+            report['checks']['structural_tests'] = dict(passed=55, elapsed_seconds=elapsed)
         if args.figures:
             print('Rebuilding all included figures from recorded results...', flush=True)
             reference = json.loads((ROOT / 'paper/figures/publication_figure_manifest.json').read_text())

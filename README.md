@@ -2,7 +2,7 @@
 
 **Silent Scale Shift: When Shared Updates Break Existing Readouts**
 
-This artifact accompanies the 62-page manuscript in
+This artifact accompanies the 70-page manuscript in
 [`paper/RepFix_ICLR2027.pdf`](paper/RepFix_ICLR2027.pdf), with nine main-text pages.
 It contains the source, complete recorded outcomes, analysis and figure scripts,
 fixed study protocols, and structural checks.
@@ -11,13 +11,18 @@ The paper separates task decodability from compatibility with an existing readou
 Matched continuation and input repair isolate a scale-sensitive failure. Signed
 update audits examine the diagnostic, while the SNR confirmation and single-encoder
 controls measure the benefit and cost of preserving compatibility. The artifact
-retains the CNN, frozen-trunk, nonlinear-side, and calibration boundary results.
+retains the CNN, frozen-trunk, nonlinear-side, and pretrained vision boundary results.
+The protected-head extension distinguishes joint distillation from fitting a reader
+on frozen features. Its retrospective HAR control certifies 10/10 saved seeds;
+the original online arm remains 9/10, and the SNR arm remains unsuccessful.
+See [the integration audit](docs/PROTECTED_HEAD_AUDIT_20261109.md) for the evidence,
+corrected serving costs, and scope.
 
 ## Paper and downloads
 
-- [Read the final paper](paper/RepFix_ICLR2027.pdf) — 9 main pages, 62 pages total.
-- [Download supplementary material](artifacts/2026-11-09/RepFix_Supplementary_20261109.zip)
-- [Download manuscript source and evidence](artifacts/2026-11-09/RepFix_ICLR_Polished_20261109_source.zip)
+- [Read the final paper](paper/RepFix_ICLR2027.pdf) — 9 main pages, 70 pages total.
+- [Download supplementary material](artifacts/2026-11-09/RepFix_DeploymentAudit_20261109_supplement.zip)
+- [Download manuscript source and evidence](artifacts/2026-11-09/RepFix_DeploymentAudit_20261109_source.zip)
 - [Reproduction guide](docs/REPRODUCIBILITY.md) · [Evidence index](docs/EVIDENCE_INDEX.md)
 
 ![Readout compatibility overview](paper/figures/fig_readout_overview.png)
@@ -49,7 +54,7 @@ See [the reproduction guide](docs/REPRODUCIBILITY.md) for each check and its inp
 - [Evidence index](docs/EVIDENCE_INDEX.md): manuscript figures and claims mapped to
   recorded results, analysis scripts, and fixed protocols.
 - [`repro/results/CPUCONT/`](repro/results/CPUCONT/): paired continuation, repair,
-  real reconstruction, CNN, head-state, protected-benefit, compiled, and nonlinear
+  real reconstruction, CNN, head-state, protected-benefit, compiled, nonlinear, chart, vision, and protected-head
   studies. Frozen development choices and the exact-count correction are included.
 - [`results/README.md`](results/README.md): detailed directory map for historical
   benchmarks; [`repro/README.md`](repro/README.md): current script entry points.
@@ -59,8 +64,8 @@ See [the reproduction guide](docs/REPRODUCIBILITY.md) for each check and its inp
 
 ## What can be reproduced
 
-The archive supports dataset-free file/provenance checks, 47 focused structural
-tests, reconstruction of all 17 included figures from recorded results, and a local
+The archive supports dataset-free file/provenance checks, 55 focused structural
+tests, reconstruction of all 19 included figures from recorded results, and a local
 LaTeX build. The validation choice and failed nonlinear development gate can be
 inspected without rerunning training.
 

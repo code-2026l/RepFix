@@ -1,7 +1,7 @@
 # Reproducing the supplementary artifact
 
 Run commands from the extracted `repfix_supplementary` directory. The supplied
-PDF is the polished manuscript: nine main pages and 62 pages in total.
+PDF is the polished manuscript: nine main pages and 70 pages in total.
 
 ## File and record checks
 
@@ -11,7 +11,11 @@ python repro/scripts/verify_supplement.py
 
 Python 3.10 or newer is sufficient for this check. It verifies the manifest,
 required manuscript inputs, source and protocol hashes stored in the CPU records,
-and the frozen nonlinear decision. It reads records rather than loading model
+the frozen nonlinear/chart decisions, and the protected-head original and
+retrospective verdicts. Exact historical driver bytes are retained under
+`repro/source_versions/`. Some early vision replay records hash `repr(bytes)`
+instead of the raw bytes; the verifier checks and counts that convention
+explicitly. It reads records rather than loading model
 states or recomputing predictions.
 
 ## Review environment
@@ -33,9 +37,11 @@ thread. The hardware timings reported in the paper retain their original setup.
 python repro/scripts/verify_supplement.py --tests
 ```
 
-The 47 tests cover finite-corpus disagreement bounds, repair availability, affine
+The 55 tests cover finite-corpus disagreement bounds, repair availability, affine
 scale boundaries, normalized-head nullspaces, constrained affine folding,
-nonlinear fusion, and exact-count selection at a zero-benefit tie. They use
+nonlinear fusion, exact-count selection at a zero-benefit tie, invertible chart folding,
+vision access/split controls, and teacher-head fitting on affine and nonlinear
+examples. They use
 synthetic numerical inputs. Their success validates the stated algebra and
 implementation controls; the experimental results are in the recorded studies.
 
@@ -46,7 +52,7 @@ python repro/scripts/verify_supplement.py --figures
 ```
 
 The helper runs `repro/scripts/render_paper_figures.py` in a temporary copy. The
-ten coordinated generators reconstruct all 17 included figures from shipped
+twelve coordinated generators reconstruct all 19 included figures from shipped
 records. It compares plotted numerical artists and dimensions with the release
 manifest. Files are exported as PDF, PNG, and SVG at a 5.5-inch width.
 
@@ -115,3 +121,22 @@ The default verification checks available file and record hashes. It does not
 substitute that check for a fresh replay of omitted tensor states. The evidence
 index distinguishes paired seeds, separate protocols, development estimates,
 confirmation results, and historical aggregates.
+
+## Protected-head audit inputs
+
+`protected_head_cpu.py` is the original frozen experiment. Its old timing
+fields are retained but do not measure the cost of returning both outputs.
+`audit_protected_head_cpu.py` replays all 20 confirmation records and computes
+the fixed retrospective OLS/ridge readers on saved encoders.
+`verify_frozen_legacy_readers_cpu.py` reloads the saved heads, checks metrics,
+certificates and convex stationarity without refitting.
+`benchmark_protected_outputs_cpu.py` measures current plus legacy outputs from
+one encoder call, including the float64 OLS implementation.
+
+`summarize_protected_audit.py` derives the release table and verdicts from the
+shipped records. The archive records all 60 original and 140 control consumer
+replays; the default verifier checks those records and hashes rather than
+loading the model tensors. Original checkpoint files and fitted-head tensors
+are retained locally outside the compact release. See
+`docs/PROTECTED_HEAD_AUDIT_20261109.md` for access assumptions, the distinction
+between original and retrospective evidence, and the timing correction.

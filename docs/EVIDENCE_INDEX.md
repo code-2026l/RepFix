@@ -26,7 +26,7 @@ unless a full path is given. The main text's 0.453 to 0.938 repair comparison
 uses ten HAR continuation seeds. The reconstruction comparison uses five seeds;
 the protected-benefit confirmation uses ten new seeds. These studies are separate.
 
-## All 17 figures
+## All 19 figures
 
 Every file below is under `paper/figures/`. Use the coordinated entry point
 `repro/scripts/render_paper_figures.py` to reconstruct them.
@@ -49,7 +49,9 @@ Every file below is under `paper/figures/`. Use the coordinated entry point
 | 14 | `fig_compiled_frontier.pdf` | `plot_compiled_frontier.py` | `C/compiled_interface_summary.json` |
 | 15 | `fig_nonlinear_interface.pdf` | `plot_nonlinear_study.py` | Analytic schematic, Equation `eq:nonlinear_fusion` |
 | 16 | `fig_nonlinear_validation.pdf` | `plot_nonlinear_study.py` | `C/nonlinear_development_choice.json` |
-| 17 | `fig_consumer_audit.pdf` | `plot_readout_story.py` | `C/consumer_frontier_summary.json` |
+| 17 | `fig_chart_confirmation.pdf` | `plot_chart_confirmation.py` | `C/chart_confirmation/`, `C/chart_confirmation_summary.json` |
+| 18 | `fig_protected_audit.pdf` | `plot_protected_audit.py` | `C/protected_head_audit/`, `C/protected_head_audit_summary.json` |
+| 19 | `fig_consumer_audit.pdf` | `plot_readout_story.py` | `C/consumer_frontier_summary.json` |
 
 Generator basenames are under `repro/scripts/`. Figure manifests retain source
 and numerical-artist hashes; diagrams are marked as schematics in their captions.
@@ -62,10 +64,28 @@ included. Complete null and adverse results remain in the package.
 
 The nonlinear side study stops at its fixed development gate: no scientific test
 confirmation or full-data latency measurement follows. The earlier floating-point
-choice and exact-count correction are both retained. Confirmation seeds are kept
-separate from development seeds and from other precision or label-budget regimes.
+choice and exact-count correction are both retained. Confirmation is held out from each study's development seeds. Some confirmation
+seeds recur across studies, including protected-head seeds 300--309. Precision
+and label-budget regimes are reported separately.
 
 `*_verification.json` and replay JSON files record earlier checks of saved tensors.
 The compact ZIP excludes those tensors; consult the reproduction guide before
 attempting state-dependent replay. Historical result and manifest conventions,
 including aggregate-only exceptions, are detailed in `results/README.md`.
+
+## Integrated deployment studies
+
+| Question | Records under `repro/results/CPUCONT/` | Driver / protocol |
+|---|---|---|
+| Does post-hoc folding preserve decisions as well as aggregate metrics? | `chart_development/`, `chart_confirmation/`, `chart_replay/` | `posthoc_chart_cpu.py`, `2026-11-09-deployment-chart.md` |
+| Does an update invalidate vision decisions despite accurate readouts? | `vision_boundary/`, `vision_flows_900.json` through `902` | `vision_boundary_cpu.py`, `vision_decision_flows.py` |
+| What does the original learned legacy head retain? | `protected_head/`, `protected_head_summary*.json` | `protected_head_cpu.py`, original SNR plan and HAR addendum |
+| Does frozen-feature fitting explain joint distillation? | `protected_head_audit/`, `protected_head_audit_summary.json` | `audit_protected_head_cpu.py`, `legacy_head_fit.py`; retrospective fixed plan |
+| Do saved control readers replay and satisfy their fitting conditions? | `protected_head_reader_replay/` | `verify_frozen_legacy_readers_cpu.py` |
+| What does returning both current and legacy outputs cost? | `protected_head_timing_audit.json` | `benchmark_protected_outputs_cpu.py` |
+
+The original HAR 9/10 and SNR 0/10 gates are preserved. The new HAR OLS 10/10
+count is a fresh fixed-corpus audit of the same saved encoders, not a new
+training confirmation. No large-model or information-erasure conclusion is
+inferred from these controls. Source snapshots preserve exact recorded digests;
+see `repro/source_versions/README.md` for the historical vision hash convention.

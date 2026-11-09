@@ -58,7 +58,7 @@
 \maketitle
 
 \begin{abstract}
-Shared encoders keep learning long after the readouts that consume them were fitted. Auxiliary-task updates can preserve what a task needs while shrinking the features, so a frozen readout loses accuracy although a refitted probe does not. We isolate this silent scale shift in matched continuations. On HAR, frozen-readout accuracy falls from $\CpuHarHealthy$ to $\CpuHarJointMid$ across ten seeds while the jointly trained head reaches $\CpuHarOwnMid$, and one global input-scale correction fitted without labels restores $\MechHarScalarMid$. With a real reconstruction auxiliary, error falls to $\ReconHarMseRatioHigh$ of detachment while frozen accuracy drops to $\ReconHarFrozenHigh$; a paired linear map restores $\ReconHarPairedLinearHigh$ without touching either model. Exact scale boundaries of an affine readout locate the first class change, and a repair hierarchy separates scale from the richer drift that follows stronger contraction. A signed chain-rule audit explains why task-gradient conflict and unsigned variance probes misjudge the direction of variance change. On SNR, ten confirmation seeds keep a $\BenefitGuardGain$-point auxiliary gain and the old logits under a reference-anchored constraint, at $\BenefitLatencyRatio\times$ CPU inference cost; folding the constraint into the encoder removes the cost and the gain. A coordinate map fitted after training keeps the gain at native cost and improves old-reader accuracy, yet changes $\ChartDisagreement\%$ of legacy decisions. Penalizing those changes during training halves them at native cost while keeping most of the gain. An anchor on the consumer's logits holds mean disagreement to five percent but loses $1.6$ points of primary accuracy. A learned linear readout preserves the old function at one pass where the update is geometric and loses primary accuracy where it changes the information. No single-encoder arm keeps the auxiliary gain and every seed inside the budget on both corpora. Accuracy and compatibility are separate acceptance criteria.
+Shared encoders can keep learning while invalidating the readouts that depend on them. We study this failure under auxiliary updates and isolate a scale-sensitive component: task information remains decodable while a fixed readout loses accuracy. In matched HAR continuations across ten seeds, frozen accuracy falls from $\CpuHarHealthy$ to $\CpuHarJointMid$ while the current head reaches $\CpuHarOwnMid$; unlabeled scale correction restores $\MechHarScalarMid$. With a real reconstruction auxiliary, error falls to $\ReconHarMseRatioHigh$ of detachment while frozen accuracy drops to $\ReconHarFrozenHigh$; paired alignment restores $\ReconHarPairedLinearHigh$. Exact affine boundaries explain pure scaling, and a signed update audit identifies what gradient conflict and unsigned variance probes leave unresolved. Fixed-protocol interventions distinguish scores, decisions, and aggregate utility. A reference-anchored SNR control retains a $\BenefitGuardGain$-point auxiliary gain and unchanged old logits at $\BenefitLatencyRatio\times$ CPU inference cost. A learned legacy head on HAR retains reconstruction progress with $1.8\%$ prediction disagreement, and nine of ten consumers certify under the fixed five-point budget; the corresponding SNR arm loses primary accuracy and certifies none. On pretrained ResNet-18, accuracy can improve while more than $40\%$ of legacy decisions change. These results make compatibility a separate evaluation requirement, with its data access, tolerated changes, and deployment cost stated explicitly.
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
@@ -71,7 +71,7 @@ The failure does not need a synthetic auxiliary. HAR reconstruction lowers held-
 
 The rest of the paper asks how much of the damage is scale, which updates cause it, and whether useful auxiliary learning can coexist with an unchanged readout. Exact boundaries for an affine readout give the scale answer: a single scalar predicts where a frozen prediction changes class, and a fixed hierarchy of repairs, from mean and scale to per-feature and paired alignment, places the damage that remains. The diagnostic starts from the variance gradient. Task-gradient relations, the object of PCGrad~\citep{yu2020pcgrad} and CAGrad~\citep{liu2021cagrad}, do not determine the sign of variance change; the update's projection onto the variance gradient does, and for Adam the applied increment matters as well.
 
-For coexistence, a reference-anchored readout-nullspace control~\citep{shen2020backward,farajtabar2020ogd} preserves healthy logits while leaving $53$ of $64$ feature directions free. Ten new seeds confirm a $\BenefitGuardGain$-point auxiliary gain at $\BenefitLatencyRatio\times$ CPU inference cost. Freezing the nonlinear trunk removes the cost and loses the gain. A post-hoc single-encoder chart retains the gain and improves old-reader accuracy, yet changes $\ChartDisagreement\%$ of old predictions. A penalty on the frozen consumer's margin during training halves that change at native cost while keeping most of the gain. Compatibility is bought in one of three places: accuracy in the directions the consumer reads, a second forward pass, or a learned readout that works only while the old function remains recoverable. Decodability, aggregate utility, and decision compatibility are separate measurements; a deployed consumer also carries cached decisions, calibrated thresholds, and human review. Compatibility with those is an acceptance criterion in its own right.
+For coexistence, a reference-anchored readout-nullspace control~\citep{shen2020backward,farajtabar2020ogd} preserves healthy logits while leaving $53$ of $64$ feature directions free. Ten new seeds confirm a $\BenefitGuardGain$-point auxiliary gain at $\BenefitLatencyRatio\times$ CPU inference cost. Freezing the nonlinear trunk removes the cost and loses the gain. A post-hoc single-encoder chart retains the gain and improves old-reader accuracy, yet changes $\ChartDisagreement\%$ of old predictions. A penalty on the frozen consumer's margin during training halves that change at native cost while keeping most of the gain. The tested controls trade reference inference, restrictions on feature learning, and adaptation of the legacy readout. Decodability, aggregate utility, and decision compatibility are separate measurements; a deployed consumer also carries cached decisions, calibrated thresholds, and human review. Compatibility with those is an acceptance criterion in its own right.
 
 \begin{figure}[t]
 \centering
@@ -244,7 +244,11 @@ Real reconstruction tests repair while the auxiliary makes progress (Table~\ref{
 
 Let $A=W_0\operatorname{diag}(1/s_0)$ and let $P_\perp$ project onto $\ker A$. The reference-anchored control $H_0+(H_\theta-H_0)P_\perp$ preserves all healthy logits while emitting one shared $64$-vector (Proposition~\ref{prop:consumer_nullspace}, Figure~\ref{fig:nullspace_control}). Validation selects SNR dose $1$ from six fixed candidates using $20\%$ of fitting primary labels. Ten new seeds confirm an ordinary auxiliary gain J--D of $\BenefitJointGain$ percentage points, paired $95\%$ interval $[\BenefitJointGainLow,\BenefitJointGainHigh]$, and a guarded gain GJ--GD of $\BenefitGuardGain$, $[\BenefitGuardGainLow,\BenefitGuardGainHigh]$ (Table~\ref{tab:benefit_confirmation}). The guarded model clears the declared $0.5$-point noninferiority margin against J, and its predictions, NLL, and ECE match the reference to a maximum logit error of $\BenefitLogitError$; its ten endpoints also satisfy a separate five-point disagreement budget. Frozen accuracy barely moves, while ECE rises from $\BenefitHealthyECE$ to $\BenefitJointECE$. Both encoders remain at inference, at a measured $\BenefitLatencyRatio\times$ CPU cost (Appendix~\ref{app:benefit_confirmation}).
 
-With a frozen nonlinear trunk, the last-affine constraint folds into one encoder but loses the SNR gain; freezing accounts for $-3.53$ points, while the constraint adds $-0.003$ (Appendix~\ref{app:compiled_interface}). A nonlinear-side grid also fails its benefit screen. Fitting and folding a chart \emph{after} unrestricted learning instead retains a $\ChartGain$-point gain at $\ChartLatency\times$ native CPU cost. Old-reader accuracy improves by $\ChartOldGain$ points and its NLL and ECE fall, yet $\ChartDisagreement\%$ of its predictions change, and none of ten repaired consumers meets the fixed five-point disagreement budget (Appendix~\ref{app:posthoc_chart}). Every aggregate check can pass while the deployed interface changes. A training-time hinge on the frozen consumer's margin keeps one encoder and a $0.72$-point gain, against $0.97$ for joint training, while halving decision changes to $29.2\%$; it still misses the budget, and on a second corpus whose auxiliary barely moves the readout the same rule meets it with eight of ten certificates; pinning the consumer's logits instead of its margin traces the same frontier and certifies none (Table~\ref{tab:compatibility_frontier}, Appendix~\ref{app:decision_preserving}). On a pretrained vision backbone, three epochs of primary-only continuation raise the frozen readout's accuracy by $8.5$ points and still change $42.1\%$ of its decisions, with $7.2\%$ of examples moving from correct to wrong (Appendix~\ref{app:vision_boundary}). Function compatibility is cheaper where the drift is geometric. On HAR at dose $100$, a learned $6$-vector readout that reproduces the old logits keeps reconstruction error at $0.767$ of detachment, the same as joint training, and primary accuracy $0.44$ points above it, while holding the old predictions to $1.8\%$ disagreement; nine of ten seeds certify, at one forward pass. On SNR the same readout loses $1.29$ points at five percent disagreement. A scale is a linear map away from the old function; a change of information is not (Appendix~\ref{app:protected_head}).
+Removing reference inference exposes a different constraint. Freezing the nonlinear trunk and folding the last-affine protection loses the SNR gain: freezing accounts for $-3.53$ points, while the constraint adds $-0.003$ (Appendix~\ref{app:compiled_interface}). Fitting a chart \emph{after} unrestricted learning retains a $\ChartGain$-point gain at $\ChartLatency\times$ native CPU cost. Old-reader accuracy improves by $\ChartOldGain$ points and NLL and ECE fall, yet $\ChartDisagreement\%$ of predictions change; none of ten repaired consumers meets the five-point budget (Appendix~\ref{app:posthoc_chart}). Aggregate recovery does not establish decision compatibility.
+
+A training-time margin hinge retains a $0.72$-point SNR gain, against $0.97$ for joint training, and halves decision changes to $29.2\%$. It still misses the budget; pinning logits also certifies none (Table~\ref{tab:compatibility_frontier}, Appendix~\ref{app:decision_preserving}). The distinction extends to a pretrained vision backbone: primary-only continuation raises frozen accuracy by $8.5$ points while changing $42.1\%$ of decisions, including $7.2\%$ of examples moving from correct to wrong (Appendix~\ref{app:vision_boundary}).
+
+A learned legacy head relaxes the fixed-weight contract through joint distillation~\citep{hinton2015distilling,li2016lwf}. On HAR at dose $100$, it retains reconstruction MSE at $0.767$ of detachment with $1.8\%$ prediction disagreement. Nine of ten monitor certificates meet the five-point budget; all measured full-corpus disagreements are below it. Primary accuracy differs by $+0.44$ points, with interval $[-0.03,0.91]$. The SNR arm instead loses $1.29$ points and certifies none (Appendix~\ref{app:protected_head}). Frozen-feature controls separate head fitting from the encoder regularization this loss also supplies (Appendix~\ref{app:protected_audit}).
 
 \input{decision_preserving_table.tex}
 
@@ -287,7 +291,7 @@ Each check has a scope. The signed flux describes the current gradient-flow dire
 
 Multi-task learning~\citep{caruana1997multitask} and task grouping~\citep{standley2020tasks} ask when shared training helps. PCGrad and CAGrad address gradient conflict~\citep{yu2020pcgrad,liu2021cagrad}; MGDA, Nash-MTL, and FAMO optimize Pareto, bargaining, or progress-balancing criteria~\citep{sener2018multi,navon2022multi,liu2023famo}. Other methods adapt task-gradient geometry or loss weights~\citep{senushkin2023aligned,liu2021imtl,chen2018gradnorm,kendall2018multi,wang2021gradient,limarenko2026gcond,zhou2025imgrad}. We add the variance gradient to this picture: task-gradient relations alone leave the sign of variance change unidentified.
 
-Backward-compatible learning studies model-version compatibility~\citep{shen2020backward,hu2022backward}. LDC~\citep{gomezvilla2024ldc} shows retained discrimination behind drifting class prototypes and learns label-agnostic feature maps. Two arms we measure are these controls: recomputing per-feature input statistics is the AdaBN operation, and the paired linear map is a label-free old-to-new feature map of the LDC family. Our question is narrower: fixed affine consumers under auxiliary updates, with scale, useful learning, and preserved decisions separated. CORAL~\citep{sun2016coral}, AdaBN~\citep{li2016adabn}, and Tent~\citep{wang2021tent} supply alignment and unlabeled-adaptation baselines; our anchor-fitted repairs test model drift without adapting on test inputs. Shift and model-selection assumptions matter~\citep{zhao2023pitfalls}. Calibration~\citep{guo2017calibration,ovadia2019trust}, probes~\citep{alain2016probe}, and unlabeled performance estimation~\citep{garg2022unlabeled} complement the fixed-corpus disagreement check.
+Backward-compatible learning studies model-version compatibility~\citep{shen2020backward,hu2022backward}. LDC~\citep{gomezvilla2024ldc} shows retained discrimination behind drifting class prototypes and learns label-agnostic feature maps. Our input-moment and paired-ridge baselines follow these ideas at the readout interface; they are not full-network AdaBN or LDC prototype updating. Our question is narrower: fixed affine consumers under auxiliary updates, with scale, useful learning, and preserved decisions separated. CORAL~\citep{sun2016coral}, AdaBN~\citep{li2016adabn}, and Tent~\citep{wang2021tent} supply alignment and unlabeled-adaptation baselines; our anchor-fitted repairs test model drift without adapting on test inputs. Shift and model-selection assumptions matter~\citep{zhao2023pitfalls}. Calibration~\citep{guo2017calibration,ovadia2019trust}, probes~\citep{alain2016probe}, and unlabeled performance estimation~\citep{garg2022unlabeled} complement the fixed-corpus disagreement check.
 
 Self-supervised learning studies collapse through stop-gradient mechanisms~\citep{grill2020bootstrap,chen2021simsiam,caron2021emerging}, variance and covariance regularization~\citep{zbontar2021barlow,bardes2022vicreg,ermolov2021whitening}, and spectral dynamics~\citep{jing2022understanding,dong2021attention,kim2025taxonomy}. RankMe evaluates representations by effective rank~\citep{garrido2023rankme}. Our observable is variation across examples, distinct from terminal classifier geometry in neural collapse~\citep{papyan2020prevalence,wang2026neuralcollapse}. Input repair shows how reduced variation can coexist with retained decodability and lost readout compatibility.
 
@@ -295,14 +299,14 @@ Auxiliary-gradient projection~\citep{dery2021attittud,zhu2025gradops}, auxiliary
 
 \section{Conclusion}\label{sec:conclusion}
 
-An accurate current head can conceal a broken existing readout. Matched continuation and fixed input repairs expose the gap; exact affine boundaries account for its scale component; signed audits identify what gradient alignment and unsigned probes miss. The SNR confirmation shows that auxiliary benefit and unchanged old logits can coexist at the price of a second encoder, and the single-encoder arms show that the alternative price is accuracy in the directions the consumer reads; a learned readout escapes that price only when the drift is geometric. Shared-representation evaluation should measure what new features can predict and whether existing readouts can still use them.
+An accurate current head can conceal a broken existing readout. Matched continuation and fixed input repairs expose the gap; exact affine boundaries account for its scale component; signed audits identify what gradient alignment and unsigned probes miss. The SNR confirmation shows that auxiliary benefit and unchanged old logits can coexist at the price of a second encoder, while the single-encoder controls expose different utility and compatibility tradeoffs. A learned legacy head retains HAR reconstruction progress with small prediction changes; one original monitor abstains, and the SNR arm loses primary accuracy. Shared-representation evaluation should measure what new features can predict and whether existing readouts can still use them.
 
 \clearpage
 \section*{AI Use Statement}
 Generative AI tools assisted with drafting, language editing, code, literature retrieval, proof development, and figure design. The new diagnostic identities were checked with executable numerical examples; assumptions are stated explicitly with each claim and in Appendix~\ref{app:proofs}. Figures are drawn from recorded experimental results. The authors remain responsible for verifying the final text, claims, code, and artifacts.
 
 \section*{Ethics Statement}
-We use existing datasets: UCI-HAR, RadioML2016.10A, the NASA PCoE and MATR battery archives, public A-share market data, NYUv2, and CelebA. We collected no new human-subject data. The HAR identity auxiliary is evaluated as a training-head probe, not a held-out privacy attack. Battery prediction is safety-relevant; Section~\ref{sec:negatives} describes the observed limitations, and deployment requires task-specific validation.
+We use existing datasets: UCI-HAR, RadioML2016.10A, the NASA PCoE and MATR battery archives, public A-share market data, NYUv2, CelebA, and CIFAR-100, with ImageNet-pretrained vision weights. We collected no new human-subject data. The HAR identity auxiliary is evaluated as a training-head probe, not a held-out privacy attack. Battery prediction is safety-relevant; Section~\ref{sec:negatives} describes the observed limitations, and deployment requires task-specific validation.
 
 
 \section*{Reproducibility Statement}
@@ -1751,7 +1755,7 @@ The strict-positive gate is evaluated from integer correct counts and exact rati
 
 All $165$ saved state files are locally checked: six healthy states, $87$ endpoint model--Adam states and $72$ deployed side models. A separate tensor-only process reconstructs all $87$ validation consumers; accuracy, NLL and ECE replay exactly, with auxiliary errors also checked. All $36$ constrained-side consumers retain their old validation predictions/NLL/ECE; maximum logit error is $\NonlinearLogitError$. Fused/unfused feature error is at most $\NonlinearFusionError$. The nonlinear prefix changes in every constrained branch, and frozen base weights and Adam states remain unchanged. Structural tests include arbitrary nonlinear changes, native-precision fusion, full-rank/no-nullspace and unconstrained/base-drift negative controls.
 
-The construction supports nonlinear updates with retained affine-consumer outputs, but none of the tested candidates closes the utility and cost target. Isolating the prefix's contribution would need a matched side with its prefix frozen. A pre-registered vision screen did not reproduce the accuracy failure at the tested doses, although the frozen readout changed $42$--$56\%$ of its decisions (Appendix~\ref{app:vision_boundary}). Stronger vision auxiliaries and non-affine consumers are untested.
+The construction supports nonlinear updates with retained affine-consumer outputs, but none of the tested candidates closes the utility and cost target. Isolating the prefix's contribution would need a matched side with its prefix frozen. A fixed-protocol vision screen did not reproduce the accuracy failure at the tested doses, although the frozen readout changed $42$--$56\%$ of its decisions (Appendix~\ref{app:vision_boundary}). Stronger vision auxiliaries and non-affine consumers are untested.
 
 \input{chart_study.tex}
 
@@ -1840,12 +1844,12 @@ reads, as both constraints do, or recompute $A h_0(x)$ at inference, which is
 the second encoder and its measured $\BenefitLatencyRatio\times$ cost. The
 five-point budget is an approximate version of the same condition, and the
 hinge buys that approximation at a rate set by how much of the gain it removes.
-Because a decision changes at most once, disagreement bounds the fraction of
+Disagreement bounds the fraction of
 examples the interface can newly corrupt, so the budget also caps that harm;
 five points is a deployment tolerance, and the frontier reports the whole curve
 for another choice.
 
-\subsection{A Learned Readout for the Old Function}\label{app:protected_head}
+\subsection{Learning a Legacy Readout}\label{app:protected_head}
 
 The constraints above keep the old weights on the new feature. A weaker
 requirement asks whether only the old \emph{function} must survive. Let $p$ be
@@ -1859,11 +1863,11 @@ where $z_0(x)=Ah_0(x)+B$ is the frozen consumer's logit vector, precomputed for
 the fitting set before continuation. Deployment applies $p$ to $h_\theta(x)$:
 one encoder, one forward pass, $n_cm+n_c$ extra parameters ($390$ on HAR,
 $715$ on SNR), and no reference
-forward. The arm is \emph{function-compatible}: the deployed model reproduces
-the old predictions, not its weights. The objective is a distillation loss on
-the healthy logits, so the arm asks one narrow question: whether that function
-is still present in the feature for a linear map to recover, at one pass and
-without the reference encoder. Protocol, splits, minibatch order and
+forward. This replaces the legacy weights and aims to retain their predictions;
+it does not give an exact logit identity. Logit distillation~\citep{hinton2015distilling}
+and Learning without Forgetting~\citep{li2016lwf} provide the methodological
+precedents. The loss updates both the head and encoder, so this arm tests their
+joint ability to retain legacy predictions. Protocol, splits, minibatch order and
 monitor are those of the benefit confirmation; $\lambda\in\{0.1,1,10\}$ was
 selected on seeds $800$--$802$ by the same rule that ignores accuracy and gain,
 and confirmation uses seeds $300$--$309$.
@@ -1871,39 +1875,39 @@ and confirmation uses seeds $300$--$309$.
 \input{protected_head_table.tex}
 
 On SNR the selected $\lambda=10$ gives $-1.29$ points $[-1.78,-0.80]$ against
-detachment, $5.0\%$ disagreement and no certificate, with reconstruction error
+detachment, $5.0\%$ disagreement and no certificate, with SNR-regression MSE
 at $0.891$ of the control against $0.763$ for joint training. The learned head
 halves the change of the fixed weights on the same features, from $11.8\%$ to
-$5.0\%$, and stops there.
+$5.0\%$, under the selected setting.
 
-HAR at dose $100$ is the other side. The auxiliary contracts the feature and
-leaves the information $z_0$ reads, and the same arm at $\lambda=0.1$ gives
+HAR reconstruction is more favorable under the selected $\lambda=0.1$. The arm gives
 $+0.44$ points $[-0.03,0.91]$ on the primary task, reconstruction error $0.767$
-of detachment, the same as joint training, and $1.8\%$ disagreement, at most
+of detachment, close to joint training, and $1.8\%$ disagreement, at most
 $2.2\%$ per seed (Table~\ref{tab:protected_head}). Nine of ten seeds meet the
-pre-registered certificate criterion; the remaining seed has an observed
+specified certificate criterion; the remaining seed has an observed
 disagreement of $1.8\%$ and an exact bound of $5.1\%$, and abstains. Applying
 the original
 weights to the same features changes $3.3\%$ of decisions, so the head absorbs
-about half the geometric drift that the weights cannot. Absolute accuracies
+roughly half the prediction changes on these same features. The primary-gain interval includes zero, and maximum healthy-logit error is $4.05$, so neither a resolved primary gain nor exact function retention follows. Absolute accuracies
 differ from the full-label reconstruction study of Section~\ref{sec:stf}
 because this run keeps the $10\%$ label protocol; all comparisons are within
 run.
 
-The boundary between the corpora is what the repair hierarchy predicts. A scale
-change is a linear map away from the old function, and a linear head learns that
-map during training. A change in what the feature encodes is not, and no readout
-recovers a function that is no longer present. Function compatibility is
-therefore free where the diagnostic says the damage is geometric, and priced
-like weight compatibility where the auxiliary changes the information.
+The full specified conjunction requires every seed to certify. HAR therefore
+misses it by one conservative abstention, despite all measured full-corpus
+disagreements being below budget; SNR also fails the utility criteria. The
+cross-corpus difference does not identify information loss: teacher regularization,
+linear approximation and fitting can each affect the result. Appendix~\ref{app:protected_audit}
+separates readout fitting on frozen features from jointly constrained learning.
+
+\input{protected_audit.tex}
 
 \subsection{A Vision Boundary Screen}\label{app:vision_boundary}
 
-The failure needs an update that changes the scale of the features. A mild
-auxiliary on a pretrained vision backbone did not supply one in our screens. We
-ran two pre-registered development screens and did not open the official test
+We next test whether the scale-sensitive accuracy failure appears on a pretrained
+vision backbone. We ran two fixed-protocol development screens and did not open the official test
 split. The model is an
-ImageNet-pretrained ResNet-18 on CIFAR-100 at $64\times64$ input, continued for
+ImageNet-pretrained ResNet-18~\citep{he2016resnet} on CIFAR-100~\citep{krizhevsky2009cifar} at $64\times64$ input, continued for
 three epochs with SGD at $10^{-3}$ for the encoder and $10^{-2}$ for the heads,
 momentum $0.9$, weight decay $5\times10^{-4}$, batch $128$, and frozen
 batch-normalization running statistics. A linear readout fitted on the healthy
@@ -1911,12 +1915,13 @@ features reaches $0.521$ validation accuracy across the three replication seeds
 ($0.513$--$0.528$). Each branch clones the pretrained model and shares minibatch
 order, and $2{,}048$ paired anchors are isolated from fitting.
 
-The first screen used a natural rotation auxiliary at dose $1$ and dose $10$.
-The readout did not degrade: it reached $0.606$ in the primary-only branch and
-$0.588$ at dose $1$, while the corresponding current heads reached $0.620$ and
-$0.615$; the auxiliary gave no measurable primary benefit ($-0.0006$). The
+The first screen used bf16 continuation at seed $900$, with a natural rotation
+auxiliary at doses $1$ and $10$. Against healthy accuracy $0.513$, the frozen
+readout reached $0.598$ in the primary-only branch and $0.588$ at dose $1$;
+the corresponding current heads reached $0.616$ and $0.615$. The paired
+primary difference was $-0.06$ points, so this screen did not establish an auxiliary benefit. The
 dose-$10$ branch produced a non-finite loss in its first epoch and was not
-retuned or rerun. The pre-registered failure criterion was a loss of at least five
+retuned or rerun. The specified failure criterion was a loss of at least five
 points. The screen therefore cannot test repair: the fixed
 diagonal-statistics family stayed near $0.61$--$0.62$, and the paired-ridge
 family was unstable across anchor budgets ($0.17$--$0.58$).
@@ -1937,16 +1942,19 @@ branch combines a crossed scale with a silent readout loss.
 
 \input{vision_boundary_table.tex}
 
-What the scale does change is the decisions. A post-hoc replay evaluates the
-healthy readout on $c\,h$ over a fixed grid of $c$ and isolates the scale
-component from the direction change learned in continuation. Accuracy falls by
-only $3.5$ points at $c=0.432$, the seed-$900$ median crossing scale, where
+What the scale does change is the decisions. A post-hoc replay contracts the
+standardized features $z=(h-\mu_0)/s_0$ and evaluates logits $cWz+b$ over a
+fixed grid. This is contraction around the healthy feature mean; the raw-feature
+top-two crossing scale above describes a different path. Accuracy falls by
+only $3.5$ points at the grid value $c=0.432$, where
 $21.1\%$ of predictions change, and by
 $7.0$ points at $c=0.318$, where $33.9\%$ change. Only at $c=0.15$, where
-accuracy falls to $0.169$, do $77.7\%$ of decisions change. At the crossing
-scale $6.2\%$ of the corpus moves from correct to wrong and $2.7\%$ the other
-way, while $57.6\%$ of all changes stay between two wrong classes; at $c=0.318$
-the three flows are $10.7$, $3.7$ and $57.4\%$, for a net $7.0$-point loss. An
+accuracy falls to $0.169$, do $77.7\%$ of decisions change. At $c=0.432$,
+$6.2\%$ of the corpus moves from correct to wrong and $2.7\%$ the other
+way, while $57.6\%$ of all changes stay between two wrong classes. At $c=0.318$,
+correct-to-wrong and wrong-to-correct changes account for $10.7\%$ and $3.7\%$
+of the corpus, while $57.4\%$ of changed predictions stay between wrong classes,
+giving a net $7.0$-point loss. An
 incompatible interface hides behind stable accuracy because most of its traffic
 never touches the label.
 
@@ -1962,25 +1970,21 @@ auxiliary branches above the primary-only branch, while the frozen readout ranks
 them below it; the largest accuracy gain of the four still arrives with a
 $42.1\%$ change of legacy decisions.
 
-Standard unlabeled baselines fail the same way. Recomputing per-feature input
-statistics, the AdaBN operation, raises the old readout from $0.606$ to $0.622$
+The fixed unlabeled readout-input baselines also leave substantial disagreement. Recomputing per-feature input
+statistics at the readout input raises the old readout from $0.606$ to $0.622$
 on the primary-only branch and from $0.557$ to $0.630$ on the selected scale
 branch, yet $40.4\%$ and $41.7\%$ of its decisions still differ. The paired
-linear map, the label-free old-to-new map of the LDC family, reaches $0.585$ and
+new-to-old ridge map reaches $0.585$ and
 $0.580$ with $42.2\%$ and $44.0\%$ changed. Alignment recovers accuracy; it does
 not recover the interface.
 
-Both screens bound the accuracy failure, not the compatibility failure. The
-affine law governs pure contraction, and the replay shows decisions accumulating
-as the scale falls. In a trained branch the same trace ratio arrives with a
-direction change the law does not model: that change raises the refit probe and
-offsets the scale damage to accuracy, but not to decisions. The silent accuracy
-failure needs contraction strong enough to reach the bias-only predictor while
-the features stay decodable. The HAR variance auxiliary contracts to $0.015$ of
-healthy against a median crossing scale of $0.054$ and lands there, whereas the
-vision branches that contract that far destroy the refit probe as well. The
-compatibility failure is the more robust of the two: it appears in every branch
-whose features move, including the ones that improve accuracy.
+Neither screen reproduces the HAR accuracy failure. Pure contraction has an
+exact affine law, whereas trained features also change direction; their trace
+ratio alone does not predict legacy accuracy. The HAR variance auxiliary reaches
+a scale of $0.015$ against a median top-two crossing scale of $0.054$ while
+remaining decodable. The strongly contracting vision branch instead loses both
+frozen and refitted accuracy. Decision compatibility fails across the tested
+vision continuations, including those that improve aggregate accuracy.
 
 \subsection{A Fixed-Corpus Unlabeled Consumer Check}\label{app:consumer_audit}
 

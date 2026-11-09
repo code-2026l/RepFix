@@ -11,3 +11,9 @@ files below, which retain their own terms.
   and remain under their respective licenses.
 - `paper/iclr2027_conference.bst` is the ICLR conference bibliography style and
   remains under its own terms.
+
+Raw datasets and pretrained model weights are not bundled. The vision study
+uses [CIFAR-100](https://cave.cs.toronto.edu/kriz/cifar.html) and the torchvision
+ResNet-18 `IMAGENET1K_V1` weights. Dataset access and pretrained-weight use
+remain subject to their original providers' terms. Numerical summaries and
+figure scripts in this artifact do not redistribute the images or weights.
