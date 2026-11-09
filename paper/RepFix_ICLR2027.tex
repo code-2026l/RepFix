@@ -243,7 +243,7 @@ Real reconstruction tests repair while the auxiliary makes progress (Table~\ref{
 
 Let $A=W_0\operatorname{diag}(1/s_0)$ and let $P_\perp$ project onto $\ker A$. The reference-anchored control $H_0+(H_\theta-H_0)P_\perp$ preserves all healthy logits while emitting one shared $64$-vector (Proposition~\ref{prop:consumer_nullspace}, Figure~\ref{fig:nullspace_control}). Validation selects SNR dose $1$ from six fixed candidates using $20\%$ of fitting primary labels. Ten new seeds confirm an ordinary auxiliary gain J--D of $\BenefitJointGain$ percentage points, paired $95\%$ interval $[\BenefitJointGainLow,\BenefitJointGainHigh]$, and a guarded gain GJ--GD of $\BenefitGuardGain$, $[\BenefitGuardGainLow,\BenefitGuardGainHigh]$ (Table~\ref{tab:benefit_confirmation}). The guarded model clears the declared $0.5$-point noninferiority margin against J, and its predictions, NLL, and ECE match the reference to a maximum logit error of $\BenefitLogitError$; its ten endpoints also satisfy a separate five-point disagreement budget. Frozen accuracy barely moves, while ECE rises from $\BenefitHealthyECE$ to $\BenefitJointECE$. Both encoders remain at inference, at a measured $\BenefitLatencyRatio\times$ CPU cost (Appendix~\ref{app:benefit_confirmation}).
 
-With a frozen nonlinear trunk, the last-affine constraint folds into one encoder but loses the SNR gain; freezing accounts for $-3.53$ points, while the constraint adds $-0.003$ (Appendix~\ref{app:compiled_interface}). A nonlinear-side grid also fails its benefit screen. Fitting and folding a chart \emph{after} unrestricted learning instead retains a $\ChartGain$-point gain at $\ChartLatency\times$ native CPU cost. Old-reader accuracy improves by $\ChartOldGain$ points and its NLL and ECE fall, yet $\ChartDisagreement\%$ of its predictions change, and none of ten repaired consumers meets the fixed five-point disagreement budget (Appendix~\ref{app:posthoc_chart}). Every aggregate check can pass while the deployed interface changes. A training-time hinge on the frozen consumer's margin keeps one encoder and a $0.72$-point gain, against $0.97$ for joint training, while halving decision changes to $29.2\%$; it still misses the budget, and on a second corpus whose auxiliary barely moves the readout the same rule meets it with eight of ten certificates; pinning the consumer's logits instead of its margin traces the same frontier and certifies none (Table~\ref{tab:compatibility_frontier}, Appendix~\ref{app:decision_preserving}). On a pretrained vision backbone, three epochs of primary-only continuation raise the frozen readout's accuracy by $8.5$ points and still change $42.1\%$ of its decisions, with $16.8\%$ of examples moving from correct to wrong (Appendix~\ref{app:vision_boundary}).
+With a frozen nonlinear trunk, the last-affine constraint folds into one encoder but loses the SNR gain; freezing accounts for $-3.53$ points, while the constraint adds $-0.003$ (Appendix~\ref{app:compiled_interface}). A nonlinear-side grid also fails its benefit screen. Fitting and folding a chart \emph{after} unrestricted learning instead retains a $\ChartGain$-point gain at $\ChartLatency\times$ native CPU cost. Old-reader accuracy improves by $\ChartOldGain$ points and its NLL and ECE fall, yet $\ChartDisagreement\%$ of its predictions change, and none of ten repaired consumers meets the fixed five-point disagreement budget (Appendix~\ref{app:posthoc_chart}). Every aggregate check can pass while the deployed interface changes. A training-time hinge on the frozen consumer's margin keeps one encoder and a $0.72$-point gain, against $0.97$ for joint training, while halving decision changes to $29.2\%$; it still misses the budget, and on a second corpus whose auxiliary barely moves the readout the same rule meets it with eight of ten certificates; pinning the consumer's logits instead of its margin traces the same frontier and certifies none (Table~\ref{tab:compatibility_frontier}, Appendix~\ref{app:decision_preserving}). On a pretrained vision backbone, three epochs of primary-only continuation raise the frozen readout's accuracy by $8.5$ points and still change $42.1\%$ of its decisions, with $7.2\%$ of examples moving from correct to wrong (Appendix~\ref{app:vision_boundary}).
 
 \input{decision_preserving_table.tex}
 
@@ -1891,21 +1891,20 @@ only $3.5$ points at $c=0.432$, the seed-$900$ median crossing scale, where
 $21.1\%$ of predictions change, and by
 $7.0$ points at $c=0.318$, where $33.9\%$ change. Only at $c=0.15$, where
 accuracy falls to $0.169$, do $77.7\%$ of decisions change. At the crossing
-scale $12.3\%$ of the corpus moves from correct to wrong and $8.8\%$ the other
-way, so the net $3.5$-point loss is the residue of two larger flows; at
-$c=0.318$ the flows are $20.5$ and $13.4\%$ for a net $7.0$-point loss. The
-healthy readout is $52\%$ accurate, a changed prediction is about as likely to
-correct an error as to create one, and an incompatible interface hides behind
-stable accuracy.
+scale $6.2\%$ of the corpus moves from correct to wrong and $2.7\%$ the other
+way, while $57.6\%$ of all changes stay between two wrong classes; at $c=0.318$
+the three flows are $10.7$, $3.7$ and $57.4\%$, for a net $7.0$-point loss. An
+incompatible interface hides behind stable accuracy because most of its traffic
+never touches the label.
 
 The trained branches show the same separation. The primary-only branch raises
 frozen accuracy by $8.5$ points, changes $42.1\%$ of predictions, and turns
-$16.8\%$ of the corpus from correct to wrong; dose $1$
+$7.2\%$ of the corpus from correct to wrong; dose $1$
 raises it by $7.4$ points and changes $44.8\%$, reproduced within one point in
 an independent bf16 run ($42.5\%$ at $8.5$ points); the selected scale branch
 gains $3.6$ points and changes $47.0\%$; dose $3$ loses $2.9$ points, with
-$29.8\%$ of the corpus moving from correct to wrong and $26.0\%$ the other way
-(Table~\ref{tab:vision_boundary}). The standardized refit ranks the two
+$15.8\%$ of the corpus moving from correct to wrong, $12.8\%$ the other way, and
+$27.2\%$ of the corpus changing between wrong classes (Table~\ref{tab:vision_boundary}). The standardized refit ranks the two
 auxiliary branches above the primary-only branch, while the frozen readout ranks
 them below it; the largest accuracy gain of the four still arrives with a
 $42.1\%$ change of legacy decisions.
