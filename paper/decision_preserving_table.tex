@@ -1,0 +1,17 @@
+\begin{table}[t]
+\centering
+\caption{What each compatibility arm buys and costs, all on the same ten SNR confirmation seeds, splits and minibatch order. Gain is primary accuracy against the detached control, with paired descriptive $95\%$ intervals; \emph{changed} is the fraction of the healthy consumer's predictions that differ on the fixed test corpus; \emph{certified} counts seeds whose exact finite-population bound is at most $0.05$. Only the reference-anchored control certifies every seed, and it needs the reference encoder at inference. The decision-preserving arms share one encoder and still miss the budget. The post-hoc chart reaches $1.16$ points at $44.07\%$ on its own ten confirmation seeds.}
+\label{tab:compatibility_frontier}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lrrrr}
+\toprule
+Arm & gain (pp) & changed & certified & encoders \\
+\midrule
+Joint training & $0.97$ [$0.63$, $1.31$] & $58.9\%$ & $0/10$ & $1$ \\
+Decision, $\gamma=1$ & $0.72$ [$0.31$, $1.12$] & $29.2\%$ & $0/10$ & $1$ \\
+Decision, $\gamma=3$ & $-0.04$ [$-0.46$, $0.38$] & $17.8\%$ & $0/10$ & $1$ \\
+Reference-anchored & $0.89$ [$0.60$, $1.18$] & $0.0\%$ & $10/10$ & $2$ \\
+\bottomrule
+\end{tabular}
+\end{table}

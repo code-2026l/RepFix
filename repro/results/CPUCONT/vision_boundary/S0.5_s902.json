@@ -1,0 +1,124 @@
+{
+  "protocol": "prespecified ResNet-18 CIFAR-100 boundary crossing, fp32, development",
+  "phase": "development",
+  "seed": 902,
+  "plan_sha256": "ac2f773c77ceb46fff2c9cdc057c56921bd67af1bf99e80a030416e8970225b1",
+  "device": "cpu",
+  "cuda_visibility": "",
+  "torch_threads": 8,
+  "torch_version": "2.7.1+cu128",
+  "python_version": "3.11.18",
+  "source_sha256": {
+    "vision_boundary_cpu.py": "3f6c3917c3a7e2f54acdda2745162a43ba9afebca0bc1df32a0932c179b1c49d",
+    "readout_alignment.py": "437256fdd10ec0025e19236ea2f46b6d16073e2900b8e28aa038c08e39e7b93e",
+    "readout_transfer_audit.py": "c53870f0179aa8b902767b3df6f84d9267afcb5d624c178f623ef683876ab27a",
+    "paired_readout_continuation.py": "b395215409a276cafcc074c452be0842dbc6d2197c22c49a449261b8afbb1df5"
+  },
+  "configuration": {
+    "pretrained_weights": "torchvision ResNet18_Weights.IMAGENET1K_V1",
+    "image_size": 64,
+    "batch": 128,
+    "epochs": 3,
+    "encoder_lr": 0.001,
+    "heads_lr": 0.01,
+    "momentum": 0.9,
+    "weight_decay": 0.0005,
+    "train_dtype": "float32",
+    "eval_dtype": "float64",
+    "bn_running_statistics_frozen": true
+  },
+  "splits": {
+    "fitting": 42952,
+    "anchors": 2048,
+    "validation": 5000,
+    "official_test_loaded": false,
+    "test_metrics_computed": false,
+    "fitting_sha256": "955dbc66e27baf3fedc98d7059a869573129965f45321369cd1164722da4034e",
+    "anchor_sha256": "2b8dd6785b4d260ef1f1e50e7d47e4841aab4fb7b4bacc58dc200e2c5c6a7db6",
+    "validation_sha256": "a9274a6a869991a9c939a1c335e717e515e06442932d625c4e1d23b0698e0d8a",
+    "anchors_excluded_from_training": true
+  },
+  "reference_encoder_sha256": "2648b89b4c67dadfa23702f5d08265f8a96c9e0678486f413ad45fbfb22df990",
+  "reference_bn_sha256": "631a53cb8972d5d7db903b82c31bd344510351eda0fd4f87f802d9783885fd07",
+  "healthy": {
+    "metrics": {
+      "acc": 0.5224,
+      "nll": 1.9122089360283214,
+      "ece": 0.12893505530480917,
+      "largest_prediction_fraction": 0.013799999840557575
+    },
+    "trace_V": 873.2748025613638,
+    "scatter_S": 1.7906381456904163,
+    "median_first_flip_c": 0.40255452804590053,
+    "first_flip_defined": 2547,
+    "first_flip_positive": 3999
+  },
+  "branches": [
+    {
+      "mode": "S0.5",
+      "dose": 0.5,
+      "trace": [
+        {
+          "epoch": 1,
+          "primary_loss": 1.477911816915113,
+          "aux_loss": 0.6923025130981351
+        },
+        {
+          "epoch": 2,
+          "primary_loss": 1.048514293078982,
+          "aux_loss": 0.49696852619542736
+        },
+        {
+          "epoch": 3,
+          "primary_loss": 0.8026103721381699,
+          "aux_loss": 0.4564695727683064
+        }
+      ],
+      "epoch_trace_ratio": [
+        {
+          "epoch": 1,
+          "trace_ratio": 0.11349135396681173
+        },
+        {
+          "epoch": 2,
+          "trace_ratio": 0.1051163424204054
+        }
+      ],
+      "initial_encoder_sha256": "2648b89b4c67dadfa23702f5d08265f8a96c9e0678486f413ad45fbfb22df990",
+      "bn_buffers_unchanged": true,
+      "minibatch_order_sha256": "785179365afa4a9b2e59478e963e782fae5184315cf8a7a0f6d8791e1e2d19c9",
+      "rotation_order_sha256": "bfd946f7177298c9cdd46f82e14e449227b5509cd68e97b04a0973866e550cb0",
+      "final_encoder_sha256": "80f06fccec08f33cc346db3faebc4e063e94ea8776c3542bf8302beff97e50fa",
+      "trace_V": 87.54639270258077,
+      "trace_ratio": 0.10025067990717505,
+      "scale_ratio": 0.31662387766429595,
+      "scatter_S": 0.5705484408619856,
+      "frozen": {
+        "acc": 0.5512,
+        "nll": 1.6487969224294805,
+        "ece": 0.050705728722973784,
+        "largest_prediction_fraction": 0.052400000393390656
+      },
+      "current": {
+        "acc": 0.6394,
+        "nll": 1.2553599552802401,
+        "ece": 0.01276410432094378,
+        "largest_prediction_fraction": 0.016599999740719795
+      },
+      "refit": {
+        "acc": 0.6378,
+        "nll": 1.6317209680023606,
+        "ece": 0.1733255736543041,
+        "largest_prediction_fraction": 0.012600000016391277
+      },
+      "recalibrated": {
+        "acc": 0.6274,
+        "nll": 1.863850445309794,
+        "ece": 0.21088949580506094,
+        "largest_prediction_fraction": 0.017400000244379044
+      }
+    }
+  ],
+  "complete": true,
+  "elapsed_s": 237.35187029838562
+}

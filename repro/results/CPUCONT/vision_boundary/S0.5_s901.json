@@ -1,0 +1,124 @@
+{
+  "protocol": "prespecified ResNet-18 CIFAR-100 boundary crossing, fp32, development",
+  "phase": "development",
+  "seed": 901,
+  "plan_sha256": "ac2f773c77ceb46fff2c9cdc057c56921bd67af1bf99e80a030416e8970225b1",
+  "device": "cpu",
+  "cuda_visibility": "",
+  "torch_threads": 8,
+  "torch_version": "2.7.1+cu128",
+  "python_version": "3.11.18",
+  "source_sha256": {
+    "vision_boundary_cpu.py": "3f6c3917c3a7e2f54acdda2745162a43ba9afebca0bc1df32a0932c179b1c49d",
+    "readout_alignment.py": "437256fdd10ec0025e19236ea2f46b6d16073e2900b8e28aa038c08e39e7b93e",
+    "readout_transfer_audit.py": "c53870f0179aa8b902767b3df6f84d9267afcb5d624c178f623ef683876ab27a",
+    "paired_readout_continuation.py": "b395215409a276cafcc074c452be0842dbc6d2197c22c49a449261b8afbb1df5"
+  },
+  "configuration": {
+    "pretrained_weights": "torchvision ResNet18_Weights.IMAGENET1K_V1",
+    "image_size": 64,
+    "batch": 128,
+    "epochs": 3,
+    "encoder_lr": 0.001,
+    "heads_lr": 0.01,
+    "momentum": 0.9,
+    "weight_decay": 0.0005,
+    "train_dtype": "float32",
+    "eval_dtype": "float64",
+    "bn_running_statistics_frozen": true
+  },
+  "splits": {
+    "fitting": 42952,
+    "anchors": 2048,
+    "validation": 5000,
+    "official_test_loaded": false,
+    "test_metrics_computed": false,
+    "fitting_sha256": "92de33c48cdc53fcec4f1ec8e0938c6a5662392b4f06ae8563557f762f31e780",
+    "anchor_sha256": "aecb1eab8000b87021267cb839c898818d359c68522675c4fca54aafc299f23b",
+    "validation_sha256": "0be8ffe201c56208d6bb2505dbbdefebc6fea9a8ef186b0869163e9c940cbcde",
+    "anchors_excluded_from_training": true
+  },
+  "reference_encoder_sha256": "2648b89b4c67dadfa23702f5d08265f8a96c9e0678486f413ad45fbfb22df990",
+  "reference_bn_sha256": "631a53cb8972d5d7db903b82c31bd344510351eda0fd4f87f802d9783885fd07",
+  "healthy": {
+    "metrics": {
+      "acc": 0.5276,
+      "nll": 1.9025511376033886,
+      "ece": 0.12185674352791193,
+      "largest_prediction_fraction": 0.0142000000923872
+    },
+    "trace_V": 863.6687553483222,
+    "scatter_S": 1.7795674472893748,
+    "median_first_flip_c": 0.39782812337251944,
+    "first_flip_defined": 2554,
+    "first_flip_positive": 3957
+  },
+  "branches": [
+    {
+      "mode": "S0.5",
+      "dose": 0.5,
+      "trace": [
+        {
+          "epoch": 1,
+          "primary_loss": 1.4716393484441366,
+          "aux_loss": 0.6949528295426733
+        },
+        {
+          "epoch": 2,
+          "primary_loss": 1.0423988588563688,
+          "aux_loss": 0.4975095342370824
+        },
+        {
+          "epoch": 3,
+          "primary_loss": 0.798962671045352,
+          "aux_loss": 0.45747838445073025
+        }
+      ],
+      "epoch_trace_ratio": [
+        {
+          "epoch": 1,
+          "trace_ratio": 0.12171238910078738
+        },
+        {
+          "epoch": 2,
+          "trace_ratio": 0.10079064740367484
+        }
+      ],
+      "initial_encoder_sha256": "2648b89b4c67dadfa23702f5d08265f8a96c9e0678486f413ad45fbfb22df990",
+      "bn_buffers_unchanged": true,
+      "minibatch_order_sha256": "af8c0a7f720988a3da598626c0ee821cd83ef8d368e334c528bda7be6a864b69",
+      "rotation_order_sha256": "96cfea5fd0aa75261ba71cd5d7f1dec0aa5fb51f6517c9fbce5a864faa6fe29d",
+      "final_encoder_sha256": "fa55dd45839cbd2dcaae3559e34e311ad42ab961a78647f5a571dbc95ee3a035",
+      "trace_V": 82.64456767606023,
+      "trace_ratio": 0.09569012096857578,
+      "scale_ratio": 0.30933819836640897,
+      "scatter_S": 0.5550040842254144,
+      "frozen": {
+        "acc": 0.5638,
+        "nll": 1.5984027614673086,
+        "ece": 0.055081887451540204,
+        "largest_prediction_fraction": 0.04600000008940697
+      },
+      "current": {
+        "acc": 0.6484,
+        "nll": 1.2034091732149956,
+        "ece": 0.01830562708453008,
+        "largest_prediction_fraction": 0.017799999564886093
+      },
+      "refit": {
+        "acc": 0.6412,
+        "nll": 1.6135686734995878,
+        "ece": 0.17441345346577697,
+        "largest_prediction_fraction": 0.012400000356137753
+      },
+      "recalibrated": {
+        "acc": 0.6312,
+        "nll": 1.860880108277201,
+        "ece": 0.2109805177258329,
+        "largest_prediction_fraction": 0.018799999728798866
+      }
+    }
+  ],
+  "complete": true,
+  "elapsed_s": 247.55450177192688
+}

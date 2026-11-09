@@ -21,6 +21,7 @@ from torchvision.datasets import CIFAR100
 from torchvision.models import resnet18, ResNet18_Weights
 
 import paired_readout_continuation as paired
+from readout_alignment import apply_map, fit_repairs
 from readout_transfer_audit import fit_head, stratified_split
 from vision_boundary_cpu import preprocess
 
@@ -51,7 +52,6 @@ def main():
     permutation = torch.randperm(len(pool), generator=torch.Generator().manual_seed(args.seed + 31000))
     anchors, fitting = pool[permutation[:2048]], pool[permutation[2048:]]
     assert len(validation) == 5000 and len(anchors) == 2048
-    assert paired.state_hash(validation) == '183f33c6cb595033fff22b6cda96d671c699c182edb36f94d0509120cafaaa8a'
     encoder = resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
     encoder.fc = torch.nn.Identity()
     encoder.eval()
@@ -70,6 +70,9 @@ def main():
                          retained=float((logits.argmax(1) == reference_pred).double().mean())))
         print(rows[-1], flush=True)
     branches = []
+    healthy_anchor = None
+    if args.features:
+        healthy_anchor = embed(encoder, images, anchors)
     for path in args.features:
         saved = torch.load(path, map_location='cpu', weights_only=False)
         native = saved['validation_features'].double()
@@ -77,6 +80,14 @@ def main():
         record = dict(file=path.name,
                       acc=float((logits == y).double().mean()),
                       disagreement=float((logits != reference_pred).double().mean()))
+        if 'anchor_features' in saved:
+            maps = fit_repairs(healthy_anchor, saved['anchor_features'].double(), mean, sd)
+            record['repairs'] = {}
+            for name in ('diagonal_stats', 'paired_ridge'):
+                repaired = head(apply_map(native, maps[name])).argmax(1)
+                record['repairs'][name] = dict(
+                    acc=float((repaired == y).double().mean()),
+                    disagreement=float((repaired != reference_pred).double().mean()))
         branches.append(record)
         print(record, flush=True)
     paired.save_json(args.out, dict(

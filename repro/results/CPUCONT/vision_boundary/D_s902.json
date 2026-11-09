@@ -1,0 +1,124 @@
+{
+  "protocol": "prespecified ResNet-18 CIFAR-100 boundary crossing, fp32, development",
+  "phase": "development",
+  "seed": 902,
+  "plan_sha256": "ac2f773c77ceb46fff2c9cdc057c56921bd67af1bf99e80a030416e8970225b1",
+  "device": "cpu",
+  "cuda_visibility": "",
+  "torch_threads": 8,
+  "torch_version": "2.7.1+cu128",
+  "python_version": "3.11.18",
+  "source_sha256": {
+    "vision_boundary_cpu.py": "3f6c3917c3a7e2f54acdda2745162a43ba9afebca0bc1df32a0932c179b1c49d",
+    "readout_alignment.py": "437256fdd10ec0025e19236ea2f46b6d16073e2900b8e28aa038c08e39e7b93e",
+    "readout_transfer_audit.py": "c53870f0179aa8b902767b3df6f84d9267afcb5d624c178f623ef683876ab27a",
+    "paired_readout_continuation.py": "b395215409a276cafcc074c452be0842dbc6d2197c22c49a449261b8afbb1df5"
+  },
+  "configuration": {
+    "pretrained_weights": "torchvision ResNet18_Weights.IMAGENET1K_V1",
+    "image_size": 64,
+    "batch": 128,
+    "epochs": 3,
+    "encoder_lr": 0.001,
+    "heads_lr": 0.01,
+    "momentum": 0.9,
+    "weight_decay": 0.0005,
+    "train_dtype": "float32",
+    "eval_dtype": "float64",
+    "bn_running_statistics_frozen": true
+  },
+  "splits": {
+    "fitting": 42952,
+    "anchors": 2048,
+    "validation": 5000,
+    "official_test_loaded": false,
+    "test_metrics_computed": false,
+    "fitting_sha256": "955dbc66e27baf3fedc98d7059a869573129965f45321369cd1164722da4034e",
+    "anchor_sha256": "2b8dd6785b4d260ef1f1e50e7d47e4841aab4fb7b4bacc58dc200e2c5c6a7db6",
+    "validation_sha256": "a9274a6a869991a9c939a1c335e717e515e06442932d625c4e1d23b0698e0d8a",
+    "anchors_excluded_from_training": true
+  },
+  "reference_encoder_sha256": "2648b89b4c67dadfa23702f5d08265f8a96c9e0678486f413ad45fbfb22df990",
+  "reference_bn_sha256": "631a53cb8972d5d7db903b82c31bd344510351eda0fd4f87f802d9783885fd07",
+  "healthy": {
+    "metrics": {
+      "acc": 0.5224,
+      "nll": 1.9122089360283214,
+      "ece": 0.12893505530480917,
+      "largest_prediction_fraction": 0.013799999840557575
+    },
+    "trace_V": 873.2748025613638,
+    "scatter_S": 1.7906381456904163,
+    "median_first_flip_c": 0.40255452804590053,
+    "first_flip_defined": 2547,
+    "first_flip_positive": 3999
+  },
+  "branches": [
+    {
+      "mode": "D",
+      "dose": 0.0,
+      "trace": [
+        {
+          "epoch": 1,
+          "primary_loss": 1.4683464699160966,
+          "aux_loss": 0.0
+        },
+        {
+          "epoch": 2,
+          "primary_loss": 0.9891563613535994,
+          "aux_loss": 0.0
+        },
+        {
+          "epoch": 3,
+          "primary_loss": 0.704782184952352,
+          "aux_loss": 0.0
+        }
+      ],
+      "epoch_trace_ratio": [
+        {
+          "epoch": 1,
+          "trace_ratio": 0.3268054506166238
+        },
+        {
+          "epoch": 2,
+          "trace_ratio": 0.42372459704950033
+        }
+      ],
+      "initial_encoder_sha256": "2648b89b4c67dadfa23702f5d08265f8a96c9e0678486f413ad45fbfb22df990",
+      "bn_buffers_unchanged": true,
+      "minibatch_order_sha256": "785179365afa4a9b2e59478e963e782fae5184315cf8a7a0f6d8791e1e2d19c9",
+      "rotation_order_sha256": "bfd946f7177298c9cdd46f82e14e449227b5509cd68e97b04a0973866e550cb0",
+      "final_encoder_sha256": "284fc4066f33ead4a742dd2a68a0a6de2960ce127fa1b53dc8d124a6cd7cd0f6",
+      "trace_V": 380.1846419797191,
+      "trace_ratio": 0.4353551034160339,
+      "scale_ratio": 0.6598144462013801,
+      "scatter_S": 1.1862903759731205,
+      "frozen": {
+        "acc": 0.6062,
+        "nll": 1.4388462534392639,
+        "ece": 0.07960135308823904,
+        "largest_prediction_fraction": 0.019999999552965164
+      },
+      "current": {
+        "acc": 0.6108,
+        "nll": 1.4037273064978633,
+        "ece": 0.10277185001628436,
+        "largest_prediction_fraction": 0.01860000006854534
+      },
+      "refit": {
+        "acc": 0.636,
+        "nll": 1.5490067476332736,
+        "ece": 0.1617641447724429,
+        "largest_prediction_fraction": 0.012400000356137753
+      },
+      "recalibrated": {
+        "acc": 0.6178,
+        "nll": 1.6100699202472983,
+        "ece": 0.17178151421318993,
+        "largest_prediction_fraction": 0.015399999916553497
+      }
+    }
+  ],
+  "complete": true,
+  "elapsed_s": 268.11174058914185
+}

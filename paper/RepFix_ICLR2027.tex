@@ -57,7 +57,7 @@
 \maketitle
 
 \begin{abstract}
-Shared encoders can keep learning while breaking the readouts that depend on them. We study this failure under auxiliary-task updates and identify a scale-sensitive component, \emph{silent scale shift}: task information remains decodable, but an existing readout loses accuracy. In matched HAR continuations across ten seeds, frozen-readout accuracy falls from $\CpuHarHealthy$ to $\CpuHarJointMid$, while the current head reaches $\CpuHarOwnMid$; unlabeled scale correction restores $\MechHarScalarMid$. With a real reconstruction auxiliary, error falls to $\ReconHarMseRatioHigh$ of detachment while frozen accuracy drops to $\ReconHarFrozenHigh$; paired linear alignment restores $\ReconHarPairedLinearHigh$. Exact affine boundaries explain the scale mechanism, and a repair hierarchy separates it from richer drift. A signed update audit shows why task-gradient alignment and unsigned variance probes can miss these changes. Finally, an independently confirmed SNR experiment retains a $\BenefitGuardGain$-percentage-point auxiliary gain and the old logits under a reference-anchored constraint, at $\BenefitLatencyRatio\times$ CPU inference cost; folding that constraint into the encoder removes the cost but loses the gain. A coordinate map fitted after unrestricted learning avoids both penalties, keeping a $\ChartGain$-point gain at $\ChartLatency\times$ native cost and improving old-reader accuracy, yet it changes $\ChartDisagreement\%$ of legacy decisions and no repaired consumer meets a five-point disagreement budget. Readout compatibility is therefore a separate acceptance criterion, not a corollary of accuracy.
+Shared encoders can keep learning while breaking the readouts that depend on them. We study this failure under auxiliary-task updates and identify a scale-sensitive component, \emph{silent scale shift}: task information remains decodable, but an existing readout loses accuracy. In matched HAR continuations across ten seeds, frozen-readout accuracy falls from $\CpuHarHealthy$ to $\CpuHarJointMid$, while the current head reaches $\CpuHarOwnMid$; unlabeled scale correction restores $\MechHarScalarMid$. With a real reconstruction auxiliary, error falls to $\ReconHarMseRatioHigh$ of detachment while frozen accuracy drops to $\ReconHarFrozenHigh$; paired linear alignment restores $\ReconHarPairedLinearHigh$. Exact affine boundaries explain the scale mechanism, and a repair hierarchy separates it from richer drift. A signed update audit shows why task-gradient alignment and unsigned variance probes can miss these changes. Finally, an independently confirmed SNR experiment retains a $\BenefitGuardGain$-percentage-point auxiliary gain and the old logits under a reference-anchored constraint, at $\BenefitLatencyRatio\times$ CPU inference cost; folding that constraint into the encoder removes the cost but loses the gain. A coordinate map fitted after unrestricted learning avoids both penalties, keeping a $\ChartGain$-point gain at $\ChartLatency\times$ native cost and improving old-reader accuracy, yet it changes $\ChartDisagreement\%$ of legacy decisions and no repaired consumer meets a five-point disagreement budget. Constraining legacy decisions during training halves that change at native inference cost while keeping most of the gain, yet still misses the budget. Readout compatibility is therefore a separate acceptance criterion, not a corollary of accuracy.
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
@@ -244,7 +244,7 @@ Real reconstruction tests repair while the auxiliary makes progress (Table~\ref{
 
 Let $A=W_0\operatorname{diag}(1/s_0)$ and let $P_\perp$ project onto $\ker A$. The reference-anchored control $H_0+(H_\theta-H_0)P_\perp$ preserves all healthy logits while emitting one shared $64$-vector (Proposition~\ref{prop:consumer_nullspace}, Figure~\ref{fig:nullspace_control}). Validation selects SNR dose $1$ from six fixed candidates, using $20\%$ of fitting primary labels. Ten new seeds confirm ordinary auxiliary gain J--D of $\BenefitJointGain$ percentage points, paired $95\%$ interval $[\BenefitJointGainLow,\BenefitJointGainHigh]$, and guarded gain GJ--GD of $\BenefitGuardGain$, $[\BenefitGuardGainLow,\BenefitGuardGainHigh]$ (Table~\ref{tab:benefit_confirmation}). The guarded model meets the declared $0.5$-point noninferiority margin against J. All guarded predictions, NLL, and ECE match the reference; maximum logit error is $\BenefitLogitError$. The ten guarded joint endpoints also pass a separate five-point disagreement budget. Ordinary frozen accuracy barely changes, but ECE rises from $\BenefitHealthyECE$ to $\BenefitJointECE$. Both encoders remain at inference, at a measured $\BenefitLatencyRatio\times$ CPU cost (Appendix~\ref{app:benefit_confirmation}).
 
-With a frozen nonlinear trunk, the last-affine constraint folds into one encoder but loses the SNR gain; freezing accounts for $-3.53$ points, while the constraint adds $-0.003$ (Appendix~\ref{app:compiled_interface}). A nonlinear-side grid also fails its benefit screen. Fitting and folding a chart \emph{after} unrestricted learning instead retains a $\ChartGain$-point gain at $\ChartLatency\times$ native CPU cost. Old-reader accuracy improves by $\ChartOldGain$ points and its NLL and ECE fall, yet $\ChartDisagreement\%$ of its predictions change, and none of ten repaired consumers meets the fixed five-point disagreement budget (Appendix~\ref{app:posthoc_chart}). Accuracy, calibration, current-head preservation, and cost can all pass while the deployed interface still changes. On a pretrained vision backbone, three epochs of primary-only continuation raise the frozen readout's accuracy by $8.6$ points and still change $43.4\%$ of its decisions (Appendix~\ref{app:vision_boundary}).
+With a frozen nonlinear trunk, the last-affine constraint folds into one encoder but loses the SNR gain; freezing accounts for $-3.53$ points, while the constraint adds $-0.003$ (Appendix~\ref{app:compiled_interface}). A nonlinear-side grid also fails its benefit screen. Fitting and folding a chart \emph{after} unrestricted learning instead retains a $\ChartGain$-point gain at $\ChartLatency\times$ native CPU cost. Old-reader accuracy improves by $\ChartOldGain$ points and its NLL and ECE fall, yet $\ChartDisagreement\%$ of its predictions change, and none of ten repaired consumers meets the fixed five-point disagreement budget (Appendix~\ref{app:posthoc_chart}). Accuracy, calibration, current-head preservation, and cost can all pass while the deployed interface still changes. A training-time hinge on the frozen consumer's margin keeps one encoder and a $0.72$-point gain, against $0.97$ for joint training, while halving decision changes to $29.2\%$; it still misses the budget (Appendix~\ref{app:decision_preserving}). On a pretrained vision backbone, three epochs of primary-only continuation raise the frozen readout's accuracy by $8.5$ points and still change $42.1\%$ of its decisions (Appendix~\ref{app:vision_boundary}).
 
 Detachment blocks auxiliary gradients to the encoder and provides the reference when the auxiliary brings no primary-task value. The spectral toxicity filter (\STF{}) instead removes a chosen component of the auxiliary channel. Its idealized backward form is
 \begin{equation}
@@ -1771,9 +1771,51 @@ The strict-positive gate is evaluated from integer correct counts and exact rati
 
 All $165$ saved state files are locally checked: six healthy states, $87$ endpoint model--Adam states and $72$ deployed side models. A separate tensor-only process reconstructs all $87$ validation consumers; accuracy, NLL and ECE replay exactly, with auxiliary errors also checked. All $36$ constrained-side consumers retain their old validation predictions/NLL/ECE; maximum logit error is $\NonlinearLogitError$. Fused/unfused feature error is at most $\NonlinearFusionError$. The nonlinear prefix changes in every constrained branch, and frozen base weights and Adam states remain unchanged. Structural tests include arbitrary nonlinear changes, native-precision fusion, full-rank/no-nullspace and unconstrained/base-drift negative controls.
 
-The construction supports nonlinear updates with retained affine-consumer outputs, but the tested candidates do not close the utility and cost target. A matched side with its prefix frozen would be needed to isolate the prefix's contribution to performance. A prespecified screen on a pretrained vision backbone did not reproduce the accuracy failure at the tested doses, although the frozen readout changed $43$--$56\%$ of its decisions (Appendix~\ref{app:vision_boundary}); nonlinear downstream consumers, stronger vision auxiliaries, new populations, and adaptive warning policies remain open extensions.
+The construction supports nonlinear updates with retained affine-consumer outputs, but the tested candidates do not close the utility and cost target. A matched side with its prefix frozen would be needed to isolate the prefix's contribution to performance. A prespecified screen on a pretrained vision backbone did not reproduce the accuracy failure at the tested doses, although the frozen readout changed $42$--$56\%$ of its decisions (Appendix~\ref{app:vision_boundary}); nonlinear downstream consumers, stronger vision auxiliaries, new populations, and adaptive warning policies remain open extensions.
 
 \input{chart_study.tex}
+
+\subsection{A Decision-Preserving Training Constraint}\label{app:decision_preserving}
+
+The arms above each fail one axis. A training-time constraint asks whether the
+missing combination is reachable at all. Continuation minimises
+$L_{\rm primary}+\alpha L_{\rm aux}+\gamma R$ with
+\begin{equation}
+ R=\frac1n\sum_i\max\Bigl(0,\ \max_{j\ne p_{0i}}z_i[j]-z_i[p_{0i}]\Bigr),
+ \label{eq:decision_penalty}
+\end{equation}
+where $z_i$ is the frozen consumer's logit vector on the current features and
+$p_{0i}$ its prediction on the healthy features. $R$ vanishes at
+initialisation, so it penalises decisions that would flip, not drift. The
+healthy encoder and readout enter fitting only; inference is the single shared
+encoder.
+
+The protocol is the ten-seed benefit confirmation unchanged: RadioML, $20\%$
+primary labels, width $64$, Adam $10^{-3}$, batch $256$, dose $1$, $25$ warm-up
+and $25$ continuation epochs, the same splits, minibatch order, healthy readout
+and monitor partition. On development seeds $800$--$802$ the penalty trades
+disagreement for gain smoothly: at $\gamma=0.1,0.3,1.0,3.0$ the primary gain is
+$1.35,1.26,1.11,0.08$ points and the validation disagreement is
+$38.4,33.4,24.3,14.0\%$, against $1.06$ points and $53.3\%$ for joint training.
+The fixed rule selected the smallest $\gamma$ whose development disagreement is
+at most $5\%$; none reaches it, so it selected $\gamma=3$.
+
+\input{decision_preserving_table.tex}
+
+Ten confirmation seeds give $0.72$ points $[0.31,1.12]$ at $\gamma=1$ with
+$29.2\%$ disagreement and $-0.04$ $[-0.46,0.38]$ at $\gamma=3$ with $17.8\%$;
+both use one encoder at inference. Neither is certified: no seed meets the
+five-point budget and the largest exact upper bound is $0.26$ at $\gamma=3$. The
+frozen consumer's accuracy is $0.262$ at $\gamma=3$, above the healthy $0.258$,
+while $17.8\%$ of its decisions differ. The $\gamma=1$ row is a post-hoc knee
+confirmation run after the fixed rule selected $\gamma=3$ and the primary arm
+failed; it is reported separately and does not change the primary decision.
+
+The constraint buys compatibility at no inference cost: it gives up $0.25$ points
+of the $0.97$-point gain and roughly halves the decision changes. It still cannot
+reach the budget. Exact compatibility costs a second encoder at inference;
+approximate compatibility costs gain; the five-point budget sits beyond the
+strength at which the gain vanishes.
 
 \subsection{A Vision Boundary Screen}\label{app:vision_boundary}
 
@@ -1784,13 +1826,13 @@ ImageNet-pretrained ResNet-18 on CIFAR-100 at $64\times64$ input, continued for
 three epochs with SGD at $10^{-3}$ for the encoder and $10^{-2}$ for the heads,
 momentum $0.9$, weight decay $5\times10^{-4}$, batch $128$, and frozen
 batch-normalization running statistics. A linear readout fitted on the healthy
-features reaches $0.513$ validation accuracy. Each branch clones the pretrained
-model and shares minibatch order, and $2{,}048$ paired anchors are isolated from
-fitting.
+features reaches $0.521$ validation accuracy across the three replication seeds
+($0.513$--$0.528$). Each branch clones the pretrained model and shares minibatch
+order, and $2{,}048$ paired anchors are isolated from fitting.
 
 The first screen used a natural rotation auxiliary at dose $1$ and dose $10$.
-The readout did not degrade: it reached $0.598$ in the primary-only branch and
-$0.588$ at dose $1$, while the corresponding current heads reached $0.616$ and
+The readout did not degrade: it reached $0.606$ in the primary-only branch and
+$0.588$ at dose $1$, while the corresponding current heads reached $0.620$ and
 $0.615$; the auxiliary gave no measurable primary benefit ($-0.0006$). The
 dose-$10$ branch produced a non-finite loss in its first epoch and was not
 retuned or rerun. The prespecified failure criterion was a loss of at least five
@@ -1802,15 +1844,15 @@ The second screen crossed the affine boundary deliberately. The dose was fixed
 before outcomes from the feature trace alone: of two one-epoch scale
 instruments, $\lambda=0.2$ gave a trace ratio of $0.180$ and $\lambda=0.5$ gave
 $0.116$, so the rule selected $0.5$ for a three-epoch branch; readout accuracy
-was not used. Its endpoint trace ratio is $0.101$, a scale of $0.318$, below the
-median top-two crossing scale $0.432$ of the healthy readout. The predeclared
-crossing criterion still fails. Frozen accuracy is $0.557$, $4.3$ points above
-healthy, and the standardized refit reaches $0.632$. A rotation auxiliary at
-dose $3$ reaches scale $0.367$ and frozen $0.484$ ($-2.9$ points), refit $0.594$.
-At dose $5$ the scale is $0.067$; the frozen readout collapses to the constant
-predictor ($0.013$, equal to the largest healthy class frequency) and the
-current head collapses with it ($0.023$). No branch combines a crossed scale
-with a silent readout loss.
+was not used. Its endpoint trace ratio is $0.099\pm0.003$, a scale of
+$0.315\pm0.005$, below the median top-two crossing scale $0.411$ of the healthy
+readout. The predeclared crossing criterion still fails. Frozen accuracy is
+$0.557$, $3.6$ points above healthy, and the standardized refit reaches $0.637$.
+A rotation auxiliary at dose $3$ reaches scale $0.367$ and frozen $0.484$
+($-2.9$ points), refit $0.594$. At dose $5$ the scale is $0.067$; the frozen
+readout collapses to the constant predictor ($0.013$, equal to the largest
+healthy class frequency) and the current head collapses with it ($0.023$). No
+branch combines a crossed scale with a silent readout loss.
 
 \input{vision_boundary_table.tex}
 
@@ -1820,19 +1862,19 @@ component from the direction change learned in continuation. Accuracy falls by
 only $3.5$ points at $c=0.432$, where $21.1\%$ of predictions change, and by
 $7.0$ points at $c=0.318$, where $33.9\%$ change. Only at $c=0.15$, where
 accuracy falls to $0.169$, do $77.7\%$ of decisions change. The healthy readout
-is $51\%$ accurate, so a changed prediction is nearly as likely to correct an
+is $52\%$ accurate, so a changed prediction is nearly as likely to correct an
 error as to create one, and an incompatible interface hides behind stable
 accuracy.
 
 The trained branches show the same separation. The primary-only branch raises
-frozen accuracy by $8.6$ points and changes $43.4\%$ of predictions; dose $1$
+frozen accuracy by $8.5$ points and changes $42.1\%$ of predictions; dose $1$
 raises it by $7.4$ points and changes $44.8\%$, reproduced within one point in
 an independent bf16 run ($42.5\%$ at $8.5$ points); the selected scale branch
-gains $4.3$ points and changes $47.5\%$; dose $3$ loses $2.9$ points and changes
+gains $3.6$ points and changes $47.0\%$; dose $3$ loses $2.9$ points and changes
 $55.8\%$ (Table~\ref{tab:vision_boundary}). The standardized refit ranks the two
 auxiliary branches above the primary-only branch, while the frozen readout ranks
 them below it; the largest accuracy gain of the four still arrives with a
-$43.4\%$ change of legacy decisions.
+$42.1\%$ change of legacy decisions.
 
 We report both screens as a boundary on accuracy, not on compatibility. The
 affine law governs pure contraction, and the replay shows decisions accumulating
