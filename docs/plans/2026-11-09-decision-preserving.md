@@ -46,3 +46,19 @@ Partial outcomes are reported as a frontier point.
 twelve concurrent jobs. Source hashes, split hashes, minibatch-order hashes,
 initial model/optimizer hashes and the selected `gamma` are recorded.
 Development evaluates validation only; confirmation never tunes anything.
+
+## Addendum: second corpus (HAR), written before any HAR outcome
+
+**Fixed before running.** Domain HAR, reconstruction auxiliary, dose 10: the
+highest-scoring HAR candidate in the earlier benefit development
+(`benefit_development_choice.json`), chosen there by the original rule and not
+re-chosen here. Everything else is unchanged: 10% primary labels, width 64,
+Adam 1e-3, batch 256, 60 warm-up and 30 continuation epochs, seeds 800-802 for
+the same `gamma` grid and the same selection rule, then seeds 300-309 for the
+selected `gamma`.
+
+**Reporting.** HAR's auxiliary gain at the tested doses is near zero, so the
+gain axis is expected to be flat. The HAR rows therefore report the primary
+gain, the auxiliary reconstruction MSE ratio against the detached control, the
+disagreement, and certification. No criterion is added after the fact and the
+SNR decision is not revisited.

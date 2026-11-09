@@ -1,7 +1,10 @@
 """Summarise the pre-registered decision-preserving continuation records.
 
-Reads dp_dev_<seed>_<gamma>.json, dp_conf_<seed>.json and dp_knee_<seed>.json
-from the record directory and writes summary.json. No training and no rerun.
+Reads dev_<seed>_<gamma>.json, conf_<seed>.json and knee_<seed>.json from the
+record directory and writes summary.json. No training and no rerun.
+
+The defaults are the SNR (RadioML) records; ``--prefix hp_ --domain har
+--dose 10 --selected-gamma 0.1`` summarises the second corpus.
 """
 import argparse
 import json
@@ -33,9 +36,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--records', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument('--prefix', default='dp_', help='record filename prefix before dev/conf/knee')
+    parser.add_argument('--domain', default='radioml')
+    parser.add_argument('--dose', type=float, default=1.0)
+    parser.add_argument('--selected-gamma', type=float, default=3.0)
+    parser.add_argument('--knee-gamma', type=float, default=1.0)
     args = parser.parse_args()
     dev = {}
-    for path in records(args.records, 'dp_dev_*.json'):
+    for path in records(args.records, f'{args.prefix}dev_*.json'):
         d, b = arms(path)
         dev.setdefault(d['gamma'], []).append(dict(
             seed=d['seed'],
@@ -43,7 +51,10 @@ def main():
             joint=b['joint']['validation']['own']['acc'],
             penalty=b['penalty']['validation']['own']['acc'],
             disagreement=b['penalty']['validation']['disagreement'],
-            joint_disagreement=b['joint']['validation']['disagreement']))
+            joint_disagreement=b['joint']['validation']['disagreement'],
+            detach_mse=b['detach']['validation']['auxiliary_mse'],
+            joint_mse=b['joint']['validation']['auxiliary_mse'],
+            penalty_mse=b['penalty']['validation']['auxiliary_mse']))
     frontier = []
     for gamma in sorted(dev):
         rows = dev[gamma]
@@ -52,13 +63,17 @@ def main():
         frontier.append(dict(gamma=gamma, seeds=len(rows),
                              gain_pp=float(gain), joint_gain_pp=float(joint),
                              disagreement=float(np.mean([r['disagreement'] for r in rows])),
-                             joint_disagreement=float(np.mean([r['joint_disagreement'] for r in rows]))))
+                             disagreement_max=float(np.max([r['disagreement'] for r in rows])),
+                             joint_disagreement=float(np.mean([r['joint_disagreement'] for r in rows])),
+                             penalty_auxiliary_mse_ratio=float(np.mean([r['penalty_mse'] / r['detach_mse'] for r in rows])),
+                             joint_auxiliary_mse_ratio=float(np.mean([r['joint_mse'] / r['detach_mse'] for r in rows]))))
     blocks = {}
-    for name, pattern in [('primary_gamma_3', 'dp_conf_*.json'), ('knee_gamma_1', 'dp_knee_*.json')]:
+    for name, pattern, gamma in [(f'primary_gamma_{args.selected_gamma:g}', f'{args.prefix}conf_*.json', args.selected_gamma),
+                                 (f'knee_gamma_{args.knee_gamma:g}', f'{args.prefix}knee_*.json', args.knee_gamma)]:
         rows = []
         for path in records(args.records, pattern):
             d, b = arms(path)
-            assert d['gamma'] == (3.0 if name == 'primary_gamma_3' else 1.0)
+            assert d['gamma'] == gamma
             rows.append(dict(seed=d['seed'], detach=b['detach'], joint=b['joint'], penalty=b['penalty']))
         if not rows:
             continue
@@ -73,16 +88,21 @@ def main():
             certified=int(sum(1 for r in rows if r['penalty']['test']['consumer_audit']['certified'])),
             max_upper_bound=float(max(r['penalty']['test']['consumer_audit']['upper_remaining_disagreement'] for r in rows)),
             frozen_acc=float(np.mean([r['penalty']['test']['frozen']['acc'] for r in rows])),
+            detach_frozen_acc=float(np.mean([r['detach']['test']['frozen']['acc'] for r in rows])),
+            joint_frozen_acc=float(np.mean([r['joint']['test']['frozen']['acc'] for r in rows])),
             frozen_nll=float(np.mean([r['penalty']['test']['frozen']['nll'] for r in rows])),
             frozen_ece=float(np.mean([r['penalty']['test']['frozen']['ece'] for r in rows])),
             reference_acc=float(np.mean([r['penalty']['test']['reference']['acc'] for r in rows])),
+            penalty_auxiliary_mse_ratio=float(np.mean([r['penalty']['test']['auxiliary_mse'] / r['detach']['test']['auxiliary_mse'] for r in rows])),
+            joint_auxiliary_mse_ratio=float(np.mean([r['joint']['test']['auxiliary_mse'] / r['detach']['test']['auxiliary_mse'] for r in rows])),
             encoder_at_inference=1)
+    first = records(args.records, f'{args.prefix}conf_*.json') or records(args.records, f'{args.prefix}dev_*.json')
     summary = dict(
         protocol='predeclared decision-preserving continuation, single shared encoder',
-        plan_sha256=json.loads(records(args.records, 'dp_conf_*.json')[0].read_text())['plan_sha256'],
-        domain='radioml', dose=1.0, margin=0.0,
+        plan_sha256=json.loads(first[0].read_text())['plan_sha256'],
+        domain=args.domain, dose=args.dose, margin=0.0,
         selection_rule='smallest gamma with development disagreement <= 0.05, else the largest',
-        gamma_grid=sorted(dev), selected_gamma=3.0,
+        gamma_grid=sorted(dev), selected_gamma=args.selected_gamma,
         development_frontier=frontier,
         confirmation=blocks,
         note='The gamma=1.0 block is a post-hoc knee confirmation run after the fixed rule selected gamma=3.0 and the primary confirmation failed; it is reported separately and does not change the primary decision.')

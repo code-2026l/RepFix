@@ -1813,9 +1813,29 @@ failed; it is reported separately and does not change the primary decision.
 
 The constraint buys compatibility at no inference cost: it gives up $0.25$ points
 of the $0.97$-point gain and roughly halves the decision changes. It still cannot
-reach the budget. Exact compatibility costs a second encoder at inference;
-approximate compatibility costs gain; the five-point budget sits beyond the
-strength at which the gain vanishes.
+reach the budget. A second corpus tests whether the frontier belongs to the
+method or to the shift. An addendum fixed before any HAR outcome reruns the same
+grid, rule and seeds on HAR with its reconstruction auxiliary at dose $10$, the
+highest-scoring HAR candidate in the earlier benefit development, where the
+auxiliary's primary gain is near zero. Every development value already meets the
+budget: disagreement is $1.6,1.2,1.1,2.5\%$ at $\gamma=0.1,0.3,1.0,3.0$, against
+$2.6\%$ for joint training, so the rule selected the smallest, $\gamma=0.1$. Ten
+confirmation seeds at that value give $+0.22$ points $[-0.15,0.60]$ over the
+detached control and $+0.31$ $[-0.68,1.29]$ over joint training, with
+reconstruction error at $0.78$ of the control against $0.81$ for joint training;
+the gain axis is flat in both comparisons. Mean disagreement is $2.3\%$, between
+$1.5$ and $3.1\%$ per seed, and eight of ten seeds certify. The two remaining
+seeds have $2.7$ and $3.0\%$ point disagreement with exact upper bounds of $5.4$
+and $5.6\%$, so they abstain rather than contradict the budget. Unconstrained
+joint training on the same seeds changes $5.3\%$ of legacy decisions, misses the
+budget on three seeds, certifies one, and loses $1.1$ points of frozen accuracy,
+including a $5.6$-point loss on one seed that the constrained arm avoids
+(Table~\ref{tab:decision_har}). The budget is therefore reachable where the
+shift is small and out of reach where it is large: exact compatibility costs a
+second encoder at inference; approximate compatibility costs gain; the
+five-point budget sits beyond the strength at which the gain vanishes.
+
+\input{decision_preserving_har_table.tex}
 
 \subsection{A Vision Boundary Screen}\label{app:vision_boundary}
 
