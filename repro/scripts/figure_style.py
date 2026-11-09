@@ -18,7 +18,8 @@ COLORS = dict(current='#355D85', frozen='#B8475F', repair='#147D80',
 
 def apply_style():
     plt.rcParams.update({
-        'font.family': 'DejaVu Sans', 'mathtext.fontset': 'dejavusans',
+        'font.family': 'serif', 'font.serif':['Times New Roman','STIXGeneral','DejaVu Serif'],
+        'mathtext.fontset': 'stix',
         'font.size': 8, 'axes.labelsize': 8.2, 'axes.titlesize': 8.4,
         'xtick.labelsize': 7.7, 'ytick.labelsize': 7.7, 'legend.fontsize': 7.5,
         'axes.linewidth': .65, 'lines.linewidth': 1.5, 'lines.markersize': 3.5,
@@ -35,7 +36,7 @@ def apply_style():
 
 
 def panel(ax, letter, heading):
-    ax.set_title(r'$\bf{' + letter + '}$  ' + heading, loc='left', pad=8)
+    ax.set_title(f'({letter}) {heading}',loc='left',pad=8,fontfamily='Times New Roman',fontweight='bold')
 
 
 def numerical_artists(fig):
@@ -61,7 +62,7 @@ def polish(fig):
     """Unify legacy text at final width without modifying scientific artists."""
     before = numerical_artists(fig)
     for t in fig.findobj(Text):
-        t.set_fontfamily('DejaVu Sans')
+        t.set_fontfamily('Times New Roman')
         t.set_fontsize(max(7.1, t.get_fontsize()))
     for ax in fig.axes:
         ax.xaxis.label.set_fontsize(8)

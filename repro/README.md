@@ -291,7 +291,7 @@ multiple branches of the same seed are not independent trials.
 
 ### Publication figures and head-state boundary
 
-`render_paper_figures.py` regenerates all eleven included figures locally from
+`render_paper_figures.py` regenerates all thirteen included figures locally from
 the shipped records, including editable SVGs. It uses a final 5.5-inch canvas,
 checks label bounds and vector fonts, and verifies that legacy text styling
 does not change plotted numerical artists. The manifest contains physical
@@ -312,6 +312,44 @@ and `head_state_verification.json`. Running `summarize_head_state.py` again
 performs full model/Adam checks and therefore requires the large local trained
 states, which are excluded from the source ZIP. The generated tables/macros
 and numerical summaries are included for a data-free local LaTeX rebuild.
+
+### Predeclared real-auxiliary benefit and exact consumer control
+
+`docs/plans/2026-11-09-prospective-benefit-compatibility.md` fixes the study before
+calculation. `benefit_development_choice.json` freezes the validation choice
+before confirmation. Development seeds 200--202 cover the six declared HAR /
+RadioML dose candidates and compute no test outcomes. Confirmation seeds
+300--309 use the selected low-label SNR dose-1 recipe with ordinary/guarded
+detachment/joint branches, shared model/Adam states and future orders.
+
+`readout_nullspace.py` constructs the projector from the normalized healthy
+head, including feature scales. `benefit_compatibility_cpu.py` performs only
+CPU numerical work. `verify_benefit_consumers_cpu.py` independently reconstructs
+the forty saved endpoint consumers. The separate fixed audit bank has 40
+consumers and does not inherit the earlier 3,015-candidate guarantee. Protection
+is fixed before continuation; anchor-drift logs are not an adaptive controller.
+
+The local state-dependent verifier/analysis is
+`summarize_benefit_compatibility.py`. Its verification JSON confirms 104 model /
+optimizer states, all five criteria, and exact independent replay. Trained
+states and raw datasets are excluded from the source ZIP. The complete
+numerical records, all negative development candidates, frozen selection,
+generated tables/macros and figure inputs are included. `select_benefit_configuration.py`
+deliberately refuses to overwrite an existing frozen choice or choose again
+after confirmation. It is not a post-hoc tuning command.
+
+The guard needs the frozen reference encoder at inference. Its measured CPU
+batch latency is 2.37x ordinary inference, and it emits one shared 64-vector.
+Dual routing is a distinct, explicitly discussed baseline. Full-column-rank
+heads leave no nullspace feature freedom; primary gains outside this fixed
+low-label protocol remain unestablished. See the latest revision report for
+the exact statistical scope and all costs.
+
+```bash
+python repro/scripts/render_paper_figures.py
+python -m pytest repro/scripts/test_consumer_risk.py repro/scripts/test_readout_alignment.py repro/scripts/test_scale_boundaries.py repro/scripts/test_readout_nullspace.py -q
+python repro/scripts/build_cpu_paper.py
+```
 
 ## Reproduce
 

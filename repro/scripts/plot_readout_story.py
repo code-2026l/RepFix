@@ -10,11 +10,12 @@ import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-from matplotlib.patches import FancyBboxPatch
 import numpy as np
 
 from figure_style import COLORS as C, WIDTH, apply_style, panel, save
 from summarize_cpu_evidence import describe
+from plot_paper_diagrams import consumer_interface
+from spatial_diagrams import validate_layout
 
 ROOT = Path(__file__).resolve().parents[2]
 BASE = ROOT / 'repro/results/CPUCONT'
@@ -39,28 +40,13 @@ def export(fig, name):
 
 
 def overview(old, repairs, recon, mechanism):
-    fig = plt.figure(figsize=(WIDTH, 2.75))
-    gs = fig.add_gridspec(1, 3, width_ratios=[1.15, 1, 1],
-                         left=.015, right=.99, bottom=.20, top=.84, wspace=.37)
-    a, b, c = [fig.add_subplot(gs[0, i]) for i in range(3)]
-    panel(a, 'a', 'Consumer interface')
-    a.set_axis_off()
-    a.set(xlim=(0, 1), ylim=(0, 1))
-
-    def box(x, y, w, h, text, color, fill):
-        a.add_patch(FancyBboxPatch((x, y), w, h, boxstyle='round,pad=.025,rounding_size=.025',
-                                 facecolor=fill, edgecolor=color, linewidth=.8))
-        a.text(x + w / 2, y + h / 2, text, ha='center', va='center', fontsize=7.7, color=color)
-    box(.07, .81, .85, .15, 'Updated features', C['ink'], '#F2F5F7')
-    a.plot([.12, .12], [.78, .14], color=C['reference'], lw=1)
-    for y, label, color, fill in [(.61, 'Current task head', C['current'], '#EFF3F8'),
-                                   (.37, 'Frozen consumer', C['frozen'], '#FAF0F2'),
-                                   (.13, 'Input repair\n+ same consumer', C['repair'], '#ECF5F4')]:
-        a.annotate('', xy=(.26, y), xytext=(.12, y),
-                   arrowprops=dict(arrowstyle='->', color=color, lw=1))
-        box(.29, y - .085, .65, .17, label, color, fill)
-    a.text(.50, -.12, 'Repair changes the interface,\nnot the encoder or auxiliary.',
-           ha='center', va='top', fontsize=7.5, color=C['ink'])
+    fig = plt.figure(figsize=(WIDTH, 4.0))
+    a = fig.add_axes([.008,.54,.984,.415])
+    consumer_interface(a)
+    fig.text(.018,.98,'(a) Shared updates and retained interfaces',fontsize=8.8,
+             fontfamily='Times New Roman',fontweight='bold',va='top')
+    b = fig.add_axes([.105,.16,.365,.29])
+    c = fig.add_axes([.605,.16,.365,.29])
 
     iso = [branch(r, 'joint', 3)['trajectory'][-1] for r in old]
     iso_rep = [branch(r, 'joint', 3) for r in repairs]
@@ -86,20 +72,24 @@ def overview(old, repairs, recon, mechanism):
                         elinewidth=1.2, markeredgecolor='white', markeredgewidth=.5, zorder=3)
             ax.text(j, 1.055, f'{mean:.3f}', ha='center', va='top', fontsize=7.8, color=color)
         ax.set(xlim=(-.42, 2.42), ylim=(0, 1.075), xticks=[0, 1, 2], xticklabels=labels,
-               yticks=[0, .25, .5, .75, 1])
+               yticks=[0, .5, 1])
         ax.grid(axis='y')
-        ax.tick_params(axis='x', labelsize=7.3)
+        ax.tick_params(axis='x', labelsize=7.5)
         for t, color in zip(ax.get_xticklabels(), [C['frozen'], C['current'], C['repair']]):
             t.set_color(color)
         ax.set_ylabel('Test accuracy' if ax is b else '')
         if ax is c:
             ax.tick_params(axis='y', labelleft=False)
-    b.text(.42, .09, 'One scalar\nNo new labels', transform=b.transAxes, fontsize=7.2)
+    b.set_xticklabels(['Frozen\nconsumer','Current\nhead','Scale\nrepair'])
+    c.set_xticklabels(['Frozen\nconsumer','Current\nhead','Linear\nrepair*'])
+    b.text(.45, .10, '$\\alpha=3$ / 10 seeds\nNo new labels', transform=b.transAxes, fontsize=7.2)
     real = branch(mechanism['reconstruction']['har'], 'joint', 100)
     mse_ratio = real['test_reconstruction_ratio_to_detached']['mean']
-    c.text(.06, .12, 'Recon. MSE $\\times$%.3f' % mse_ratio,
+    c.text(.40, .10, '$\\alpha=100$ / 5 seeds\nRecon. MSE $\\times$%.3f' % mse_ratio,
            transform=c.transAxes, fontsize=7.2)
-    fig.text(.66, .035, 'Points: seeds   Diamonds / bars: mean ± SD', ha='center', fontsize=7.3)
+    fig.text(.50, .035, 'Points: seeds   Diamonds / bars: mean ± SD   Dashed: healthy reference',
+             ha='center', fontsize=7.1)
+    validate_layout(fig)
     export(fig, 'fig_readout_overview')
     AUDIT['overview_values'] = dict(isotropic=iso_values.tolist(), reconstruction=rec_values.tolist(),
                                   reconstruction_mse_ratio=mse_ratio,

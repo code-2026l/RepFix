@@ -1,5 +1,9 @@
 # Consumer compatibility, CNN boundaries, and publication figures
 
+This report describes the preserved earlier artifact. The subsequent fixed-plan
+positive control and new layered figures are documented in
+`PROTECTED_BENEFIT_REVISION_2026-11-09.md`; earlier findings below are retained.
+
 The revision starts from `fa73e89c56e3e011feac0bd41368e1cc65c46d3a` on local branch `research/consumer-risk-cnn-20261109`. Earlier reports and source artifacts remain available separately. All code, analysis, figures, article writing, compilation, and packaging are local. Remote execution is numerical CPU calculation only, with opaque directories, global concurrency at most four, and the previous memory/time/host guards. GitHub and OpenReview were not changed.
 
 ## The research gaps are broader than generalization

@@ -420,8 +420,8 @@ this is a seeded partition, not a unique official split.
 
 ## Waveform CNN and unlabeled consumer audit
 
-The latest extension adds five waveform-CNN reconstruction runs on the identical
-RadioML inputs/split. The complete paired collection now contains **35 training
+The waveform extension adds five CNN reconstruction runs on the identical
+RadioML inputs/split. That fixed consumer bank contains **35 training
 runs, 335 continuation endpoints, and 370 locally verified model/optimizer
 checkpoints**. The CNN healthy readout reaches 0.424 versus the MLP's 0.297;
 its reconstruction continuation remains near-null at the fixed grid, with
@@ -459,7 +459,7 @@ remaining gaps are in `docs/CONSUMER_CNN_REVISION_2026-11-09.md`.
 The new opening figure compares the controlled scale repair with real HAR
 reconstruction: paired linear alignment reaches 0.947 full-test accuracy versus
 0.826 frozen while leaving the learned auxiliary error unchanged. It uses paired
-training anchors and no new labels. All eleven manuscript figures have vector
+training anchors and no new labels. All thirteen manuscript figures have vector
 PDF, editable SVG and PNG exports at final 5.5-inch width; data/font/bounds checks
 and input hashes accompany the local rendering pipeline.
 
@@ -469,6 +469,37 @@ replays and 15 conditional trajectories outside the consumer bank. None
 reproduces the historical severe scatter collapse; higher variance need not
 mean higher frozen-consumer accuracy. These null/adverse boundaries are retained
 in `head_state_summary.json` and `head_state_verification.json`.
+
+## Predeclared useful-auxiliary and retained-consumer confirmation
+
+The latest study freezes its plan before development and its validation choice
+before ten new confirmation seeds. At 20% fitting primary labels, RadioML SNR
+dose 1 improves current-head accuracy by **0.97 percentage points** over
+detachment. A reference-anchored readout-nullspace control retains **0.89 points**
+of auxiliary gain over its guarded detachment control, with paired 95% interval
+**[0.60, 1.18]**, while preserving all healthy consumer logits/predictions.
+All five declared criteria pass, and independent saved-state replay reproduces
+all forty consumers exactly.
+
+The control emits one shared 64-vector for both heads, leaving 53 dimensions
+free for the tested rank-11 head. It retains a reference encoder and costs
+**2.37x** measured single-thread CPU batch inference. A dual-routing old/new-model
+baseline is discussed explicitly; this is a constructive positive control,
+not a new projection algorithm or a cheap single-encoder solution. The task gain
+is conditional on this one fixed split/recipe. All development outcomes remain
+in the artifact. Details: `docs/PROTECTED_BENEFIT_REVISION_2026-11-09.md`.
+
+```bash
+python repro/scripts/render_paper_figures.py
+python -m pytest repro/scripts/test_consumer_risk.py repro/scripts/test_readout_alignment.py repro/scripts/test_scale_boundaries.py repro/scripts/test_readout_nullspace.py -q
+python repro/scripts/build_cpu_paper.py
+```
+
+These commands reproduce thirteen figures, run 32 mathematical/control tests,
+and compile the local manuscript from shipped records. All figure diagrams use
+editable vector planes; their apparent depth encodes no measured performance.
+The positive study's 104 trained states remain local; the source artifact ships
+its full records, frozen plan/choice, summaries and independent replay results.
 
 ## License and citation
 

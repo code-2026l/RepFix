@@ -39,6 +39,8 @@ labels={m.group(1):dict(number=m.group(2),page=int(m.group(3)))
         for m in re.finditer(r'\\newlabel\{([^}]+)\}\{\{([^}]*)\}\{(\d+)\}',aux)}
 result=dict(copied_baseline_figures=copied,warnings=warnings,
             labels={k:labels[k] for k in ['sec:conclusion','app:boundary_proof','fig:overview','fig:paired_dose',
+                'fig:nullspace_control','fig:benefit_confirmation','tab:benefit_confirmation',
+                'app:benefit_confirmation','prop:consumer_nullspace','tab:benefit_contrasts',
                 'fig:scale_law','app:cpu_paired','tab:cpu_paired','tab:cpu_adam',
                 'app:head_state','tab:head_state','app:consumer_audit','tab:consumer_audit','tab:cnn_continuation'] if k in labels},
             output=str(PAPER/'RepFix_ICLR2027.pdf'))
