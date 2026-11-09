@@ -1,7 +1,7 @@
 # Reproducing the supplementary artifact
 
 Run commands from the extracted `repfix_supplementary` directory. The supplied
-PDF is the polished manuscript: nine main pages and 70 pages in total.
+PDF is the polished manuscript: nine main pages and 72 pages in total.
 
 ## File and record checks
 
@@ -37,7 +37,7 @@ thread. The hardware timings reported in the paper retain their original setup.
 python repro/scripts/verify_supplement.py --tests
 ```
 
-The 55 tests cover finite-corpus disagreement bounds, repair availability, affine
+The 60 tests cover finite-corpus disagreement bounds, repair availability, affine
 scale boundaries, normalized-head nullspaces, constrained affine folding,
 nonlinear fusion, exact-count selection at a zero-benefit tie, invertible chart folding,
 vision access/split controls, and teacher-head fitting on affine and nonlinear
@@ -52,7 +52,7 @@ python repro/scripts/verify_supplement.py --figures
 ```
 
 The helper runs `repro/scripts/render_paper_figures.py` in a temporary copy. The
-twelve coordinated generators reconstruct all 19 included figures from shipped
+thirteen coordinated generators reconstruct all 20 included figures from shipped
 records. It compares plotted numerical artists and dimensions with the release
 manifest. Files are exported as PDF, PNG, and SVG at a 5.5-inch width.
 
@@ -140,3 +140,21 @@ loading the model tensors. Original checkpoint files and fitted-head tensors
 are retained locally outside the compact release. See
 `docs/PROTECTED_HEAD_AUDIT_20261109.md` for access assumptions, the distinction
 between original and retrospective evidence, and the timing correction.
+
+## Joint alignment and fresh confirmation
+
+The fixed development grid is in `alignment_development/`; its immutable
+choice is `alignment_development_choice.json`. `joint_alignment_cpu.py` reuses
+the original healthy checkpoints and paired future minibatches.
+`confirm_joint_alignment_cpu.py` trains the new HAR seeds 1300--1309 only after
+that gate. `verify_joint_alignment_cpu.py` independently reloads their saved
+states; `benchmark_joint_alignment_cpu.py` measures the inherited diagnostic
+path, and `benchmark_native_alignment_cpu.py` adds native float32 serving.
+
+`summarize_joint_alignment.py`, `alignment_development_table.py` and
+`plot_alignment_confirmation.py` derive the new statistics, tables and figure
+from released records. The default archive verifier checks record/source/plan
+links and preserved decisions; it does not replay tensors excluded from the
+compact archive. `alignment_execution_audit.json` records the completed CPU
+queues, verified transferred state hashes and uploaded numerical source hashes.
+See `docs/FRESH_CONFIRMATION_20261110.md` for all criteria and adverse outcomes.

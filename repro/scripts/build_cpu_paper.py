@@ -46,7 +46,8 @@ result=dict(copied_baseline_figures=copied,warnings=warnings,
                 'app:nonlinear_interface','fig:nonlinear_interface','fig:nonlinear_validation',
                 'tab:nonlinear_development',
                 'fig:scale_law','app:cpu_paired','tab:cpu_paired','tab:cpu_adam',
-                'app:head_state','tab:head_state','app:consumer_audit','tab:consumer_audit','tab:cnn_continuation'] if k in labels},
+                'app:head_state','tab:head_state','app:consumer_audit','tab:consumer_audit','tab:cnn_continuation',
+                'app:alignment_confirmation','tab:alignment_development','tab:alignment_confirmation','fig:alignment_confirmation'] if k in labels},
             output=str(PAPER/'RepFix_ICLR2027.pdf'))
 extraction=subprocess.run(['pdftotext','-layout',str(PAPER/'RepFix_ICLR2027.pdf'),'-'],
                           capture_output=True,check=True)

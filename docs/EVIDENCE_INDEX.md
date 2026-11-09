@@ -26,7 +26,7 @@ unless a full path is given. The main text's 0.453 to 0.938 repair comparison
 uses ten HAR continuation seeds. The reconstruction comparison uses five seeds;
 the protected-benefit confirmation uses ten new seeds. These studies are separate.
 
-## All 19 figures
+## All 20 figures
 
 Every file below is under `paper/figures/`. Use the coordinated entry point
 `repro/scripts/render_paper_figures.py` to reconstruct them.
@@ -51,7 +51,8 @@ Every file below is under `paper/figures/`. Use the coordinated entry point
 | 16 | `fig_nonlinear_validation.pdf` | `plot_nonlinear_study.py` | `C/nonlinear_development_choice.json` |
 | 17 | `fig_chart_confirmation.pdf` | `plot_chart_confirmation.py` | `C/chart_confirmation/`, `C/chart_confirmation_summary.json` |
 | 18 | `fig_protected_audit.pdf` | `plot_protected_audit.py` | `C/protected_head_audit/`, `C/protected_head_audit_summary.json` |
-| 19 | `fig_consumer_audit.pdf` | `plot_readout_story.py` | `C/consumer_frontier_summary.json` |
+| 19 | `fig_alignment_confirmation.pdf` | `plot_alignment_confirmation.py` | `C/alignment_confirmation/`, `C/alignment_confirmation_summary.json` |
+| 20 | `fig_consumer_audit.pdf` | `plot_readout_story.py` | `C/consumer_frontier_summary.json` |
 
 Generator basenames are under `repro/scripts/`. Figure manifests retain source
 and numerical-artist hashes; diagrams are marked as schematics in their captions.
@@ -89,3 +90,18 @@ count is a fresh fixed-corpus audit of the same saved encoders, not a new
 training confirmation. No large-model or information-erasure conclusion is
 inferred from these controls. Source snapshots preserve exact recorded digests;
 see `repro/source_versions/README.md` for the historical vision hash convention.
+
+## New alignment comparison and fresh HAR seeds
+
+| Question | Records under `repro/results/CPUCONT/` | Driver |
+|---|---|---|
+| How do complete-feature and logit alignment compare under the same map parameterization? | `alignment_development/`, `alignment_development_choice.json` | `joint_alignment_cpu.py`, `select_joint_alignment.py` |
+| Does the construction meet the complete criterion on newly trained seeds? | `alignment_confirmation/`, `alignment_confirmation_summary.json` | `confirm_joint_alignment_cpu.py`, `summarize_joint_alignment.py` |
+| Do all 50 saved consumers replay? | `alignment_replay/` | `verify_joint_alignment_cpu.py` |
+| Does serving meet both diagnostic and native precision limits? | `alignment_timing.json`, `alignment_native_timing.json` | `benchmark_joint_alignment_cpu.py`, `benchmark_native_alignment_cpu.py` |
+| Were all numerical states and source bytes retrieved/verified? | `alignment_execution_audit.json` | Recorded CPU ledgers and SHA-256 inventories |
+
+Fresh HAR direct and OLS readers each certify 10/10 with the primary 1024-input
+monitor and meet the complete fixed criterion. Logit-map 9/10 remains a failed
+primary decision despite 10/10 with additional monitoring inputs. No SNR
+candidate passes development. The original studies' decisions are unchanged.

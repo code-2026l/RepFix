@@ -23,6 +23,7 @@ TESTS = [
     'test_nonlinear_selection.py',
     'test_affine_chart.py', 'test_vision_chart.py',
     'test_legacy_head_fit.py',
+    'test_alignment_objectives.py',
 ]
 
 def digest(path):
@@ -188,12 +189,61 @@ def verify_files(root):
         if row['original']['passes'] or row['original']['certified']!=original_count or row['frozen_controls']['protected_ols']['certified']!=ols_count:
             raise ValueError('Protected-head verdict changed: '+domain)
 
+    alignment_dev=[name for name in files if re.fullmatch(base+r'alignment_development/a\d{3}\.json',name)]
+    alignment_conf=[name for name in files if re.fullmatch(base+r'alignment_confirmation/c\d{3}\.json',name)]
+    alignment_replay=[name for name in files if re.fullmatch(base+r'alignment_replay/v\d{3}\.json',name)]
+    if (len(alignment_dev),len(alignment_conf),len(alignment_replay))!=(6,10,10):
+        raise ValueError('The joint-alignment evidence family is incomplete')
+    original_development_hashes={value for name,value in files.items() if re.fullmatch(base+r'protected_head/ph_(?:har_)?dev_80\d\.json',name)}
+    for name in alignment_dev:
+        row=json.loads((root/name).read_text())
+        if (not row['complete'] or row['smoke'] or row['splits']['test_metrics_computed'] or
+                row['source_record_sha256'] not in original_development_hashes or any('test' in b for b in row['branches'])):
+            raise ValueError('Alignment development provenance changed: '+name)
+    alignment_choice_name=base+'alignment_development_choice.json'
+    alignment_choice=json.loads((root/alignment_choice_name).read_text())
+    if not alignment_choice['choices_frozen_before_confirmation'] or alignment_choice['selection_uses_accuracy']:
+        raise ValueError('Alignment selection rule changed')
+    if any(v['confirm'] for v in alignment_choice['domains']['radioml'].values()):
+        raise ValueError('A failed SNR alignment gate opened confirmation')
+    if alignment_choice['domains']['har']['feature_map']['confirm']:
+        raise ValueError('The failed HAR feature-map policy was changed')
+    confirmation_hashes={digest(root/name) for name in alignment_conf}
+    for name in alignment_conf:
+        row=json.loads((root/name).read_text())
+        if (not row['complete'] or row['domain']!='har' or row['seed'] not in range(1300,1310) or
+                row['selection_sha256']!=digest(root/alignment_choice_name)):
+            raise ValueError('Fresh confirmation differs from the frozen choice: '+name)
+        if row['configuration']['consumer_bank']!=160 or row['configuration']['primary_monitor']!=1024:
+            raise ValueError('Fresh confirmation acceptance budget changed')
+        if {b['mode'] for b in row['branches']}!={'detach','joint','protected','logit_map','direct_ols'}:
+            raise ValueError('Fresh confirmation candidate set changed')
+    for name in alignment_replay:
+        row=json.loads((root/name).read_text())
+        if (not row['complete'] or row['confirmation_record_sha256'] not in confirmation_hashes or
+                row['maximum_metric_error']!=0 or row['maximum_ols_stationarity_residual']>1e-6 or
+                len(row['branches'])!=5 or row['refitting_performed']):
+            raise ValueError('Fresh-consumer replay changed: '+name)
+    fresh=json.loads((root/base/'alignment_confirmation_summary.json').read_text())
+    if not fresh['prior_study_decisions_unchanged'] or fresh['primary_monitor']!=1024:
+        raise ValueError('Fresh study replaced an earlier verdict or its primary budget')
+    for mode,passes,count in [('protected',True,10),('direct_ols',True,10),('logit_map',False,9)]:
+        row=fresh['domains']['har'][mode]
+        if row['passes']!=passes or row['certificates']['1024']['count']!=count:
+            raise ValueError('Fresh primary verdict changed: '+mode)
+    native=json.loads((root/base/'alignment_native_timing.json').read_text())
+    if (not native['complete'] or native['primary_runtime_dtype']!='float32' or
+            len(native['branches'])!=30 or len(native['native_primary_metrics'])!=50):
+        raise ValueError('Native serving audit is incomplete')
+
     return manifest, dict(payload_files=len(files), manuscript_figures=len(figures),
         numerical_inputs=len(inputs), completed_cpu_records=records,
         recorded_source_hashes_checked=sources, recorded_plan_hashes_checked=plans,
         historical_source_versions_checked=versioned_sources,
         historical_repr_bytes_digests_checked=repr_sources,
         recorded_protected_original_replays_checked=60,recorded_protected_control_replays_checked=140,
+        alignment_development_records=6,fresh_training_confirmation_records=10,
+        recorded_fresh_consumer_replays_checked=50,native_serving_consumers_measured=30,
         nonlinear_development_records=len(development), nonlinear_confirmation_tasks=0,
         manuscript_pdf_sha256=manifest['pdf_sha256'])
 
@@ -213,7 +263,7 @@ def execute(command, root):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--tests', action='store_true', help='Run 55 structural checks on CPU')
+    parser.add_argument('--tests', action='store_true', help='Run 60 structural checks on CPU')
     parser.add_argument('--figures', action='store_true', help='Rebuild all included figures and compare numerical artists')
     parser.add_argument('--paper', action='store_true', help='Rebuild the manuscript and compare page text and pixels')
     args = parser.parse_args()
@@ -236,9 +286,9 @@ def main():
             stdout, elapsed = execute([sys.executable, '-m', 'pytest'] +
                 ['repro/scripts/' + name for name in TESTS] + ['-q'], copy)
             passed = re.search(r'(\d+) passed', stdout)
-            if not passed or int(passed.group(1)) != 55:
+            if not passed or int(passed.group(1)) != 60:
                 raise ValueError('Unexpected focused-test result: ' + stdout[-1000:])
-            report['checks']['structural_tests'] = dict(passed=55, elapsed_seconds=elapsed)
+            report['checks']['structural_tests'] = dict(passed=60, elapsed_seconds=elapsed)
         if args.figures:
             print('Rebuilding all included figures from recorded results...', flush=True)
             reference = json.loads((ROOT / 'paper/figures/publication_figure_manifest.json').read_text())
