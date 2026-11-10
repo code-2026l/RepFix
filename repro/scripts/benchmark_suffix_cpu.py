@@ -17,6 +17,10 @@ def trace(module,sample):
         warnings.simplefilter('ignore',torch.jit.TracerWarning)
         return torch.jit.freeze(torch.jit.trace(module.eval(),sample,check_trace=False))
 
+def cache_save(path,value):
+    path.parent.mkdir(exist_ok=True,parents=True);temporary=path.with_suffix('.%d.tmp'%os.getpid())
+    torch.save(value,temporary);temporary.replace(path)
+
 def load_suffix(ref,healthy,row,folder):
     state=torch.load(folder/row['state_file'],map_location='cpu',weights_only=True)
     assert paired.state_hash(state)==row['state_sha256']
@@ -46,28 +50,48 @@ def main(a):
         images,y,coarse,data_sha=late.images(True);indices=ref['validation_indices'];images=images[indices];y=y[indices];coarse=coarse[indices]
     assert torch.equal(y,part['y']) and torch.equal(coarse,part['coarse'])
     sample=late.preprocess(images[:128],ref['metadata']['image_size']);ts_prefix=trace(prefix,sample[:1])
-    physical=[]
-    for j in range(0,len(images),128):physical.append(ts_prefix(late.preprocess(images[j:j+128],ref['metadata']['image_size'])))
-    physical=torch.cat(physical);old=late.linear(part['h'],ref['heads']['coarse'])
-    monitor=None if phase=='development' else np.random.default_rng(13700001+seed).choice(len(images),1024,replace=False)
     names=['benchmark_suffix_cpu.py','suffix_serving.py','paired_suffix.py',*study.NAMES]
     out=dict(complete=False,device='cpu',phase=phase,arch=arch,seed=seed,threads=12,plan_sha256=a.plan_sha256,
         training_record_sha256=hashlib.sha256(a.record.read_bytes()).hexdigest(),reference_state_sha256=paired.state_hash(ref),
         source_sha256={n:hashlib.sha256(Path(__file__).with_name(n).read_bytes()).hexdigest() for n in names},
         choice_sha256=None if a.choice is None else hashlib.sha256(a.choice.read_bytes()).hexdigest(),
         prefix_sha256=paired.state_hash(prefix.state_dict()),healthy=record['healthy'],splits=record['splits'],
-        forward_latency_excludes=['decoding','preprocessing','compilation','warmup'],audits={},serving={})
+        forward_latency_excludes=['decoding','preprocessing','compilation','warmup'],audits={},serving={},branches=[],
+        timing_only=a.timing_only,audit_only=a.audit_only)
+    header=dict(reference=out['reference_state_sha256'],source=out['source_sha256'],data=data_sha,phase=phase,prefix=out['prefix_sha256'],choice=out['choice_sha256'])
+    prefix_path=None if a.shared_cache is None else a.shared_cache/(arch+'_'+phase+'_prefix.pt')
+    if a.timing_only:physical=ts_prefix(sample[:1])
+    elif prefix_path is not None and prefix_path.exists():
+        saved=torch.load(prefix_path,map_location='cpu',weights_only=True,mmap=True);assert saved['header']==header;physical=saved['physical']
+    else:
+        physical=torch.cat([ts_prefix(late.preprocess(images[j:j+128],ref['metadata']['image_size'])) for j in range(0,len(images),128)])
+        if prefix_path is not None:cache_save(prefix_path,dict(header=header,physical=physical))
+    old=late.linear(part['h'],ref['heads']['coarse'])
+    monitor=None if phase=='development' else np.random.default_rng(13700001+seed).choice(len(images),1024,replace=False)
     folder=a.record.parent/(a.record.stem+'_states')
     for row in record['branches']:
-        mode=row['mode'];make=load_suffix(ref,healthy,row,folder);s0=make(False);s1=make(True)
+        mode=row['mode']
+        if a.timing_only and mode not in ['U','H']:continue
+        make=load_suffix(ref,healthy,row,folder)
+        cache_path=None if mode!='H' or a.shared_cache is None else a.shared_cache/(arch+'_'+phase+('_H_timing.pt' if a.timing_only else '_H_audit.pt'))
+        h_header=dict(header,state=row['state_sha256']);saved=None
+        if cache_path is not None and cache_path.exists():
+            saved=torch.load(cache_path,map_location='cpu',weights_only=True);assert saved['header']==h_header
+            if a.timing_only:
+                out['serving'][mode]=dict(timings=saved['timings'],chosen={},same_function_timing_reused=True,unique_state_sha256=row['state_sha256']);continue
+        s0=make(False);s1=make(True)
         ts0=trace(s0,physical[:1]);ts1=trace(s1,physical[:1])
-        actual=[ts1(physical[j:j+128]) for j in range(0,len(images),128)]
-        z,legacy=[torch.cat([v[i] for v in actual]) for i in [0,1]]
         original=row['test' if phase=='confirmation' else 'validation']['own']
-        audit=dict(own=paired.metrics(z,y),contracts=evaluate_contracts(legacy.double(),old.double(),coarse,ref['thresholds'],monitor,.05/2000),
-            state_sha256=row['state_sha256'],maximum_legacy_logit_error=float((legacy-old).abs().max()),
-            cached_prefix_accuracy_difference=paired.metrics(z,y)['acc']-original['acc'])
-        out['audits'][mode]=audit
+        canonical=None
+        if not a.timing_only:
+            if saved is None:
+                actual=[ts1(physical[j:j+128]) for j in range(0,len(images),128)]
+                z,legacy=[torch.cat([v[i] for v in actual]) for i in [0,1]]
+            else:z,legacy=saved['canonical']
+            canonical=(z,legacy)
+            out['audits'][mode]=dict(own=paired.metrics(z,y),contracts=evaluate_contracts(legacy.double(),old.double(),coarse,ref['thresholds'],monitor,.05/2000),
+                state_sha256=row['state_sha256'],maximum_legacy_logit_error=float((legacy-old).abs().max()),
+                cached_prefix_accuracy_difference=paired.metrics(z,y)['acc']-original['acc'])
         if mode not in ['U','H']:continue
         mono0=trace(WholeNetwork(prefix,s0),sample[:1]);mono1=trace(WholeNetwork(prefix,s1),sample[:1])
         packed0=packed1=None
@@ -77,13 +101,16 @@ def main(a):
             packed1=trace(WholeNetwork(prefix,pack_suffix(healthy,s0.current,reader,ref['heads']['coarse'],True)),sample[:1])
         old_only=trace(WholeNetwork(prefix,SuffixReadout(healthy,None,ref['heads']['coarse'],ref['heads']['coarse'],'F',False)),sample[:1])
         timing={}
-        for batch in [1,128]:
+        for batch in ([] if a.audit_only else [1,128]):
             x=sample[:batch]
             operations=dict(mono_current=lambda:mono0(x),mono_protected=lambda:mono1(x),
                 modular_current=lambda:ts0(ts_prefix(x)),modular_protected=lambda:ts1(ts_prefix(x)),
                 independent=lambda:(mono0(x),old_only(x)))
             operations['modular_independent']=lambda:(ts0(ts_prefix(x)),old_only(x))
             if packed0 is not None:operations.update(packed_current=lambda:packed0(x),packed_protected=lambda:packed1(x),packed_independent=lambda:(packed0(x),old_only(x)))
+            if choice is not None:
+                fixed=choice['backbones'][arch]['modes'][mode]['batches'][str(batch)]
+                operations={n:operations[n] for n in dict.fromkeys([fixed['current'],fixed['protected'],fixed['independent']])}
             for op in operations.values():
                 for _ in range(12):op()
             times={n:[] for n in operations}
@@ -91,23 +118,28 @@ def main(a):
                 for name in (list(operations) if rep%2 else list(reversed(operations))):
                     begin=time.perf_counter();operations[name]();times[name].append(time.perf_counter()-begin)
             timing[str(batch)]=dict(samples_seconds=times,medians_seconds={n:float(np.median(v)) for n,v in times.items()})
-        chosen={}
-        if choice is not None:
+        chosen={};raw_chosen={}
+        if choice is not None and not a.timing_only:
             # Batch membership can change CPU arithmetic. Audit each chosen ABI
             # at its registered chunk size, rather than only its graph name.
             for batch in [1,128]:
                 backend=choice['backbones'][arch]['modes'][mode]['batches'][str(batch)]['protected']
-                result=[]
-                for j in range(0,len(images),batch):
-                    inputs=late.preprocess(images[j:j+batch],ref['metadata']['image_size'])
-                    if backend=='mono_protected':result.append(mono1(inputs))
-                    elif backend=='packed_protected':result.append(packed1(inputs))
-                    else:result.append(ts1(ts_prefix(inputs)))
-                own,legacy=[torch.cat([v[i] for v in result]) for i in [0,1]]
+                if saved is not None:own,legacy=saved['chosen'][str(batch)]
+                else:
+                    result=[]
+                    for j in range(0,len(images),batch):
+                        inputs=late.preprocess(images[j:j+batch],ref['metadata']['image_size'])
+                        if backend=='mono_protected':result.append(mono1(inputs))
+                        elif backend=='packed_protected':result.append(packed1(inputs))
+                        else:result.append(ts1(ts_prefix(inputs)))
+                    own,legacy=[torch.cat([v[i] for v in result]) for i in [0,1]]
+                raw_chosen[str(batch)]=(own,legacy)
                 chosen[str(batch)]=dict(backend=backend,own=paired.metrics(own,y),contracts=evaluate_contracts(legacy.double(),old.double(),coarse,ref['thresholds'],monitor,.05/2000),
                     maximum_legacy_logit_error=float((legacy-old).abs().max()),
                     cached_prefix_accuracy_difference=paired.metrics(own,y)['acc']-original['acc'])
         out['serving'][mode]=dict(timings=timing,chosen=chosen)
+        if cache_path is not None and saved is None:cache_save(cache_path,dict(header=h_header,timings=timing,canonical=canonical,chosen=raw_chosen))
+        if saved is not None:out['serving'][mode]['same_function_output_reused']=True
         paired.save_json(a.out.with_suffix('.partial.json'),out)
     out.update(complete=True,elapsed_s=time.time()-start);paired.save_json(a.out,out)
     print(json.dumps(dict(arch=arch,seed=seed,elapsed_s=time.time()-start)),flush=True)
@@ -115,4 +147,5 @@ def main(a):
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--record',type=Path,required=True);p.add_argument('--reference',type=Path,required=True)
     p.add_argument('--test-cache',type=Path);p.add_argument('--choice',type=Path);p.add_argument('--plan-sha256',required=True);p.add_argument('--out',type=Path,required=True)
+    p.add_argument('--timing-only',action='store_true');p.add_argument('--audit-only',action='store_true');p.add_argument('--shared-cache',type=Path)
     a=p.parse_args();torch.set_num_threads(12);torch.set_num_interop_threads(1);main(a)

@@ -48,6 +48,7 @@
 \input{completion_numbers.tex}
 \input{shared_replay_numbers.tex}
 \input{dense_replay_numbers.tex}
+\input{frontier_numbers.tex}
 
 % ─── Compact table style (tighter spacing/format) ───
 \setlength{\tabcolsep}{4pt}          % default 6pt -> tighter column padding
@@ -62,9 +63,7 @@
 \maketitle
 
 \begin{abstract}
-Shared encoders can keep learning while invalidating the readouts that depend on them. We separate retained task information from compatibility with a specified consumer. In matched HAR continuations across ten seeds, frozen accuracy falls from $\CpuHarHealthy$ to $\CpuHarJointMid$ while the current head reaches $\CpuHarOwnMid$; unlabeled scale correction restores $\MechHarScalarMid$. With a real reconstruction auxiliary, error falls to $\ReconHarMseRatioHigh$ of detachment while frozen accuracy drops to $\ReconHarFrozenHigh$; paired alignment restores $\ReconHarPairedLinearHigh$. Exact affine boundaries explain the scale component, and a signed update audit identifies what gradient conflict leaves unresolved. For preservation, we derive a shared-computation identity: sparse channel changes and low-rank updates retain a healthy output while learning nonlinear current features. Twenty fresh HAR/SNR runs confirm reconstruction progress or positive primary transfer with unchanged old class and selective decisions. The SNR shortfall is a rank shortfall: a dense low-rank correction
-matches unrestricted joint training at half the encoder's cost, while the sparse
-variant remains the HAR choice and measured CPU latency still misses its targets. Established alignment and distillation controls recover a cheaper classification interface on HAR, without preserving fixed confidence thresholds. Together, the results identify which consumer survives, what information and learning remain, and what preserving that interface costs.
+Shared encoders can improve their training tasks while breaking deployed readouts. We distinguish retained task information, compatibility with a specified consumer, and the cost of preserving its function. Across ten matched HAR seeds, frozen accuracy falls to $\CpuHarJointMid$ while the current head reaches $\CpuHarOwnMid$; unlabeled scale correction restores $\MechHarScalarMid$. With a reconstruction auxiliary, error falls to $\ReconHarMseRatioHigh$ of detachment while frozen accuracy drops to $\ReconHarFrozenHigh$; paired alignment restores $\ReconHarPairedLinearHigh$. Exact affine boundaries explain the scale component, and a signed update audit separates it from gradient conflict. For preservation, shared dense products or a frozen prefix retain a healthy output while current nonlinear features learn. Matched HAR/SNR confirmation establishes useful auxiliary updates; dense SNR updates remove the measured gap to unrestricted joint training. A complete ResNet-18 suffix adds $\SuffixRNGainHead$ accuracy points over head-only continuation and $\SuffixRNGainRichHead$ over a stronger frozen-feature probe on CIFAR-100, across ten fresh continuation seeds. Alignment and distillation offer cheaper classification interfaces without preserving fixed confidence thresholds. Actual consumer decisions, strong controls and CPU measurements identify the useful frontier; small-network latency still misses its targets.
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
@@ -84,11 +83,11 @@ thresholds. We then derive an exact shared-computation construction: sparse
 channel updates confine activation differences, and low-rank corrections
 reuse the healthy dense products. Twenty fresh HAR/SNR runs retain useful
 learning and all three specified consumers. Its accuracy and measured cost
-frontier, including the unsuccessful ResNet-18 screen, make the access and
-capacity tradeoffs explicit. A dense low-rank variant then removes the remaining
-SNR accuracy shortfall at half the encoder's MACs, while the sparse construction
-stays necessary on HAR; the price of compatibility tracks the rank each task
-requires. Scores, classes and selective decisions are
+frontier makes the access and capacity tradeoffs explicit. Dense low-rank
+updates remove the SNR accuracy shortfall, while a support/rank factorial
+shows why this result does not identify rank alone as its cause. Opening a
+complete nonlinear suffix also yields positive ResNet-18 transfer beyond a
+strong frozen-feature control. Scores, classes and selective decisions are
 different interfaces; evaluation must identify which one survives.
 
 \begin{figure}[t]
@@ -300,32 +299,37 @@ below full joint training. All class and fixed-threshold decisions are
 unchanged under actual native serving, and all $120$ bounds meet the
 five-point budget. The current nonlinear layers learn in both tasks.
 Small-network latency still misses the $1.20/1.10$ batch-$1/1024$ limits;
-on ResNet-18, neither fixed capacity screen clears the net-gain gate.
-These costs delimit the construction's confirmed benefit
+the initial ResNet-18 capacity screens also miss their net-gain gate.
+These outcomes delimit the structured construction's confirmed benefit
 (Appendices~\ref{app:shared_replay_protocol}--\ref{app:shared_replay_vision}).
 
-The confirmed SNR shortfall is a rank shortfall. Truncating the saved joint
-updates by SVD leaves SNR at $-\RankSnrOne$ points at first-map rank $16$, while
-the pair $(32,24)$ reaches $-\RankSnrPair$; HAR saturates near rank $16$ on both
-maps (Table~\ref{tab:rank}). Row support is sufficient but not necessary: a dense
+Row support is sufficient but not necessary: a dense
 rank-$s$ first map replays the old function exactly through
 $t_2=t_2^0+W_2^0(a_1-a_1^0)+UVa_1+\delta b_2$, paying one dense $m\times m$
 correction instead of $k$ rows. Trained on ten fresh SNR seeds at $(16,12)$,
-$\DenseSnrMacs$ extra MACs or $\DenseSnrCostFraction\%$ of the encoder, this arm
-gains $\DenseSnrGain$ points over detachment $[\DenseSnrGainLow,\DenseSnrGainHigh]$
-and matches unrestricted joint training ($\DenseSnrFull$,
+this arm gains $\DenseSnrGain$ points over detachment
+$[\DenseSnrGainLow,\DenseSnrGainHigh]$ and differs from unrestricted joint
+training by $\DenseSnrFull$ points
 $[\DenseSnrFullLow,\DenseSnrFullHigh]$), with zero disagreement on all
-$\DenseSnrContractChecks$ consumer checks and exact native replay. The same arm
+$\DenseSnrContractChecks$ consumer checks. It adds $11{,}456$ MACs, $54.1\%$
+above the folded current-only graph. The same arm
 misses the HAR primary gate on development ($\DenseHarDevLow$ to
-$\DenseHarDevHigh$ points), so HAR keeps the sparse construction. The price of
-compatibility tracks the rank a task requires rather than the parameterization
-(Appendix~\ref{app:shared_replay_rank}).
+$\DenseHarDevHigh$ points). SVD truncation concerns a particular saved update;
+the matched first-rank-$16$ factorial also changes performance when its
+support family changes. Neither identifies an intrinsic rank requirement
+(Appendices~\ref{app:shared_replay_rank} and~\ref{app:frontier_factorial}).
 
-Filtering auxiliary gradients addresses a different question: which part
-of the auxiliary update to retain on a common representation. Its dose,
-subspace and forward-input effects remain separate controls
-(Appendix~\ref{app:intervention_details}); clearing the scatter threshold
-does not guarantee either task value or consumer compatibility.
+A frozen prefix offers a different tradeoff: evaluate a healthy and a current
+nonlinear suffix on the same input. After the earlier negative capacity screens,
+a fixed ten-epoch, two-view transfer recipe opens the complete final residual
+block. Ten fresh ResNet-18 continuations gain $\SuffixRNGainHead$ points
+$[\SuffixRNGainHeadLow,\SuffixRNGainHeadHigh]$ over head-only continuation,
+and $\SuffixRNGainRichHead$ $[\SuffixRNGainRichHeadLow,\SuffixRNGainRichHeadHigh]$
+over a richer frozen-feature probe. The final-map-only control loses
+$\SuffixRNGainLastMap$ points to the full suffix. The original coarse consumer
+retains its class and selective decisions. These are supervised-transfer
+results on one fixed reference and split, with measured serving costs
+(Appendix~\ref{app:nonlinear_suffix}).
 
 \section{Evaluating a Shared Representation}\label{sec:standard}
 
@@ -355,7 +359,10 @@ LoRA uses low-rank parameter changes~\citep{hu2022lora}, and Punica and S-LoRA
 share base parameters when serving adapters~\citep{chen2024punica,sheng2024slora}.
 Our construction studies the same-input, two-version computation under
 channel-supported changes, with independent and prefix-sharing controls.
-Its exact algebra does not imply a latency advantage.
+Side-tuning likewise learns from frozen intermediate features~\citep{sung2022lst}.
+Feature distortion under fine-tuning also motivates LP--FT~\citep{kumar2022finetuning}.
+Our comparisons use these established ideas to separate learning capacity,
+consumer survival and serving cost; exact algebra alone implies no latency gain.
 
 \section{Conclusion}\label{sec:conclusion}
 
@@ -365,8 +372,9 @@ explain its scale component, and signed audits separate contraction from
 gradient conflict. Alignment and distillation can retain a cheap class
 interface without retaining confidence-threshold decisions. Shared-reference
 replay instead retains the healthy function while nonlinear learning makes
-progress on HAR and SNR, with measured capacity and serving costs. The
-unsuccessful ResNet-18 screen leaves broader positive transfer open.
+progress on HAR and SNR. Opening a full nonlinear suffix extends positive
+transfer to ResNet-18 beyond strong frozen-feature controls. Update support,
+learned scope and implementation determine the measured cost frontier.
 Shared features should be evaluated by what they predict and by whether
 a specified existing consumer can still use them.
 
@@ -2237,5 +2245,7 @@ Additional ten-seed sweeps use $\lambda\in\{2,5,20,50,200,500\}$ on HAR and $\la
 
 \input{consumer_cell_theory.tex}
 \input{consumer_cell_study.tex}
+
+\input{frontier_extension_details.tex}
 
 \end{document}
