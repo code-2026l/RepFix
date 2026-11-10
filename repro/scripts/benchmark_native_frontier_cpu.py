@@ -41,7 +41,9 @@ def main(a):
             old=F.linear(healthy.encoder[4](h2).double(),reference['A'],reference['B'])
             for mode in ['detach','joint']:
                 branch=next(b for b in record['branches'] if b['mode']==mode and ((b.get('k')==s and b.get('rank')==r) if supported else (b['rank1']==s and b['rank2']==r)))
-                raw=torch.load(states/branch['state_file'],map_location='cpu',weights_only=True);p=raw['serving'];native=NativeReplay(binary,pack(p,supported),c)
+                raw=torch.load(states/branch['state_file'],map_location='cpu',weights_only=True);p=raw['serving']
+                assert paired.state_hash(p)==branch['serving_sha256'] and paired.state_hash(raw['model'])==branch['final_state_sha256']
+                native=NativeReplay(binary,pack(p,supported),c)
                 merged=module.merged_serving(p);packed=module.packed_serving(p)
                 def current(t):return module.serve_merged_mlp(t,merged)
                 def replay(t):return module.serve_packed_mlp(t,packed)

@@ -95,7 +95,12 @@ def score(update,head,mode,part,healthy,ref,reader,monitor=None):
         maximum_legacy_logit_error=float((legacy-reference).abs().max()),maximum_feature_change=float((features[:,:old.shape[1]]-old).abs().max()))
 
 def branch(a):
-    start=time.time();ref=torch.load(a.reference,map_location='cpu',weights_only=True);cached=torch.load(a.reference.with_name('cache.pt'),map_location='cpu',weights_only=True)
+    start=time.time();prepared=a.reference.parent.parent/(a.reference.parent.name.removesuffix('_states')+'.json')
+    while not prepared.exists():
+        if time.time()-start>1800:raise TimeoutError('Nonlinear suffix preparation did not complete')
+        time.sleep(2)
+    assert json.loads(prepared.read_text())['complete']
+    ref=torch.load(a.reference,map_location='cpu',weights_only=True);cached=torch.load(a.reference.with_name('cache.pt'),map_location='cpu',weights_only=True)
     _,healthy=build_full(ref['arch']);healthy.load_state_dict(ref['healthy']);healthy.requires_grad_(False);train=cached['train'];part=cached['validation']
     modes=['F','N','H','L','U','R64'];phase='development';monitor=None
     if a.choice is not None:
