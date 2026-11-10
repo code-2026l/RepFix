@@ -131,6 +131,7 @@ def main(a):
     result=dict(complete=True,device='cpu',phase='contrastive_native_'+a.mode,reference_seed=record['reference_seed'],seed=record['seed'],
         source_sha256={Path(__file__).name:base.digest(Path(__file__))},record_sha256=base.digest(a.record),checkpoint_sha256=record['state_sha256'],
         choice_sha256=base.digest(a.choice),plan_sha256=a.plan_sha256,official_test_loaded=False,threads=12,
+        secondary_risk_plan_sha256=a.risk_plan_sha256,
         native=native,audits=audits,timings=timings,state_sha256=state_sha,secondary_risk_sha256=risk_sha,trace_setup_s=setup_s,
         host_load_average=list(os.getloadavg()),elapsed_s=time.time()-started,branches=[])
     base.save(a.out,result);print(json.dumps(dict(complete=True,mode=a.mode,reference=record['reference_seed'],seed=record['seed'])),flush=True)
@@ -140,4 +141,5 @@ if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--record',type=Path,required=True);p.add_argument('--population',type=Path,required=True)
     p.add_argument('--choice',type=Path,required=True);p.add_argument('--baseline-record',type=Path);p.add_argument('--mode',choices=['audit','timing'],required=True)
     p.add_argument('--plan-sha256',required=True);p.add_argument('--out',type=Path,required=True)
+    p.add_argument('--risk-plan-sha256')
     a=p.parse_args();torch.set_num_threads(12);torch.set_num_interop_threads(1);main(a)
