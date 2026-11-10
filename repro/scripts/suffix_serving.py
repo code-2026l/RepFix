@@ -6,7 +6,8 @@ from torch.nn import functional as F
 class SuffixReadout(nn.Module):
     def __init__(self,old,current,reader,legacy,mode='U',both=False,hidden=None,mean=None,sd=None):
         super().__init__();self.old=old;self.current=current;self.mode=mode;self.both=both;self.hidden=hidden
-        for name,value in [('weight',reader['weight']),('bias',reader['bias']),('old_weight',legacy['weight']),('old_bias',legacy['bias']),('mean',mean),('sd',sd)]:self.register_buffer(name,value)
+        for name,value in [('weight',reader['weight']),('bias',reader['bias']),('old_weight',legacy['weight']),('old_bias',legacy['bias']),('mean',mean),('sd',sd)]:
+            self.register_buffer(name,None if value is None else value.detach().clone())
     def forward(self,x):
         old=None
         if self.mode=='H':

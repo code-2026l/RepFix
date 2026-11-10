@@ -31,3 +31,6 @@ def test_richer_frozen_feature_control_uses_the_same_healthy_trace_for_both_head
         h=old.hidden(x);expected=F.linear(torch.cat([old(x),h.mean((-2,-1))],1),**reader)
         assert torch.allclose(own,expected,atol=2e-6)
         assert torch.allclose(healthy,F.linear(old(x),**legacy),atol=2e-6)
+        same=SuffixReadout(old,None,legacy,legacy,'F',False).eval()
+        traced=torch.jit.freeze(torch.jit.trace(same,x[:1]))
+        assert torch.allclose(traced(x),healthy,atol=2e-6)
