@@ -5,10 +5,11 @@ from torch import nn
 from torch.nn import functional as F
 from nonlinear_suffix import AffineMap,FullSuffix
 from token_suffix import TokenSuffix
-from mixed_reference import MixedReference
+from mixed_reference import MixedReference,AutocastReference
 
 @pytest.mark.parametrize('transformer',[False,True])
-def test_reference_only_quantization_does_not_change_current_fp32_function(transformer):
+@pytest.mark.parametrize('autocast_ref',[False,True])
+def test_reference_only_quantization_does_not_change_current_fp32_function(transformer,autocast_ref):
     torch.manual_seed(931)
     if transformer:
         from torchvision.models.vision_transformer import VisionTransformer
@@ -19,13 +20,17 @@ def test_reference_only_quantization_does_not_change_current_fp32_function(trans
     current=copy.deepcopy(old)
     with torch.no_grad():current.maps[-1].weight.add_(.03*torch.randn_like(current.maps[-1].weight))
     reader=dict(weight=torch.randn(5,d),bias=torch.randn(5));legacy=dict(weight=torch.randn(3,d),bias=torch.randn(3))
-    model=MixedReference(old,current,reader,legacy,True).eval().requires_grad_(False)
+    model=(AutocastReference(old,current,reader,legacy) if autocast_ref else MixedReference(old,current,reader,legacy,True)).eval().requires_grad_(False)
     with torch.no_grad():
         expected=F.linear(current(x),**reader);own,protected=model(x)
         assert torch.equal(own,expected) and own.dtype==torch.float32 and protected.dtype==torch.float32
         assert all(p.dtype==torch.float32 for p in current.parameters())
-        assert any(t.dtype==torch.bfloat16 for t in model.old.buffers())
-        traced=torch.jit.freeze(torch.jit.trace(model,x[:1],check_trace=False));z,old_z=traced(x)
+        if not autocast_ref:assert any(t.dtype==torch.bfloat16 for t in model.old.buffers())
+        if autocast_ref:
+            from benchmark_suffix_cpu import trace_amp
+            traced=trace_amp(model,x[:1])
+        else:traced=torch.jit.freeze(torch.jit.trace(model,x[:1],check_trace=False))
+        z,old_z=traced(x)
         assert torch.allclose(z,expected,atol=6e-6,rtol=2e-6) and torch.isfinite(old_z).all()
 
 def test_standard_amp_control_keeps_fp32_consumer_and_restores_execution_settings():

@@ -11,7 +11,7 @@ import nonlinear_suffix_cpu as study
 from consumer_contracts import evaluate_contracts
 from suffix_serving import SuffixReadout,WholeNetwork
 from paired_suffix import pack_suffix
-from mixed_reference import MixedReference
+from mixed_reference import MixedReference,AutocastReference
 from whole_amp import WholeAMPReadout,WholeAMPTwin
 
 def trace(module,sample):
@@ -74,7 +74,7 @@ def main(a):
         physical=torch.cat([ts_prefix(late.preprocess(images[j:j+128],ref['metadata']['image_size'])) for j in range(0,len(images),128)])
         if prefix_path is not None:cache_save(prefix_path,dict(header=header,physical=physical))
     old=late.linear(part['h'],ref['heads']['coarse'])
-    monitor=None if phase=='development' else np.random.default_rng(13700001+seed).choice(len(images),1024,replace=False)
+    monitor=None if phase=='development' else np.random.default_rng((14700001 if a.reference_precision else 13700001)+seed).choice(len(images),1024,replace=False)
     folder=a.record.parent/(a.record.stem+'_states')
     for row in record['branches']:
         mode=row['mode']
@@ -100,19 +100,24 @@ def main(a):
                 state_sha256=row['state_sha256'],maximum_legacy_logit_error=float((legacy-old).abs().max()),
                 cached_prefix_accuracy_difference=paired.metrics(z,y)['acc']-original['acc'])
         if mode not in ['U','H']:continue
-        if a.only_u and mode!='U':continue
+        if a.only_u and mode!='U':
+            if cache_path is not None and saved is None:cache_save(cache_path,dict(header=h_header,timings={},canonical=canonical,chosen={}))
+            continue
         mono0=trace(WholeNetwork(prefix,s0),sample[:1]);mono1=trace(WholeNetwork(prefix,s1),sample[:1])
         packed0=packed1=None
         if mode=='U':
             reader=dict(weight=s0.weight,bias=s0.bias)
             packed0=trace(WholeNetwork(prefix,pack_suffix(healthy,s0.current,reader,ref['heads']['coarse'],False)),sample[:1])
             packed1=trace(WholeNetwork(prefix,pack_suffix(healthy,s0.current,reader,ref['heads']['coarse'],True)),sample[:1])
-        precision32=precision16=precision16mono=amp0=amp1=None
+        precision32=precision16=precision16mono=amp0=amp1=reference_amp=reference_amp_mono=None
         if a.reference_precision and mode=='U':
             reader=dict(weight=s0.weight,bias=s0.bias)
             precision32=trace(MixedReference(healthy,s0.current,reader,ref['heads']['coarse'],False),physical[:1])
             precision16=trace(MixedReference(healthy,s0.current,reader,ref['heads']['coarse'],True),physical[:1])
             precision16mono=trace(WholeNetwork(prefix,MixedReference(healthy,s0.current,reader,ref['heads']['coarse'],True)),sample[:1])
+            if a.reference_autocast:
+                reference_amp=trace_amp(AutocastReference(healthy,s0.current,reader,ref['heads']['coarse']),physical[:1])
+                reference_amp_mono=trace_amp(WholeNetwork(prefix,AutocastReference(healthy,s0.current,reader,ref['heads']['coarse'])),sample[:1])
             if a.whole_amp_control:
                 amp0=trace_amp(WholeAMPReadout(prefix,s0.current,reader),sample[:1]);amp1=trace_amp(WholeAMPTwin(prefix,healthy,s0.current,reader,ref['heads']['coarse']),sample[:1])
         old_only=trace(WholeNetwork(prefix,SuffixReadout(healthy,None,ref['heads']['coarse'],ref['heads']['coarse'],'F',False)),sample[:1])
@@ -127,10 +132,15 @@ def main(a):
             if a.reference_precision:
                 fixed=choice['backbones'][arch]['modes'][mode]['batches'][str(batch)];current_name=fixed['current'];current_op=operations[current_name]
                 extra=dict(bf16_reference_mono=lambda:precision16mono(x),bf16_reference_modular=lambda:precision16(ts_prefix(x)),fp32_reference_modular=lambda:precision32(ts_prefix(x)))
+                if reference_amp is not None:extra.update(autocast_reference_mono=lambda:reference_amp_mono(x),autocast_reference_modular=lambda:reference_amp(ts_prefix(x)))
                 if phase=='development':
                     operations={current_name:current_op,**extra,'independent_fp32':lambda:(current_op(),old_only(x))}
+                    if a.reference_autocast:operations.update(mono_protected=lambda:mono1(x),modular_protected=lambda:ts1(ts_prefix(x)))
                     if amp0 is not None:operations.update(whole_amp_current=lambda:amp0(x),whole_amp_protected=lambda:amp1(x))
-                else:operations={current_name:current_op,fixed['protected']:extra[fixed['protected']],'fp32_reference_modular':extra['fp32_reference_modular']}
+                else:
+                    protected_ops=dict(extra,mono_protected=lambda:mono1(x),modular_protected=lambda:ts1(ts_prefix(x)))
+                    operations={current_name:current_op,fixed['protected']:protected_ops[fixed['protected']],'fp32_reference_modular':extra['fp32_reference_modular']}
+                    if amp0 is not None:operations.update(whole_amp_current=lambda:amp0(x),whole_amp_protected=lambda:amp1(x))
             elif choice is not None:
                 fixed=choice['backbones'][arch]['modes'][mode]['batches'][str(batch)]
                 operations={n:operations[n] for n in dict.fromkeys([fixed['current'],fixed['protected'],fixed['independent']])}
@@ -156,6 +166,8 @@ def main(a):
                         elif backend=='packed_protected':result.append(packed1(inputs))
                         elif backend=='bf16_reference_mono':result.append(precision16mono(inputs))
                         elif backend=='bf16_reference_modular':result.append(precision16(ts_prefix(inputs)))
+                        elif backend=='autocast_reference_mono':result.append(reference_amp_mono(inputs))
+                        elif backend=='autocast_reference_modular':result.append(reference_amp(ts_prefix(inputs)))
                         else:result.append(ts1(ts_prefix(inputs)))
                     own,legacy=[torch.cat([v[i] for v in result]) for i in [0,1]]
                 raw_chosen[str(batch)]=(own,legacy)
@@ -163,6 +175,19 @@ def main(a):
                     maximum_legacy_logit_error=float((legacy-old).abs().max()),
                     cached_prefix_accuracy_difference=paired.metrics(own,y)['acc']-original['acc'])
         out['serving'][mode]=dict(timings=timing,chosen=chosen)
+        raw_amp={}
+        if a.whole_amp_control and phase=='confirmation' and not a.timing_only:
+            amp_results={}
+            for batch in [1,128]:
+                actual=[amp1(late.preprocess(images[j:j+batch],ref['metadata']['image_size'])) for j in range(0,len(images),batch)]
+                own,legacy=[torch.cat([v[i] for v in actual]) for i in [0,1]];raw_amp[str(batch)]=(own,legacy)
+                amp_results[str(batch)]=dict(own=paired.metrics(own,y),contracts=evaluate_contracts(legacy.double(),old.double(),coarse,ref['thresholds'],monitor,.05/2000),maximum_legacy_logit_error=float((legacy-old).abs().max()))
+            out['serving'][mode]['whole_amp_chosen']=amp_results
+        if a.audit_only and mode=='U':
+            tensor_path=a.out.parent/(a.out.stem+'_states')/'served_logits.pt'
+            cache_save(tensor_path,dict(header=header,source_state_sha256=row['state_sha256'],canonical=canonical,chosen=raw_chosen,
+                whole_amp=raw_amp,reference=old,primary_labels=y,coarse_labels=coarse,monitor=torch.from_numpy(monitor)))
+            out['serving'][mode]['served_logits_sha256']=hashlib.sha256(tensor_path.read_bytes()).hexdigest()
         if cache_path is not None and saved is None:cache_save(cache_path,dict(header=h_header,timings=timing,canonical=canonical,chosen=raw_chosen))
         if saved is not None:out['serving'][mode]['same_function_output_reused']=True
         paired.save_json(a.out.with_suffix('.partial.json'),out)
@@ -174,4 +199,5 @@ if __name__=='__main__':
     p.add_argument('--test-cache',type=Path);p.add_argument('--choice',type=Path);p.add_argument('--plan-sha256',required=True);p.add_argument('--out',type=Path,required=True)
     p.add_argument('--timing-only',action='store_true');p.add_argument('--audit-only',action='store_true');p.add_argument('--shared-cache',type=Path)
     p.add_argument('--reference-precision',action='store_true');p.add_argument('--only-u',action='store_true');p.add_argument('--whole-amp-control',action='store_true')
+    p.add_argument('--reference-autocast',action='store_true')
     a=p.parse_args();torch.set_num_threads(12);torch.set_num_interop_threads(1);main(a)

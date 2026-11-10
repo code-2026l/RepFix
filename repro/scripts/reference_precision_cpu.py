@@ -23,6 +23,14 @@ def main(a):
         contracts=evaluate_contracts(z.double(),old.double(),part['coarse'],ref['thresholds'])
         results['bf16_products' if low else 'fp32_products']=dict(contracts=contracts,maximum_logit_error=float((z-old).abs().max()),
             passes=all(v['disagreement']<=.01 for v in contracts.values()))
+    if a.suffix_amp:
+        fastpath=torch.backends.mha.get_fastpath_enabled();torch.backends.mha.set_fastpath_enabled(False)
+        try:
+            model=WholeAMPReadout(torch.nn.Identity(),healthy,ref['heads']['coarse']).eval().requires_grad_(False)
+            z=torch.cat([model(part['x'][j:j+128]) for j in range(0,len(old),128)])
+            contracts=evaluate_contracts(z.double(),old.double(),part['coarse'],ref['thresholds'])
+            results['reference_suffix_amp']=dict(contracts=contracts,maximum_logit_error=float((z-old).abs().max()),passes=all(v['disagreement']<=.01 for v in contracts.values()))
+        finally:torch.backends.mha.set_fastpath_enabled(fastpath)
     if a.whole_network:
         images,_,_,_=late.images(True);images=images[ref['validation_indices']]
         fastpath=torch.backends.mha.get_fastpath_enabled();torch.backends.mha.set_fastpath_enabled(False)
@@ -39,5 +47,5 @@ def main(a):
     print(json.dumps(dict(arch=ref['arch'],results=results,seconds=time.time()-start)),flush=True)
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--reference',type=Path,required=True);p.add_argument('--whole-network',action='store_true');p.add_argument('--plan-sha256',required=True);p.add_argument('--out',type=Path,required=True);a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--reference',type=Path,required=True);p.add_argument('--whole-network',action='store_true');p.add_argument('--suffix-amp',action='store_true');p.add_argument('--plan-sha256',required=True);p.add_argument('--out',type=Path,required=True);a=p.parse_args()
     torch.set_num_threads(12);torch.set_num_interop_threads(1);main(a)
