@@ -75,7 +75,7 @@ def main(a):
         if prefix_path is not None:cache_save(prefix_path,dict(header=header,physical=physical))
     old=late.linear(part['h'],ref['heads']['coarse'])
     monitor=None if phase=='development' else np.random.default_rng((14700001 if a.reference_precision else 13700001)+seed).choice(len(images),1024,replace=False)
-    folder=a.record.parent/(a.record.stem+'_states')
+    folder=a.record.parent/(a.record.stem+'_states');raw_controls={}
     for row in record['branches']:
         mode=row['mode']
         if a.timing_only and (mode not in ['U','H'] or (a.only_u and mode!='U')):continue
@@ -96,6 +96,7 @@ def main(a):
                 z,legacy=[torch.cat([v[i] for v in actual]) for i in [0,1]]
             else:z,legacy=saved['canonical']
             canonical=(z,legacy)
+            raw_controls[mode]=canonical
             out['audits'][mode]=dict(own=paired.metrics(z,y),contracts=evaluate_contracts(legacy.double(),old.double(),coarse,ref['thresholds'],monitor,.05/2000),
                 state_sha256=row['state_sha256'],maximum_legacy_logit_error=float((legacy-old).abs().max()),
                 cached_prefix_accuracy_difference=paired.metrics(z,y)['acc']-original['acc'])
@@ -197,7 +198,7 @@ def main(a):
         if a.audit_only and mode=='U':
             tensor_path=a.out.parent/(a.out.stem+'_states')/'served_logits.pt'
             cache_save(tensor_path,dict(header=header,source_state_sha256=row['state_sha256'],canonical=canonical,chosen=raw_chosen,
-                whole_amp=raw_amp,full_precision=raw_full,reference=old,primary_labels=y,coarse_labels=coarse,monitor=None if monitor is None else torch.from_numpy(monitor)))
+                whole_amp=raw_amp,full_precision=raw_full,controls=raw_controls,reference=old,primary_labels=y,coarse_labels=coarse,monitor=None if monitor is None else torch.from_numpy(monitor)))
             out['serving'][mode]['served_logits_sha256']=hashlib.sha256(tensor_path.read_bytes()).hexdigest()
         if cache_path is not None and saved is None:cache_save(cache_path,dict(header=h_header,timings=timing,canonical=canonical,chosen=raw_chosen))
         if saved is not None:out['serving'][mode]['same_function_output_reused']=True
