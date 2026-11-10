@@ -12,3 +12,11 @@ This changes scheduling only. Backbones, fixed data/reference, candidates,
 controls, epochs, optimizer, selection, test access and cost criteria are
 unchanged. The preparation-only healthy/H probe values are not used to tune
 the fixed pilot or remove a backbone. Every declared pilot remains scheduled.
+# Two numerical queues
+
+After freezing the ResNet-18 choice, permit its one-worker confirmation queue
+to overlap one one-worker final-attention preparation/training queue. Across
+both roots the existing guard enforces at most two workers and 24 GiB RSS.
+No timing overlaps numerical training. This changes scheduling only; all
+gates, seeds, labels, epochs and outcome selection remain as registered.
+
