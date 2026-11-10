@@ -60,6 +60,7 @@ def evaluate(model,mode,x,cache,labels,coarse,healthy,legacy,thresholds):
 
 
 def run(a):
+    configs=getattr(a,'configs',CONFIGS);update_lr=getattr(a,'update_lr',.001)
     start=time.time();torch.manual_seed(a.seed);np.random.seed(a.seed);images,fine,coarse,data_sha=load_train()
     pool,val=stratified_split(fine,.1,a.seed);perm=torch.randperm(len(pool),generator=torch.Generator().manual_seed(a.seed+31000))
     anchors,fit=pool[perm[:2048]],pool[perm[2048:]];mask=torch.rand(len(fit),generator=torch.Generator().manual_seed(a.seed+501))<.2
@@ -83,17 +84,17 @@ def run(a):
     right=torch.linalg.svd(g2.flatten(1).double(),full_matrices=False).Vh;del f,s,loss,g1,gb,g2
     folder=a.out.parent/(a.out.stem+'_states');folder.mkdir(exist_ok=True,parents=True)
     torch.save(dict(prefix=prefix.state_dict(),first=first.state_dict(),second=second.state_dict(),normalized=normalized.state_dict(),
-        heads=heads,thresholds=thresholds,fitting=fit,validation=val,anchors=anchors,labeled=mask,support=support,right_vectors=right[:16]),folder/'reference.pt')
+        heads=heads,thresholds=thresholds,fitting=fit,validation=val,anchors=anchors,labeled=mask,support=support,right_vectors=right[:max(r for _,r in configs)]),folder/'reference.pt')
     source=['vision_shared_replay_cpu.py','shared_reference_vision.py','shared_reference_replay.py','consumer_contracts.py',
         'readout_transfer_audit.py','vision_consumer_cpu.py','vision_chart_cpu.py','paired_readout_continuation.py']
     out=dict(complete=False,device='cpu',phase='development',seed=a.seed,smoke=a.smoke,plan_sha256=a.plan_sha256,
         data_sha256=data_sha,source_sha256={n:hashlib.sha256(Path(__file__).with_name(n).read_bytes()).hexdigest() for n in source},
         splits=dict(fitting=len(fit),validation=len(val),anchors=len(anchors),labeled=int(mask.sum()),fitting_sha256=paired.state_hash(fit),
             validation_sha256=paired.state_hash(val),anchors_sha256=paired.state_hash(anchors),mask_sha256=paired.state_hash(mask),official_test_loaded=False,test_metrics_computed=False),
-        configuration=dict(epochs=3,batch=128,threads=8,head_lr=.001,sparse_lr=.001,dense_lr=.0001,weight_decay=.0001,configs=CONFIGS),
+        configuration=dict(epochs=3,batch=128,threads=8,head_lr=.001,sparse_lr=update_lr,dense_lr=.0001,weight_decay=.0001,configs=configs),
         support_calibration=dict(indices_sha256=paired.state_hash(idx),support_order=support.tolist(),right_vectors_sha256=paired.state_hash(right)),
         healthy=paired.metrics(linear(hval,heads['fine']),fine[val]),branches=[])
-    for mode,k,r in [('F',0,0),('U',0,0)]+[('replay',k,r) for k,r in ([(8,8)] if a.smoke else CONFIGS)]:
+    for mode,k,r in [('F',0,0),('U',0,0)]+[('replay',k,r) for k,r in ([(8,8)] if a.smoke else configs)]:
         head=copy.deepcopy(normalized)
         if mode=='F':model=head;groups=[dict(params=head.parameters(),lr=.001)]
         elif mode=='U':
@@ -101,7 +102,7 @@ def run(a):
             groups=[dict(params=[*f.parameters(),*s.parameters()],lr=.0001),dict(params=head.parameters(),lr=.001)]
         else:
             model=SharedReferenceBlock(first,second,support[:k],right[:r],head)
-            groups=[dict(params=[p for name,p in model.named_parameters() if p.requires_grad and not name.startswith('head.')],lr=.001),dict(params=model.head.parameters(),lr=.001)]
+            groups=[dict(params=[p for name,p in model.named_parameters() if p.requires_grad and not name.startswith('head.')],lr=update_lr),dict(params=model.head.parameters(),lr=.001)]
         opt=torch.optim.AdamW(groups,weight_decay=.0001);rng=torch.Generator().manual_seed(a.seed+20000);order_hash=hashlib.sha256();trace=[]
         for epoch in range(1 if a.smoke else 3):
             order=torch.randperm(len(fit),generator=rng);order_hash.update(order.numpy().tobytes())
