@@ -28,7 +28,7 @@ def main(a):
     result=dict(complete=True,device='cpu',phase='risk_confirmation_export',reference_seed=row['reference_seed'],seed=row['seed'],
         plan_sha256=a.plan_sha256,source_sha256={Path(__file__).name:hashlib.sha256(Path(__file__).read_bytes()).hexdigest()},
         training_record_sha256=hashlib.sha256(a.record.read_bytes()).hexdigest(),state_file='risk.pt',state_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
-        official_test_loaded=False,labels_loaded_for_fitting=False,elapsed_s=time.time()-start)
+        official_test_loaded=False,labels_loaded_for_fitting=False,branches=[],elapsed_s=time.time()-start)
     a.out.write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result),flush=True)
 
 
