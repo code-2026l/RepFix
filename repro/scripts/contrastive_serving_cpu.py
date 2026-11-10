@@ -13,6 +13,8 @@ import paired_readout_continuation as paired
 from suffix_serving import SuffixReadout,WholeNetwork
 from mixed_reference import MixedReference,AutocastReference
 from consumer_contracts import evaluate_contracts
+from conditional_reference_cpu import ridge
+from ridge_loo import fixed_design_loo
 
 
 def trace(module,x,amp=False):
@@ -27,8 +29,9 @@ def trace(module,x,amp=False):
 
 
 @torch.no_grad()
-def paired_retrieval(model,views,head):
-    hs=[F.normalize((base.embeds(model,x)-head['mean'])/head['sd'],dim=1) for x in views]
+def paired_retrieval(model,views,head,return_features=False):
+    features=[base.embeds(model,x) for x in views]
+    hs=[F.normalize((h-head['mean'])/head['sd'],dim=1) for h in features]
     correct=[]
     for query,gallery in [(hs[0],hs[1]),(hs[1],hs[0])]:
         hits=[]
@@ -36,7 +39,8 @@ def paired_retrieval(model,views,head):
             scores=query[start:start+256]@gallery.T
             hits.append(scores.argmax(1)==torch.arange(start,start+len(scores)))
         correct.append(torch.cat(hits))
-    return torch.stack(correct)
+    hits=torch.stack(correct)
+    return (hits,features) if return_features else hits
 
 
 @torch.no_grad()
@@ -60,7 +64,7 @@ def main(a):
     programs=dict(mono_current=mono_current,modular_current=lambda x:tail(pfx(x)),
         bf16_reference_mono=mono_bf16,fp32_reference_modular=lambda x:fp32_mod(pfx(x)),
         autocast_reference_modular=lambda x:amp_mod(pfx(x)),mono_protected=mono_full)
-    setup_s=time.time()-setup;audits={};timings={};arrays={}
+    setup_s=time.time()-setup;audits={};timings={};arrays={};secondary_risk=None
     if a.mode=='audit':
         physical=torch.cat([prefix(late.preprocess(images[j:j+128],size)) for j in range(0,len(images),128)])
         current_features=base.embeds(current,physical);raw_current=late.linear(current_features,reader)
@@ -92,11 +96,21 @@ def main(a):
         arrays['monitor']=torch.from_numpy(monitor)
         native=dict(current=paired.metrics(raw_current,y),detached=paired.metrics(dz,y),individual_batch1=individual,
             difference_from_cached_primary=paired.metrics(raw_current,y)['acc']-record['validation']['acc'])
-        retrieval={name:paired_retrieval(model,cache['x'][:,val],state['head']) for name,model in [('current',current),('detached',dmodel)]}
+        retrieval_data={name:paired_retrieval(model,cache['x'][:,val],state['head'],True) for name,model in [('current',current),('detached',dmodel)]}
+        retrieval={name:value[0] for name,value in retrieval_data.items()}
         native['cached_prefix_pair_retrieval']={name:float(hits.double().mean()) for name,hits in retrieval.items()}
         native['unprotected_contracts']=evaluate_contracts(unprotected,old,coarse,ref['thresholds'])
         native['feature_trace_ratio']=float(current_features.var(0,unbiased=False).sum()/old_features.var(0,unbiased=False).sum())
         arrays['pair_retrieval_hits']=retrieval
+        ax=base.embeds(current,cache['x'][0,ref['anchors']]);target=late.linear(cache['h'][0,ref['anchors']],legacy);target-=target.mean(1,keepdim=True)
+        fitting=torch.randperm(2048,generator=torch.Generator().manual_seed(6500))[:1024]
+        reader_map,_,_=ridge(ax[fitting],target[fitting],.001)
+        anchor_cheap=late.linear(ax,reader_map)
+        fx=ax[fitting].double();design=(fx-fx.mean(0))/fx.std(0).clamp_min(1e-6)
+        fit_z,loo,leverage=fixed_design_loo(design,target[fitting],1024*.001)
+        risk_views={name:dict(cheap=late.linear(h,reader_map),reference=late.linear(cache['h'][i,val],legacy)) for i,(name,h) in enumerate(zip(['clean','augmented'],retrieval_data['current'][1]))}
+        secondary_risk=dict(reference_seed=record['reference_seed'],seed=record['seed'],anchor_cheap=anchor_cheap,anchor_target=target,
+            views=risk_views,thresholds=ref['thresholds'],loo=dict(fitted=fit_z,loo=loo,leverage=leverage,target=target[fitting],fit_indices=fitting))
     else:
         native=None
         for batch in ['1','128']:
@@ -112,10 +126,12 @@ def main(a):
     folder=a.out.parent/(a.out.stem+'_states');folder.mkdir(exist_ok=True,parents=True)
     state_sha=None
     if arrays:torch.save(arrays,folder/'replay.pt');state_sha=base.digest(folder/'replay.pt')
+    risk_sha=None
+    if secondary_risk:torch.save(secondary_risk,folder/'risk.pt');risk_sha=base.digest(folder/'risk.pt')
     result=dict(complete=True,device='cpu',phase='contrastive_native_'+a.mode,reference_seed=record['reference_seed'],seed=record['seed'],
         source_sha256={Path(__file__).name:base.digest(Path(__file__))},record_sha256=base.digest(a.record),checkpoint_sha256=record['state_sha256'],
         choice_sha256=base.digest(a.choice),plan_sha256=a.plan_sha256,official_test_loaded=False,threads=12,
-        native=native,audits=audits,timings=timings,state_sha256=state_sha,trace_setup_s=setup_s,
+        native=native,audits=audits,timings=timings,state_sha256=state_sha,secondary_risk_sha256=risk_sha,trace_setup_s=setup_s,
         host_load_average=list(os.getloadavg()),elapsed_s=time.time()-started,branches=[])
     base.save(a.out,result);print(json.dumps(dict(complete=True,mode=a.mode,reference=record['reference_seed'],seed=record['seed'])),flush=True)
 
