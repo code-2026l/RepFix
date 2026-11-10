@@ -30,8 +30,10 @@ TESTS = [
     'test_dense_replay.py',
     'test_late_replay.py','test_nonlinear_suffix.py','test_suffix_serving.py',
     'test_paired_suffix.py','test_mixed_reference.py',
+    'test_consumer_routing.py','test_vision_auxiliary.py',
+    'test_vision_auxiliary_selection.py','test_reference_replication.py',
 ]
-EXPECTED_TESTS=117
+EXPECTED_TESTS=132
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -449,6 +451,8 @@ def verify_files(root):
 
     from verify_frontier_records import verify as verify_frontier
     frontier=verify_frontier(root)
+    from verify_followup_records import verify as verify_followup
+    followup=verify_followup(root)
 
     return manifest, dict(payload_files=len(files), manuscript_figures=len(figures),
         numerical_inputs=len(inputs), completed_cpu_records=records,
@@ -470,7 +474,7 @@ def verify_files(root):
         dense_packed_ratio_batch1=float(dense_medians['torchscript/1']),
         dense_packed_ratio_batch1024=float(dense_medians['torchscript/1024']),
         nonlinear_development_records=len(development), nonlinear_confirmation_tasks=0,
-        frontier_extension=frontier,manuscript_pdf_sha256=manifest['pdf_sha256'])
+        frontier_extension=frontier,research_followup=followup,manuscript_pdf_sha256=manifest['pdf_sha256'])
 
 
 def execute(command, root):

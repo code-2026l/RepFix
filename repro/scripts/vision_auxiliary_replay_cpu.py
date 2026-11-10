@@ -35,6 +35,14 @@ def main(a):
         cached_old_logits=cached_old,thresholds=reference['thresholds'],branches={})
     for branch in record['branches']:
         mode=branch['mode'];path=state_folder/(mode+'.pt');state=torch.load(path,map_location='cpu',weights_only=True)
+        def inspect(value):
+            if isinstance(value,torch.Tensor):
+                assert not value.is_floating_point() or torch.isfinite(value).all()
+                return 1
+            if isinstance(value,dict):return sum(inspect(v) for v in value.values())
+            if isinstance(value,(list,tuple)):return sum(inspect(v) for v in value)
+            return 0
+        checked_tensors=inspect(state)
         if mode in ['F','H']:features=cache['h'][0,val]
         elif mode=='N':
             h=state['head'];features=cache['h'][0,val]
@@ -48,7 +56,7 @@ def main(a):
         acc=float((z.argmax(1)==labels).double().mean())
         assert abs(acc-branch['validation']['own']['acc'])<1e-12
         entry=dict(mode=mode,accuracy=acc,correct=int((z.argmax(1)==labels).sum()),
-            state_sha256=sha(path),own_logit_max_error=None,mse_by_dose={})
+            state_sha256=sha(path),finite_saved_tensors=checked_tensors,own_logit_max_error=None,mse_by_dose={})
         saved=dict(own_logits=z)
         if mode not in ['F','N','H']:
             assert entry['state_sha256']==branch['state_sha256']

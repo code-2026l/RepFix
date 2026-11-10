@@ -14,7 +14,7 @@ def main():
         lines.append(f"{title} & {100*value['affine_oracle_mean_referral_at_one_percent']:.2f} & {100*confidence:.2f} & {100*value['lowest_referral_meeting_consumer_gate']:.2f} "+chr(92)*2)
     (P/'conditional_reference_table.tex').write_text(r'''\begin{table}[H]
 \centering\small
-\caption{Development reference-referral fractions (\%). Every tested gate shown
+\caption{Mean development reference-referral fractions (\%). Every tested gate shown
 meets the one-percent class/selective disagreement limit on all three seeds,
 but exceeds the fixed $50\%$ referral limit. The fractional oracle fixes the
 affine reader; the tested columns allow both affine and residual readers.

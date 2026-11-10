@@ -27,16 +27,17 @@ def main():
                    'repro/scripts/plot_replay_vision.py',
                    'repro/scripts/plot_suffix_frontier.py',
                    'repro/scripts/plot_suffix_repairs.py',
-                   'repro/scripts/plot_serving_frontier.py']:
+                   'repro/scripts/plot_serving_frontier.py',
+                   'repro/scripts/plot_reference_replication.py']:
         runpy.run_path(str(ROOT / script), run_name='__main__')
-    assert len(EXPORTS) == 26
+    assert len(EXPORTS) == 27
     assert all(abs(v['width_inches'] - 5.5) < 1e-10 for v in EXPORTS.values())
     report = dict(figures=EXPORTS, figures_rebuilt=len(EXPORTS),
                   all_vector_type42=True, all_text_within_canvas=True,
                   legacy_visual_changes_preserve_numerical_artists=True)
     (ROOT / 'paper/figures/publication_figure_manifest.json').write_text(
         json.dumps(report, indent=2) + '\n',encoding='utf-8',newline='\n')
-    print('Rebuilt all twenty-six included figures at final 5.5-inch width.')
+    print('Rebuilt all twenty-seven included figures at final 5.5-inch width.')
 
 
 if __name__ == '__main__':
