@@ -55,9 +55,19 @@ def main(a):
         old=late.linear(cache['h'][0,val],ref['heads']['coarse'])
     folder=a.out.parent/(a.out.stem+'_states');folder.mkdir(exist_ok=True,parents=True);state=folder/'endpoint.pt'
     torch.save(dict(model=model.state_dict(),head=head.state_dict(),reader=reader,own_logits=z,old_logits=old,reference=ref),state)
-    value=dict(complete=True,device='cpu',phase='contrastive_development',alpha=a.alpha,reference_seed=a.reference_seed,seed=a.seed,
+    baseline=None
+    if a.baseline_record:
+        control=json.loads(a.baseline_record.read_text());assert (control['reference_seed'],control['seed'])==(a.reference_seed,a.seed)
+        info=next(v for v in control['branches'] if v['mode']=='D')
+        source=a.baseline_record.parent/(a.baseline_record.stem+'_states')/'D.pt';assert base.digest(source)==info['state_sha256']
+        stored=torch.load(source,map_location='cpu',weights_only=True)
+        _,detached=factory.build_for(cache);detached.load_state_dict(stored['model']);detached.eval().requires_grad_(False)
+        dhead=base.initial_head(ref);dhead.load_state_dict(stored['head'])
+        baseline=dict(state_sha256=base.digest(source),record_sha256=base.digest(a.baseline_record),
+            accuracy=info['validation']['own']['acc'],contrastive_loss=evaluate_aux(detached,cache['x'][:,val],dhead))
+    value=dict(complete=True,device='cpu',phase='contrastive_'+a.phase,alpha=a.alpha,reference_seed=a.reference_seed,seed=a.seed,
         plan_sha256=a.plan_sha256,source_sha256={Path(__file__).name:base.digest(Path(__file__)),**base.sources()},official_test_loaded=False,
-        validation=own,contrastive_loss=aux,healthy_path='retained frozen prefix/suffix; cached output pending independent replay',trace=trace,
+        validation=own,contrastive_loss=aux,baseline=baseline,healthy_path='retained frozen prefix/suffix; cached output pending independent replay',trace=trace,
         state_sha256=base.digest(state),elapsed_s=time.time()-start,branches=[])
     base.save(a.out,value);print(json.dumps(dict(complete=True,alpha=a.alpha,accuracy=own['acc'],auxiliary_loss=aux)),flush=True)
 
@@ -65,4 +75,5 @@ def main(a):
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--population',type=Path,required=True);p.add_argument('--alpha',type=float,required=True)
     p.add_argument('--reference-seed',type=int,default=6200);p.add_argument('--seed',type=int,default=6300);p.add_argument('--plan-sha256',required=True);p.add_argument('--out',type=Path,required=True)
+    p.add_argument('--phase',choices=['development','confirmation'],default='development');p.add_argument('--baseline-record',type=Path)
     a=p.parse_args();torch.set_num_threads(12);torch.set_num_interop_threads(1);main(a)
