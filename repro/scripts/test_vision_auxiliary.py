@@ -1,7 +1,7 @@
 import copy
 import torch
 from torch import nn
-from vision_auxiliary_cpu import primary_loss,augment
+from vision_auxiliary_cpu import primary_loss,augment,clone_decoder
 
 torch.set_num_threads(1)
 
@@ -23,9 +23,13 @@ def test_detached_reconstruction_cannot_modify_primary_parameter_gradient():
 def test_cloning_decoder_optimizer_preserves_every_warm_moment():
     base=nn.Linear(4,3);opt=torch.optim.AdamW(base.parameters(),lr=.001)
     opt.zero_grad();base(torch.randn(8,4)).square().mean().backward();opt.step()
-    clone=copy.deepcopy(base);other=torch.optim.AdamW(clone.parameters(),lr=.001);other.load_state_dict(copy.deepcopy(opt.state_dict()))
+    snapshot=copy.deepcopy(opt.state_dict());clone,other=clone_decoder(base,opt)
     for a,b in zip(opt.state.values(),other.state.values()):
         assert all(torch.equal(a[k],b[k]) for k in ['step','exp_avg','exp_avg_sq'])
+        assert all(a[k].data_ptr()!=b[k].data_ptr() for k in ['step','exp_avg','exp_avg_sq'])
+    other.zero_grad();clone(torch.randn(8,4)).square().mean().backward();other.step()
+    for before,after in zip(snapshot['state'].values(),opt.state.values()):
+        assert all(torch.equal(before[k],after[k]) for k in ['step','exp_avg','exp_avg_sq'])
 
 def test_augmentation_is_fixed_and_does_not_change_image_count_or_dtype():
     x=torch.randint(256,(12,32,32,3),dtype=torch.uint8)

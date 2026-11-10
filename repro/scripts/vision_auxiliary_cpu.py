@@ -80,6 +80,11 @@ def primary_loss(head,h,labels,selected):
     ce=F.cross_entropy(head(h[selected]),labels[selected]) if selected.any() else h.sum()*0
     return ce+.0001*sum(p.square().sum() for p in head.parameters())
 
+def clone_decoder(warm,warmopt):
+    decoder=copy.deepcopy(warm);opt=torch.optim.AdamW(decoder.parameters(),lr=.001,weight_decay=.0001)
+    opt.load_state_dict(copy.deepcopy(warmopt.state_dict()))
+    return decoder,opt
+
 @torch.no_grad()
 def embeds(model,x):return torch.cat([model(batch) for batch in x.split(256)])
 
@@ -134,6 +139,7 @@ def run(a):
             views=torch.randint(2,(len(idx),),generator=g);loss=(warm(hh[views,idx])-targets[views,idx]).square().mean()/scale
             warmopt.zero_grad();loss.backward();warmopt.step()
     torch.save(dict(decoder=warm.state_dict(),optimizer=warmopt.state_dict()),folder/'warm_decoder.pt')
+    warm_hash=paired.state_hash(warmopt.state_dict())
     grid=[] if a.transfer_only else a.doses
     for mode,alpha in [('D',0.),*[(f'J{dose:g}',dose) for dose in grid]]:
         torch.manual_seed(a.seed);model=copy.deepcopy(healthy).requires_grad_(True)
@@ -142,7 +148,7 @@ def run(a):
         head=initial_head(reference);primary_opt=torch.optim.AdamW([dict(params=[p for p in model.parameters() if p.requires_grad],lr=.00003),dict(params=head.parameters(),lr=.0001)],weight_decay=.0001)
         doses=(grid or [1.]) if mode=='D' else [alpha];decoders=[];opts=[]
         for _ in doses:
-            dec=copy.deepcopy(warm);opt=torch.optim.AdamW(dec.parameters(),lr=.001,weight_decay=.0001);opt.load_state_dict(warmopt.state_dict());decoders.append(dec);opts.append(opt)
+            dec,opt=clone_decoder(warm,warmopt);decoders.append(dec);opts.append(opt)
         rng=torch.Generator().manual_seed(a.seed+20000);vrng=torch.Generator().manual_seed(a.seed+71000);trace=[]
         for epoch in range(10):
             losses=[]
@@ -171,7 +177,8 @@ def run(a):
         stored=dict(model=model.state_dict(),reader=reader,head=head.state_dict(),decoders=[d.state_dict() for d in decoders],own_logits=z,old_logits=old_logits,labels=vy,coarse=vc)
         torch.save(stored,folder/(mode+'.pt'))
         out['branches'].append(dict(mode=mode,alpha=alpha,validation=result,online_own=online,trace=trace,detached_mse_by_dose=detached_errors,
-            state_file=mode+'.pt',state_sha256=digest(folder/(mode+'.pt'))))
+            state_file=mode+'.pt',state_sha256=digest(folder/(mode+'.pt')),warm_optimizer_sha256=warm_hash))
+        assert paired.state_hash(warmopt.state_dict())==warm_hash,'Warm decoder optimizer state was mutated by a branch'
         save(a.out.with_suffix('.partial.json'),out);print(json.dumps(dict(stage='endpoint',mode=mode,arch=cache['arch'],accuracy=result['own']['acc'],mse=result['reconstruction_mse'])),flush=True)
     out.update(complete=True,elapsed_s=time.time()-start);save(a.out,out)
 
