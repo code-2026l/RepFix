@@ -16,6 +16,7 @@ and matched CPU overhead rather than inferring deployment cost from MACs.
 | Which actual programs meet the cost and consumer gates? | Deployment table and serving appendix | Full FP32 and selected reference programs, actual outputs, isolated latency and export sizes |
 | Does saved matrix rank identify a scientific law? | Rank/factorial appendix | Same-rank support comparison, SVD scope and gauge counterexample |
 | Does transfer survive new reference fits and partitions? | Reference-replication appendix | Four fitted ViT references, twelve nested continuations; reference-level intervals |
+| Can few reference queries estimate repair risk? | Small-budget query appendix | Four fitted references; direct-count and isotropic controls; point estimates separate from certification |
 | What remains open? | FINAL_REVIEW_20261110.md | Real visual auxiliary benefit, broader backbones/pretraining and online policy |
 | Can the compact artifact be checked? | REPRODUCIBILITY.md | Manifest, structural tests, reconstructed figures and all-page comparison |
 

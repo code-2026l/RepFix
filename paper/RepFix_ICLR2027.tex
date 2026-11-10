@@ -424,6 +424,13 @@ This prevents an apparent saving from coming from a different current model.
 The monitor covers the present fixed candidate family and corpus remainder.
 Changed populations and later updates require a new check.
 
+Small monitors can also estimate disagreement before a full reference audit.
+Across four fitted ViT references, statistical residual propagation reduces
+prediction MAE from $4.77$ to $0.51$ points with $32$ additional reference queries
+after the common map-fitting anchors. An isotropic model performs similarly;
+this point estimate remains separate from the finite-corpus certificate
+(Appendix~\ref{app:query_risk}).
+
 \section{Related Work}\label{sec:related}
 
 Backward-compatible learning studies consumer interfaces~\citep{shen2020backward,hu2022backward}; positive-congruent training targets negative flips~\citep{yan2021positive}. Weight interpolation reduces regressions without extra inference cost~\citep{schumann2023bcwi}, while changing the current function. BC-Aligner jointly trains an encoder and a linear backward map; our matched control adapts its single-update objective. Duan~\citep{duan2026staleness} studies frozen language-model monitors and repairs their AUC with paired unlabeled realignment. We study scale interventions and retention of fixed class and confidence-threshold decisions, with current-task utility and serving cost. Successful stitching~\citep{bansal2021stitching,mai2026stitching} alone does not establish informational similarity~\citep{smith2025functional}. Our moment and ridge repairs act at the readout interface; AdaBN~\citep{li2016adabn}, LDC~\citep{gomezvilla2024ldc}, CORAL~\citep{sun2016coral} and Tent~\citep{wang2021tent} provide adaptation context. Calibration~\citep{guo2017calibration,ovadia2019trust} and unlabeled performance estimation~\citep{garg2022unlabeled} complement the consumer audit; access and selection assumptions remain explicit~\citep{zhao2023pitfalls}.
@@ -2331,5 +2338,7 @@ Additional ten-seed sweeps use $\lambda\in\{2,5,20,50,200,500\}$ on HAR and $\la
 \input{frontier_extension_details.tex}
 
 \input{followup_studies.tex}
+
+\input{query_risk_study.tex}
 
 \end{document}

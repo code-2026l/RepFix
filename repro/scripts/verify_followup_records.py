@@ -44,6 +44,17 @@ def verify(root):
     finite=read('followup_finite_state_audit.json')
     assert finite['complete'] and finite['all_returned_floating_tensors_finite'] and finite['states']==29
     assert finite['transport_audit_sha256']==hashlib.sha256((base/'followup_execution_audit.json').read_bytes()).hexdigest()
+    risk=read('small_budget_risk_confirmation.json');rates=read('small_budget_risk_rate_replay.json')
+    risk_execution=read('risk_propagation_execution.json')
+    assert risk['complete'] and risk['confirm_primary'] and risk['reference_units']==4
+    assert len(risk['endpoints'])==12 and not risk['official_test_loaded']
+    assert rates['complete'] and rates['all_primary_forecasts_reproduced'] and rates['independent_implementation']
+    assert rates['primary_summary_sha256']==hashlib.sha256((base/'small_budget_risk_confirmation.json').read_bytes()).hexdigest()
+    assert risk_execution['complete'] and risk_execution['all_jobs_stopped'] and not risk_execution['gpu_used']
+    for n in ['32','64']:
+        primary=risk['statistics']['clean'][n]
+        assert primary['relative_reduction']>=.2 and primary['improvement']['direct']['ci95'][0]>0
+        iso=primary['improvement']['isotropic']['ci95'];assert iso[0]<0<iso[1]
     return dict(routing_development_endpoints=6,routing_policies_replayed=480,
         real_visual_auxiliary_pilots=2,auxiliary_confirmation_runs=0,
         independent_fitted_references=4,transfer_confirmation_runs=12,

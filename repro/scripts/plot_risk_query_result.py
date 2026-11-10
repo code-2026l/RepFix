@@ -19,7 +19,7 @@ def main():
         ax.set_xticks(range(4),['32','64','128','256']);ax.set_xlabel('Additional reference queries');ax.set_ylim(0,6);ax.grid(axis='y');panel(ax,letter,title)
     axes[0].set_ylabel('Prediction MAE (points)');axes[1].tick_params(labelleft=False)
     handles,labels=axes[0].get_legend_handles_labels();fig.legend(handles,labels,loc='lower center',bbox_to_anchor=(.53,.005),ncol=3,handlelength=1.3,columnspacing=1.3)
-    save(fig,R/'output/risk_research/fig_risk_queries');plt.close(fig)
+    save(fig,R/'paper/figures/fig_risk_queries');plt.close(fig)
 
 
 if __name__=='__main__':main()

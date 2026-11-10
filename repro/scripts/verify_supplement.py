@@ -32,8 +32,9 @@ TESTS = [
     'test_paired_suffix.py','test_mixed_reference.py',
     'test_consumer_routing.py','test_vision_auxiliary.py',
     'test_vision_auxiliary_selection.py','test_reference_replication.py',
+    'test_small_budget_risk.py',
 ]
-EXPECTED_TESTS=132
+EXPECTED_TESTS=134
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()

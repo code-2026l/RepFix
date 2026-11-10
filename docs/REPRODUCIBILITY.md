@@ -48,7 +48,7 @@ thread. The hardware timings reported in the paper retain their original setup.
 python repro/scripts/verify_supplement.py --tests
 ```
 
-The 132 tests cover finite-corpus disagreement bounds, repair availability, affine
+The 134 tests cover finite-corpus disagreement bounds, repair availability, affine
 scale boundaries, normalized-head nullspaces, constrained affine folding,
 nonlinear fusion, exact-count selection at a zero-benefit tie, invertible chart folding,
 vision access/split controls, and teacher-head fitting on affine and nonlinear
@@ -63,7 +63,7 @@ python repro/scripts/verify_supplement.py --figures
 ```
 
 The helper runs `repro/scripts/render_paper_figures.py` in a temporary copy. The
-coordinated generators reconstruct all 27 included figures from shipped
+coordinated generators reconstruct all 28 included figures from shipped
 records. It compares plotted numerical artists and dimensions with the release
 manifest. Files are exported as PDF, PNG, and SVG at a 5.5-inch width.
 
@@ -319,3 +319,16 @@ record's cached-reference-versus-itself comparison as an independent replay.
 `followup_execution_audit.json` records all nine stopped numerical queues,
 including failures, file fingerprints, recovered outputs and unbundled caches.
 The review verifier checks these records without fetching excluded weights.
+
+
+## Small-budget risk estimation
+
+The frozen point-estimation study and its full controls are in
+`docs/SMALL_BUDGET_RISK_RESULT_20261110.md`. Plans, CPU exports, reference-level
+analysis and independent consumer-rate replay are under the matching risk files.
+The compact paper archive includes code and numerical records. Twelve raw output
+arrays (without images/backbone weights) are provided in the separate local
+`01_研究增量_小预算风险诊断_20261110` evidence package. Its extracted replay reproduces
+both full primary and rate-level JSON results. Initial1024 map-fitting reference
+outputs are separate from the32--256 additional query budgets. These are MAE
+estimates and do not replace the finite-corpus certificate.

@@ -135,8 +135,8 @@ text keeps that scope while presenting positive results directly.
 
 ## Recovered evidence and release verification
 
-The manuscript has 8 main pages and 93 total pages.
-The release contains 27 independently regenerated vector figures and 132 passing
+The manuscript has 8 main pages and 95 total pages.
+The release contains 28 independently regenerated vector figures and 134 passing
 focused structural checks. The extracted source is rebuilt and compared page
 by page in both text and rendered pixels; the final result is in REVIEW_CHECKS.json.
 The known SciPy SLSQP intermediate clipping warning is retained separately from
@@ -189,3 +189,17 @@ Detailed unsigned-proxy calibration moves to the appendix; the existing consumer
 disagreement inequality moves into the serving check. Mathematical statements,
 proofs, tables, numerical inputs and figure data are unchanged. The language
 and structural audit is in STORY_FINAL_20261110.md and STORY_INTEGRITY_20261110.json.
+
+
+## Confirmed low-query diagnostic addition
+
+The saved-model confirmation uses four fitted references and twelve endpoints.
+At32/64 extra reference calls, disagreement-estimation MAE is0.509/0.502 points
+versus4.773/2.964 for direct counts. The paired improvement intervals across
+reference means exclude zero at both primary budgets. Augmented-view controls
+and independent per-consumer rate replay retain the low-budget benefit.
+The isotropic comparator performs similarly; no covariance-direction advantage
+is established. This is a useful diagnostic result, not a repaired-utility result,
+a new variance-reduction theorem or a distribution-free deployment certificate.
+The1024 initial map-fitting reference outputs remain part of the access account.
+Full results and assumptions are in SMALL_BUDGET_RISK_RESULT_20261110.md.

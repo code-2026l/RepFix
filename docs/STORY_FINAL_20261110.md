@@ -1,3 +1,7 @@
+Historical editorial-pass report: the subsequent risk-diagnosis addition is
+recorded in SMALL_BUDGET_RISK_RESULT_20261110.md. The8/93-page count below belongs
+to the preserved editorial release.
+
 # Final argument and English revision
 
 The paper's central argument is now explicit: task decodability can survive an

@@ -30,11 +30,17 @@ at development. See the [follow-up report](docs/FOLLOWUP_REPORT_20261110.md).
 
 ![Shared computation and fresh transfer](paper/figures/fig_suffix_frontier.png)
 
+A frozen saved-model risk study additionally confirms a small-query diagnostic
+benefit across four fitted ViT references. At32 extra reference queries after
+1024 common map-fitting anchors, prediction MAE falls from4.77 to0.51 points.
+The isotropic baseline ties full covariance; this is a point estimate, separate
+from deployment certification. See [the complete risk study](docs/SMALL_BUDGET_RISK_RESULT_20261110.md).
+
 ## Paper and files
 
-- [Final paper](paper/RepFix_ICLR2027.pdf): 8 main pages, 93 total.
-- [Supplementary archive](artifacts/2026-11-10/RepFix_ICLR_StoryFinal_20261110_supplement.zip)
-- [Editable source and evidence](artifacts/2026-11-10/RepFix_ICLR_StoryFinal_20261110_source.zip)
+- [Final paper](paper/RepFix_ICLR2027.pdf): 8 main pages, 95 total.
+- [Supplementary archive](artifacts/2026-11-10/RepFix_RiskDiagnosis_20261110_supplement.zip)
+- [Editable source and evidence](artifacts/2026-11-10/RepFix_RiskDiagnosis_20261110_source.zip)
 - [Reading guide](docs/REVIEWER_GUIDE.md) · [Evidence index](docs/EVIDENCE_INDEX.md)
 - [Final argument and English](docs/STORY_FINAL_20261110.md) · [Scientific integrity](docs/STORY_INTEGRITY_20261110.json)
 - [Editorial and figure refinement](docs/EDITORIAL_FINISH_20261110.md) · [Integrity checks](docs/EDITORIAL_VISUAL_VERIFICATION_20261110.json)
@@ -55,7 +61,7 @@ python repro/scripts/verify_supplement.py --tests --figures --paper
 ```
 
 This runs in a temporary copy and preserves the extracted source. It checks 132
-focused structural tests, reconstructs 27 manuscript figures from recorded data,
+focused structural tests, reconstructs 28 manuscript figures from recorded data,
 and compares the rebuilt paper's page text and pixels. LaTeX requires `pdflatex`,
 `bibtex` and `pdftotext`. See the [reproduction guide](docs/REPRODUCIBILITY.md).
 
