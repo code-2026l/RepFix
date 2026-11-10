@@ -310,7 +310,7 @@ def verify_files(root):
         if len(family)!=count:raise ValueError('Incomplete cell development: '+folder)
         for name in family:
             row=json.loads((root/name).read_text())
-            if (not row['complete'] or row['phase']!='development' or row['smoke'] or len(row['branches'])!=endpoints or
+            if (not row['complete'] or row['phase']!='development' or row.get('smoke',False) or len(row['branches'])!=endpoints or
                     row['splits']['test_metrics_computed'] or any('test' in b for b in row['branches'])):
                 raise ValueError('Cell development scope changed: '+name)
     stop=json.loads((root/base/'cell_development_stop.json').read_text())
