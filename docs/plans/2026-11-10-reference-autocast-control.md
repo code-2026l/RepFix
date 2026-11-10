@@ -29,3 +29,9 @@ plan's fresh monitor, alpha and budgets. Any failure is retained. Independent
 AMP may be confirmed as an established control if it clears its own matched
 utility, consumer and cost gates. Numerical queues stay within the original
 CPU, RAM and disk limits, and timing remains isolated. All authoring is local.
+
+The final timing screen selected different ABIs at the two batch sizes. Freeze
+the fastest full-precision reference ABI as a separate control as well; replay
+its actual outputs and time it with the same fixed FP32 current denominator.
+The final ViT whole-AMP batch-128 ratio misses 1.10, so that control stops at
+development despite its earlier passing timing run. Preserve both runs.

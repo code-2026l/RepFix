@@ -139,7 +139,8 @@ def main(a):
                     if amp0 is not None:operations.update(whole_amp_current=lambda:amp0(x),whole_amp_protected=lambda:amp1(x))
                 else:
                     protected_ops=dict(extra,mono_protected=lambda:mono1(x),modular_protected=lambda:ts1(ts_prefix(x)))
-                    operations={current_name:current_op,fixed['protected']:protected_ops[fixed['protected']],'fp32_reference_modular':extra['fp32_reference_modular']}
+                    full=fixed.get('full_precision_protected','fp32_reference_modular')
+                    operations={current_name:current_op,fixed['protected']:protected_ops[fixed['protected']],full:protected_ops[full]}
                     if amp0 is not None:operations.update(whole_amp_current=lambda:amp0(x),whole_amp_protected=lambda:amp1(x))
             elif choice is not None:
                 fixed=choice['backbones'][arch]['modes'][mode]['batches'][str(batch)]
@@ -151,32 +152,42 @@ def main(a):
                 for name in (list(operations) if rep%2 else list(reversed(operations))):
                     begin=time.perf_counter();operations[name]();times[name].append(time.perf_counter()-begin)
             timing[str(batch)]=dict(samples_seconds=times,medians_seconds={n:float(np.median(v)) for n,v in times.items()})
-        chosen={};raw_chosen={}
+        chosen={};raw_chosen={};full_precision={};raw_full={}
         if choice is not None and not a.timing_only:
             # Batch membership can change CPU arithmetic. Audit each chosen ABI
             # at its registered chunk size, rather than only its graph name.
+            def serve(backend,batch):
+                result=[]
+                for j in range(0,len(images),batch):
+                    inputs=late.preprocess(images[j:j+batch],ref['metadata']['image_size'])
+                    if backend=='mono_protected':result.append(mono1(inputs))
+                    elif backend=='packed_protected':result.append(packed1(inputs))
+                    elif backend=='bf16_reference_mono':result.append(precision16mono(inputs))
+                    elif backend=='bf16_reference_modular':result.append(precision16(ts_prefix(inputs)))
+                    elif backend=='fp32_reference_modular':result.append(precision32(ts_prefix(inputs)))
+                    elif backend=='autocast_reference_mono':result.append(reference_amp_mono(inputs))
+                    elif backend=='autocast_reference_modular':result.append(reference_amp(ts_prefix(inputs)))
+                    else:
+                        assert backend=='modular_protected',backend
+                        result.append(ts1(ts_prefix(inputs)))
+                return tuple(torch.cat([v[i] for v in result]) for i in [0,1])
+            def report(backend,own,legacy):
+                return dict(backend=backend,own=paired.metrics(own,y),contracts=evaluate_contracts(legacy.double(),old.double(),coarse,ref['thresholds'],monitor,.05/2000),
+                    maximum_legacy_logit_error=float((legacy-old).abs().max()),cached_prefix_accuracy_difference=paired.metrics(own,y)['acc']-original['acc'])
             for batch in [1,128]:
-                backend=choice['backbones'][arch]['modes'][mode]['batches'][str(batch)]['protected']
+                fixed=choice['backbones'][arch]['modes'][mode]['batches'][str(batch)];backend=fixed['protected']
                 if saved is not None:own,legacy=saved['chosen'][str(batch)]
-                else:
-                    result=[]
-                    for j in range(0,len(images),batch):
-                        inputs=late.preprocess(images[j:j+batch],ref['metadata']['image_size'])
-                        if backend=='mono_protected':result.append(mono1(inputs))
-                        elif backend=='packed_protected':result.append(packed1(inputs))
-                        elif backend=='bf16_reference_mono':result.append(precision16mono(inputs))
-                        elif backend=='bf16_reference_modular':result.append(precision16(ts_prefix(inputs)))
-                        elif backend=='autocast_reference_mono':result.append(reference_amp_mono(inputs))
-                        elif backend=='autocast_reference_modular':result.append(reference_amp(ts_prefix(inputs)))
-                        else:result.append(ts1(ts_prefix(inputs)))
-                    own,legacy=[torch.cat([v[i] for v in result]) for i in [0,1]]
+                else:own,legacy=serve(backend,batch)
                 raw_chosen[str(batch)]=(own,legacy)
-                chosen[str(batch)]=dict(backend=backend,own=paired.metrics(own,y),contracts=evaluate_contracts(legacy.double(),old.double(),coarse,ref['thresholds'],monitor,.05/2000),
-                    maximum_legacy_logit_error=float((legacy-old).abs().max()),
-                    cached_prefix_accuracy_difference=paired.metrics(own,y)['acc']-original['acc'])
-        out['serving'][mode]=dict(timings=timing,chosen=chosen)
+                chosen[str(batch)]=report(backend,own,legacy)
+                if a.reference_precision and mode=='U':
+                    full=fixed['full_precision_protected']
+                    full_own,full_legacy=(own,legacy) if full==backend else serve(full,batch)
+                    raw_full[str(batch)]=(full_own,full_legacy)
+                    full_precision[str(batch)]=report(full,full_own,full_legacy)
+        out['serving'][mode]=dict(timings=timing,chosen=chosen,full_precision=full_precision)
         raw_amp={}
-        if a.whole_amp_control and phase=='confirmation' and not a.timing_only:
+        if a.whole_amp_control and not a.timing_only:
             amp_results={}
             for batch in [1,128]:
                 actual=[amp1(late.preprocess(images[j:j+batch],ref['metadata']['image_size'])) for j in range(0,len(images),batch)]
@@ -186,7 +197,7 @@ def main(a):
         if a.audit_only and mode=='U':
             tensor_path=a.out.parent/(a.out.stem+'_states')/'served_logits.pt'
             cache_save(tensor_path,dict(header=header,source_state_sha256=row['state_sha256'],canonical=canonical,chosen=raw_chosen,
-                whole_amp=raw_amp,reference=old,primary_labels=y,coarse_labels=coarse,monitor=torch.from_numpy(monitor)))
+                whole_amp=raw_amp,full_precision=raw_full,reference=old,primary_labels=y,coarse_labels=coarse,monitor=None if monitor is None else torch.from_numpy(monitor)))
             out['serving'][mode]['served_logits_sha256']=hashlib.sha256(tensor_path.read_bytes()).hexdigest()
         if cache_path is not None and saved is None:cache_save(cache_path,dict(header=h_header,timings=timing,canonical=canonical,chosen=raw_chosen))
         if saved is not None:out['serving'][mode]['same_function_output_reused']=True
