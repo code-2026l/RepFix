@@ -27,8 +27,9 @@ TESTS = [
     'test_consumer_contracts.py',
     'test_consumer_cells.py','test_recovery_readers.py',
     'test_shared_reference_replay.py','test_shared_reference_vision.py',
+    'test_dense_replay.py',
 ]
-EXPECTED_TESTS=91
+EXPECTED_TESTS=97
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -360,6 +361,71 @@ def verify_files(root):
     audit=json.loads((root/base/'shared_replay_independent_audit.json').read_text())
     if not audit['complete'] or len(audit['branches'])!=40 or not all(v['contracts_match'] and v['current_metrics_match'] and v['full_reference_bitwise_equal'] for v in audit['branches']):
         raise ValueError('Independent shared-replay audit is incomplete')
+
+    # Dense low-rank companion: the utility gap is a rank gap, confirmed on SNR
+    # and stopped at development on HAR.  The cost failure is retained.
+    dense_plan=digest(root/'docs/plans/2026-11-10-dense-lowrank-replay.md')
+    dense_choice_name=base+'dense_replay_development_choice.json'
+    dense_choice=json.loads((root/dense_choice_name).read_text())
+    dense_choice_sha=digest(root/dense_choice_name)
+    if (not dense_choice['choices_frozen_before_confirmation'] or dense_choice['ranking_uses_accuracy'] or
+            dense_choice['domains']['har']['utility_gate'] or not dense_choice['domains']['radioml']['utility_gate'] or
+            (dense_choice['domains']['radioml']['selected']['rank1'],dense_choice['domains']['radioml']['selected']['rank2'])!=(16,12)):
+        raise ValueError('The dense development verdict or selection changed')
+    dense_dev=[name for name in files if re.fullmatch(base+r'dense_replay_development/d\d{3}\.json',name)]
+    dense_conf=[name for name in files if re.fullmatch(base+r'dense_replay_confirmation/c\d{3}\.json',name)]
+    if (len(dense_dev),len(dense_conf))!=(6,10):
+        raise ValueError('Incomplete dense-replay evidence')
+    for name in dense_dev:
+        row=json.loads((root/name).read_text())
+        if (not row['complete'] or row['phase']!='development' or row['plan_sha256']!=dense_plan or
+                row['splits']['test_metrics_computed'] or len(row['branches'])!=6 or
+                any('test' in b for b in row['branches'])):
+            raise ValueError('Dense development scope changed: '+name)
+    dense_rows=[]
+    for name in dense_conf:
+        row=json.loads((root/name).read_text());dense_rows.append(row)
+        if (not row['complete'] or row['phase']!='confirmation' or row['domain']!='radioml' or
+                not 2520<=row['seed']<=2529 or row['selection_sha256']!=dense_choice_sha or
+                row['plan_sha256']!=dense_plan or len(row['branches'])!=2 or
+                set(row['full_controls'])!={'detach','joint'}):
+            raise ValueError('Dense confirmation changed: '+name)
+        if len({b['minibatch_order_sha256'] for b in [*row['branches'],*row['full_controls'].values()]})!=1:
+            raise ValueError('Dense future orders differ')
+        for b in row['branches']:
+            if (b['rank1'],b['rank2'])!=(16,12) or b['test']['changed_first_relu_gates']<=0 or b['test']['changed_second_relu_gates']<=0:
+                raise ValueError('A dense nonlinear update did not change its gates')
+            if b['test']['packed_serving']['maximum_legacy_logit_error']>1e-3 or b['test']['full_reference_maximum_logit_error']!=0:
+                raise ValueError('Dense replay identity changed')
+            for c in b['test']['contracts'].values():
+                cert=c['certificate']
+                if (c['disagreement']!=0 or not cert['certified'] or cert['monitor_examples']!=1024 or
+                        cert['allocated_tail_probability']!=.05/600):
+                    raise ValueError('Dense consumer evidence changed')
+    dense_summary=json.loads((root/base/'dense_replay_confirmation_summary.json').read_text())
+    if (not dense_summary['utility_gate']['passed'] or dense_summary['configuration']['extra_macs']!=12288 or
+            any(v!=0 for v in dense_summary['maximum_consumer_disagreement'].values()) or
+            dense_summary['total_current_merge_prediction_changes']!=0):
+        raise ValueError('The dense SNR utility verdict changed')
+    dense_pairs=[{b['mode']:b for b in r['branches']} for r in dense_rows]
+    dense_values={
+        'primary_gain_vs_detached':[p['joint']['test']['own']['acc']-p['detach']['test']['own']['acc'] for p in dense_pairs],
+        'primary_difference_to_full_joint':[p['joint']['test']['own']['acc']-r['full_controls']['joint']['test']['own']['acc'] for p,r in zip(dense_pairs,dense_rows)],
+        'auxiliary_mse_ratio':[p['joint']['test']['auxiliary_mse']/p['detach']['test']['auxiliary_mse'] for p in dense_pairs]}
+    for key,v in dense_values.items():
+        item=dense_summary[key];m=statistics.mean(v);half=2.2621571628540993*statistics.stdev(v)/math.sqrt(10)
+        if max(abs(m-item['mean']),abs(m-half-item['ci95'][0]),abs(m+half-item['ci95'][1]))>1e-10:
+            raise ValueError('Dense paired interval mismatch')
+    dense_native=json.loads((root/base/'dense_replay_native.json').read_text())
+    if (not dense_native['complete'] or len(dense_native['branches'])!=20 or
+            any(b['random_input_maximum_errors']['packed_replay']>1e-3 for b in dense_native['branches'])):
+        raise ValueError('Dense native serving evidence is incomplete')
+    dense_medians={backend+'/'+batch:statistics.median(
+        [b['backends'][backend]['timings'][batch]['ratios_to_current']['packed_replay'] for b in dense_native['branches']])
+        for backend in ['eager','torchscript'] for batch in ['1','1024']}
+    if dense_medians['torchscript/1']<=1.2 or dense_medians['torchscript/1024']<=1.1:
+        raise ValueError('The dense cost failure was overwritten')
+
     visual=json.loads((root/base/'vision_shared_replay_choice.json').read_text())
     if visual['continue_development'] or visual['official_test_evaluated'] or len(visual['all_candidates'])!=6 or any(v['passes'] for v in visual['all_candidates']):
         raise ValueError('The visual capacity stop was changed')
@@ -390,6 +456,10 @@ def verify_files(root):
         shared_replay_independently_replayed_endpoints=40,shared_replay_monitored_contracts=120,
         shared_replay_cost_gate_passed=False,residual_block_candidates=6,residual_block_endpoints_replayed=10,
         new_scientific_states_sha256_verified=630,
+        dense_replay_development_records=len(dense_dev),dense_replay_confirmation_records=len(dense_conf),
+        dense_replay_monitored_contracts=60,dense_replay_cost_gate_passed=False,
+        dense_packed_ratio_batch1=float(dense_medians['torchscript/1']),
+        dense_packed_ratio_batch1024=float(dense_medians['torchscript/1024']),
         nonlinear_development_records=len(development), nonlinear_confirmation_tasks=0,
         manuscript_pdf_sha256=manifest['pdf_sha256'])
 

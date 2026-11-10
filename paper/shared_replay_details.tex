@@ -40,6 +40,83 @@ Adding the unchanged shortcut and applying ReLU gives the merged current
 block in real arithmetic. Before the visual study, fixed BN is folded into
 the healthy convolutions; this defines the numerical reference from the start.
 
+\subsection{Rank Requirement and Dense Replay}\label{app:shared_replay_rank}
+
+Row support is one admissible structure, not the only one. Replace the first map
+by $W_1^0+PQ$ with $P\in\mathbb R^{m\times s}$, $Q\in\mathbb R^{s\times d}$, the
+second by $W_2^0+UV$ of rank $r$, and add biases $\delta b_1,\delta b_2$. With
+$a_1=\sigma(W_1^0x+b_1^0+PQx+\delta b_1)$ and $a_1^0=\sigma(W_1^0x+b_1^0)$,
+substitution into $(W_2^0+UV)a_1+b_2^0+\delta b_2$ gives
+\begin{equation}
+ t_2=t_2^0+W_2^0(a_1-a_1^0)+UVa_1+\delta b_2
+ \label{eq:dense_replay}
+\end{equation}
+exactly, for any coordinatewise $\sigma$. The correction is dense, so the extra
+MACs are $sd+ms+mm+2rm+2n_cm$: the saving comes from reusing the healthy dense
+products, not from sparsity.
+
+Equation~\eqref{eq:dense_replay} also makes the requirement measurable. For each
+saved full-joint endpoint we truncate the first- and second-map deltas by SVD,
+keep everything else fixed, and score the official test split
+(Table~\ref{tab:rank}). A truncated update is a member of the dense low-rank
+family, so a nonnegative gap proves that this structure can reproduce joint
+accuracy. A negative gap does not prove that no trained member can: the trained
+rank-$16/12$ SNR arm below reaches parity although the first map alone needs
+rank $32$ in the projection.
+
+\begin{table}[h]
+\centering
+\small
+\caption{Mean accuracy difference, in points, to the saved full-joint endpoint
+after truncating its first-map ($s$) or second-map ($r$) update and scoring the
+official test split. Ten endpoints per task. A truncated update is a member of
+the dense low-rank family, so a nonnegative gap is achievable accuracy, not a
+lower bound on the family.}
+\label{tab:rank}
+\begin{tabular}{lcc}
+\toprule
+Update kept & HAR & SNR\\
+\midrule
+first map, $s=16$ & $-0.13$ & $-0.56$\\
+first map, $s=32$ & $-0.07$ & $-0.01$\\
+second map, $r=16$ & $-0.18$ & $-0.16$\\
+second map, $r=24$ & -- & $+0.01$\\
+$(s,r)=(16,16)$ & $-0.28$ & --\\
+$(s,r)=(32,24)$ & -- & $-0.02$\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Development selected $(16,12)$ for SNR, the smallest grid configuration clearing
+the predeclared gate on seeds $800$--$802$. Ten fresh seeds then give a primary
+gain of $\DenseSnrGain$ points $[\DenseSnrGainLow,\DenseSnrGainHigh]$ over
+detachment, a difference of $\DenseSnrFull$ points
+$[\DenseSnrFullLow,\DenseSnrFullHigh]$ to ordinary joint training, and an
+auxiliary MSE ratio of $\DenseSnrMse$
+$[\DenseSnrMseLow,\DenseSnrMseHigh]$. Accuracies are $\DenseSnrDetAcc\%$,
+$\DenseSnrJointAcc\%$ and $\DenseSnrFullAcc\%$. Every observed consumer
+disagreement is zero, every certificate meets the five-point budget with maximum
+upper bound $0.0092$, the exact reference error is $0$, and packed serving
+differs by at most $\DenseMaxPackedError$ logits without changing a merged
+prediction.
+
+The HAR gate rejects the same family: primary differences are $\DenseHarDevLow$
+to $\DenseHarDevHigh$ points on development while reconstruction improves, so no
+HAR configuration was confirmed. Extra capacity is not a free improvement; it
+helps where the required change is dense, as on SNR, and costs task accuracy
+where few channels suffice, as on HAR. The sparse HAR arm and its confirmed
+reconstruction result are unchanged.
+
+The dense SNR arm needs $\DenseSnrMacs$ extra MACs, $\DenseSnrCostFraction\%$ of
+the $24{,}576$-MAC encoder, against $6{,}848$ ($27.9\%$) for the confirmed sparse
+arm. The rank that reaches joint accuracy in projection would cost
+$\RankSnrCostFraction\%$ of the encoder on SNR and $\RankHarCostFraction\%$ on
+HAR; training within the family beats the projection on SNR, so these are
+conservative prices. On HAR the same capacity did not preserve the primary task,
+which is why the family stops at development. Measured packed latency for the
+dense arm is reported with the other serving numbers in
+Appendix~\ref{app:shared_replay_cost}.
+
 \subsection{Development, Selection and Fresh Confirmation}\label{app:shared_replay_protocol}
 
 The fixed plan precedes development and is included with its source hashes.
@@ -87,6 +164,13 @@ $1.092\%$ on HAR and $0.917\%$ on SNR. These findings establish useful
 learning with class and selective compatibility, while leaving a cost
 failure and an SNR capacity cost.
 
+The dense companion study was registered separately before its outcomes. Its
+grid is $(s,r)\in\{(16,12),(24,16),(32,24)\}$; the same development seeds,
+warm checkpoints, orders, initialization rule and gate decide selection, and
+seeds $2520$--$2529$ confirm the chosen pair. HAR fails the primary gate at all
+three configurations, so only SNR is confirmed, at $(16,12)$. No criterion was
+changed after any outcome.
+
 The full reference path reproduces stored healthy logits exactly under
 the declared evaluation arithmetic. The compressed native-float32 old
 heads have maximum errors $1.27\times10^{-5}$ on HAR and
@@ -124,6 +208,16 @@ Initial setup ranges from $0.10$ to $13.88$ seconds across compiled paths.
 Both absolute times and ratios are retained; the smaller compiled ratio
 does not establish a faster deployment. No universal latency claim follows
 from the exact identity or MAC count.
+
+The same protocol on the ten dense SNR endpoints gives median packed/current
+ratios of $3.02$ at batch $1$ and $2.57$ at batch $1024$ under TorchScript
+($3.22/2.63$ eager), against $2.54/2.07$ for the sparse arm. Denser corrections
+raise both the analytic MAC count and the measured cost, so the dense arm is
+reported as the utility endpoint of the frontier, not as a deployment proposal.
+For a fixed input dimension of $561$, the same sparse implementation improves
+from $1.53\times$ at width $64$ to $1.12\times$ at width $1024$ for batch $1024$,
+and remains between $1.56\times$ and $4.70\times$ at batch $1$; the batch-$1$
+target is not reachable for two-output paths of this form at these widths.
 
 \subsection{ResNet-18 Capacity Boundary}\label{app:shared_replay_vision}
 

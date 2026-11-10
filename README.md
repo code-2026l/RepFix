@@ -40,7 +40,7 @@ separates this partial frontier from a complete deployment claim.
 
 ## Paper and downloads
 
-- [Read the final paper](paper/RepFix_ICLR2027.pdf) — 9 main pages, 81 pages total.
+- [Read the final paper](paper/RepFix_ICLR2027.pdf) — 9 main pages, 82 pages total.
 - [Download supplementary material](artifacts/2026-11-10/RepFix_SharedReplay_20261110_supplement.zip)
 - [Download manuscript source and evidence](artifacts/2026-11-10/RepFix_SharedReplay_20261110_source.zip)
 - [Reproduction guide](docs/REPRODUCIBILITY.md) · [Evidence index](docs/EVIDENCE_INDEX.md)

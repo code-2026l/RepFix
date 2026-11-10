@@ -138,6 +138,9 @@ See `docs/FINAL_REVIEW_20261110.md` and `docs/REVIEWER_GUIDE.md`.
 | Native cost failure and reuse controls | shared_replay_native_development.json, shared_replay_inductor_development.json | benchmark_shared_replay_cpu.py, benchmark_replay_inductor_cpu.py |
 | Independent 40-endpoint replay | shared_replay_independent_audit.json | audit_shared_replay_cpu.py |
 | Two stopped ResNet grids | vision_shared_replay/, vision_shared_replay_choice.json, vision_shared_replay_independent_audit.json | vision_shared_replay_cpu.py, vision_replay_capacity_cpu.py, audit_vision_replay_cpu.py, plot_replay_vision.py |
+| Rank diagnostic on saved endpoints | replay_rank/, replay_rank_summary.json | summarize_replay_rank.py |
+| Dense low-rank replay: HAR stop, SNR confirmation | dense_replay_development/, dense_replay_confirmation/, dense_replay_development_choice.json, dense_replay_confirmation_summary.json | dense_replay.py, dense_replay_confirm_cpu.py, select_dense_replay.py, summarize_dense_replay.py |
+| Dense native cost failure | dense_replay_native.json | benchmark_dense_replay_cpu.py |
 | Failed cell-loss development; no test confirmation | cell_stage_a/, cell_stage_b/, cell_class_secondary/, cell_development_stop.json | consumer_cells.py, recovery_readers.py, select_cell_recovery.py, select_joint_cells.py |
 | 630 new states retrieved; CPU queues ended | recovery_replay_execution_audit.json | Per-file SHA-256 and preserved source versions |
 

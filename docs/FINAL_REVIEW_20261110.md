@@ -75,6 +75,27 @@ decoding the official test pickle. Ten completed endpoint states are independent
 replayed with zero metric error. The initial folded-bias autograd stop occurs
 before any continuation outcome and is kept separately from scientific failures.
 
+## Rank frontier and dense replay
+
+Truncating the saved full-joint deltas by SVD on the ten confirmation endpoints
+per task locates the SNR shortfall in the rank of the required change: first-map
+rank 16 loses 0.56 points and rank 32 loses 0.02; second-map rank 24 returns the
+joint result; HAR saturates near rank 16 on both maps. A projection is a member
+of the truncated family, so these are achievable accuracies, not lower bounds.
+
+A dense rank-s first map admits the same exact replay through one dense m*m
+correction. Its study is registered separately, with grid (16,12), (24,16),
+(32,24) on seeds 800--802. Only SNR passes the development gate, selecting
+(16,12). Ten fresh seeds then give a primary gain of 1.257 points
+[1.037, 1.477] over detachment, -0.008 points [-0.227, 0.210] to unrestricted
+joint training, and a reconstruction ratio of 0.788 [0.754, 0.822]. All 60
+consumer checks show zero disagreement, every certificate meets the five-point
+budget, the exact reference error is zero and packed serving differs by at most
+8.4e-6 logits. The arm needs 12,288 extra MACs, half the SNR encoder, and
+measured packed/current ratios are 3.02/2.57 at batch 1/1024, so the cost target
+remains failed. HAR fails the primary gate on development (-0.59 to -1.18
+points) and is stopped there; its confirmed sparse result is unchanged.
+
 ## Loss route and scope
 
 The probability-cell study has 114 frozen-feature, 216 joint-continuation and
@@ -84,15 +105,16 @@ an explicitly additional development futility judgment stops it before test.
 The article retains its analytic projection and high-confidence KL saturation
 example without claiming a training advantage.
 
-The remaining hard gap is a competitive, low-cost positive result on a stronger
-backbone or a broader task/population set. There is now fresh positive transfer
-on SNR and reconstruction progress on HAR with threshold contracts, but no
-complete cross-task cost/utility target and no foundation-model result.
+The remaining gap is cost and external validity. The SNR accuracy shortfall is
+closed with exact replay, but measured CPU latency still exceeds 1.20/1.10, the
+dense correction costs half the encoder, the dense family fails on HAR, and no
+foundation-model result exists. The cross-task claim is therefore structural:
+compatibility is priced by the rank a task requires, not by a single method.
 
 ## Artifact and computation
 
-The article has nine main pages and 81 total pages, with 23 included vector
-figures. The focused suite has 91 passing checks. Standard SLSQP may emit its
+The article has nine main pages and 82 total pages, with 23 included vector
+figures. The focused suite has 97 passing checks. Standard SLSQP may emit its
 documented intermediate bound-clipping warning during the independent optimizer
 comparison; the solution and gradient assertions pass. No bold run-in prose
 headings are introduced. Longer probe and historical filter details move to

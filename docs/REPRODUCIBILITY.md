@@ -1,7 +1,7 @@
 # Reproducing the supplementary artifact
 
 Run commands from the extracted `repfix_supplementary` directory. The supplied
-PDF is the polished manuscript: nine main pages and 81 pages in total.
+PDF is the polished manuscript: nine main pages and 82 pages in total.
 
 ## File and record checks
 
@@ -37,7 +37,7 @@ thread. The hardware timings reported in the paper retain their original setup.
 python repro/scripts/verify_supplement.py --tests
 ```
 
-The 91 tests cover finite-corpus disagreement bounds, repair availability, affine
+The 97 tests cover finite-corpus disagreement bounds, repair availability, affine
 scale boundaries, normalized-head nullspaces, constrained affine folding,
 nonlinear fusion, exact-count selection at a zero-benefit tie, invertible chart folding,
 vision access/split controls, and teacher-head fitting on affine and nonlinear
@@ -210,6 +210,18 @@ completed endpoint states. Both grids stop before official test scoring. The
 study is last-block primary-task adaptation, not full-backbone or auxiliary
 transfer. `shared_reference_replay.py` and `shared_reference_vision.py` implement
 the real-arithmetic identities and separately measured serving arithmetic.
+
+The dense low-rank companion is registered in
+`docs/plans/2026-11-10-dense-lowrank-replay.md`.
+`dense_replay_confirm_cpu.py` produces six development records on seeds
+800--802 and ten confirmation records on seeds 2520--2529; on HAR the
+development gate stops the family, and on SNR the selected (16, 12)
+configuration matches unrestricted joint training. `dense_replay.py`
+implements the dense identity and the packed serving path;
+`benchmark_dense_replay_cpu.py` measures the traced cost of the same
+endpoints; `summarize_replay_rank.py` computes the SVD rank projections on the
+saved full-joint endpoints. The projections are members of the truncated
+families, not lower bounds, and the cost failure is retained.
 
 `recovery_replay_execution_audit.json` records every new queue and file digest,
 all 630 transferred `.pt` files, approximately 1.20 GB remote bytes, and the
