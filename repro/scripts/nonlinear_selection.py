@@ -15,7 +15,9 @@ def choice(paths):
     groups={};evidence={}
     for path in paths:
         path=Path(path);r=json.loads(path.read_text());groups.setdefault(r['arch'],{})[r['seed']]=r
-        evidence[path.name]=hashlib.sha256(path.read_bytes()).hexdigest()
+        key=path.parent.name+'/'+path.name
+        assert key not in evidence,key
+        evidence[key]=hashlib.sha256(path.read_bytes()).hexdigest()
     backbones={}
     for arch,records in groups.items():
         assert set(records)=={3800,3801,3802},(arch,set(records))
