@@ -76,6 +76,10 @@ def make_reference(cache,seed):
 def initial_head(reference):
     h=reference['primary'];head=NormalizedHead(h['linear.weight'],h['linear.bias'],h['mean'],h['sd']);head.load_state_dict(h);return head
 
+def primary_loss(head,h,labels,selected):
+    ce=F.cross_entropy(head(h[selected]),labels[selected]) if selected.any() else h.sum()*0
+    return ce+.0001*sum(p.square().sum() for p in head.parameters())
+
 @torch.no_grad()
 def embeds(model,x):return torch.cat([model(batch) for batch in x.split(256)])
 
@@ -96,7 +100,7 @@ def run(a):
     vxx=cache['x'][0,val];vt=cache['targets'][0,val];vy=cache['y'][val];vc=cache['coarse'][val]
     old_logits=late.linear(cache['h'][0,val],reference['heads']['coarse'])
     ref=dict(arch=cache['arch'],family=cache.get('family'),attention_blocks=cache.get('attention_blocks',1))
-    out=dict(complete=False,device='cpu',phase='development',arch=cache['arch'],reference_seed=a.reference_seed,seed=a.seed,plan_sha256=a.plan_sha256,
+    out=dict(complete=False,device='cpu',phase=a.phase,arch=cache['arch'],reference_seed=a.reference_seed,seed=a.seed,plan_sha256=a.plan_sha256,
         source_sha256=sources(),population_sha256=digest(a.population),source_reference_sha256=cache['source_reference_sha256'],
         splits=dict(fitting=10000,validation=5000,anchors=2048,labeled=int(mask.sum()),official_test_loaded=False,
             fitting_sha256=paired.state_hash(fit),validation_sha256=paired.state_hash(val),mask_sha256=paired.state_hash(mask)),
@@ -130,12 +134,13 @@ def run(a):
             views=torch.randint(2,(len(idx),),generator=g);loss=(warm(hh[views,idx])-targets[views,idx]).square().mean()/scale
             warmopt.zero_grad();loss.backward();warmopt.step()
     torch.save(dict(decoder=warm.state_dict(),optimizer=warmopt.state_dict()),folder/'warm_decoder.pt')
-    for mode,alpha in [('D',0.),*[(f'J{dose:g}',dose) for dose in DOSES]]:
+    grid=[] if a.transfer_only else a.doses
+    for mode,alpha in [('D',0.),*[(f'J{dose:g}',dose) for dose in grid]]:
         torch.manual_seed(a.seed);model=copy.deepcopy(healthy).requires_grad_(True)
         for layer in model.modules():
             if isinstance(layer,nn.LayerNorm):layer.requires_grad_(False)
         head=initial_head(reference);primary_opt=torch.optim.AdamW([dict(params=[p for p in model.parameters() if p.requires_grad],lr=.00003),dict(params=head.parameters(),lr=.0001)],weight_decay=.0001)
-        doses=DOSES if mode=='D' else [alpha];decoders=[];opts=[]
+        doses=(grid or [1.]) if mode=='D' else [alpha];decoders=[];opts=[]
         for _ in doses:
             dec=copy.deepcopy(warm);opt=torch.optim.AdamW(dec.parameters(),lr=.001,weight_decay=.0001);opt.load_state_dict(warmopt.state_dict());decoders.append(dec);opts.append(opt)
         rng=torch.Generator().manual_seed(a.seed+20000);vrng=torch.Generator().manual_seed(a.seed+71000);trace=[]
@@ -143,7 +148,7 @@ def run(a):
             losses=[]
             for idx in torch.randperm(len(fit),generator=rng).split(128):
                 view=torch.randint(2,(len(idx),),generator=vrng);h=model(xx[view,idx]);selected=mask[idx]
-                ce=F.cross_entropy(head(h[selected]),labels[idx[selected]])+.0001*sum(p.square().sum() for p in head.parameters())
+                ce=primary_loss(head,h,labels[idx],selected)
                 primary_opt.zero_grad(set_to_none=True)
                 if mode=='D':
                     ce.backward();primary_opt.step()
@@ -173,6 +178,7 @@ def run(a):
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--stage',choices=['prepare','run'],required=True);p.add_argument('--reference',type=Path);p.add_argument('--population',type=Path)
     p.add_argument('--reference-seed',type=int,default=6200);p.add_argument('--seed',type=int,default=6300);p.add_argument('--plan-sha256',required=True);p.add_argument('--out',type=Path,required=True)
+    p.add_argument('--phase',choices=['development','confirmation'],default='development');p.add_argument('--doses',type=float,nargs='+',default=DOSES);p.add_argument('--transfer-only',action='store_true')
     a=p.parse_args();torch.set_num_threads(12);torch.set_num_interop_threads(1)
     if a.stage=='prepare':prepare(a)
     else:run(a)
