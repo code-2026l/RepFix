@@ -1,0 +1,79 @@
+\subsection{Conditional Reference Routing}\label{app:conditional_reference}
+
+We test whether referring only difficult inputs to the healthy suffix can
+reduce preservation cost. Cascades and learned deferral are established
+methods~\citep{jitkrittum2023cascade}; here routing affects only the old output,
+leaving the complete FP32 current function fixed.
+
+For cheap logits $z$ with winner $k$, define $s_k=z[k]-\log\sum_{j\ne k}e^{z[j]}$.
+The nearest decision margin is the minimum of the winning-class gap and
+$|s_k-\operatorname{logit}(\tau)|$ over the fixed thresholds. Let
+$\omega=\max_j(z_0[j]-z[j])-\min_j(z_0[j]-z[j])$. If the margin exceeds
+$\omega$, the class and all threshold outputs agree with the reference $z_0$:
+each class margin changes by at most $\omega$, and log-sum-exp gives the same
+bound for the winning-class log-odds. Common logit offsets cancel. A fitted
+estimate of $\omega$ is a routing score, not a pointwise certificate.
+
+Exact fallback removes errors only on the referred set. For each nonempty
+three-consumer error pattern $S$, let $p_S$ be its corpus mass and $f_S$ the
+mass referred. The fractional oracle minimizes $\sum_Sf_S$ subject to
+$0\le f_S\le p_S$ and $\sum_{S:j\in S}f_S\ge e_j-\epsilon_j$ for each
+consumer's initial error $e_j$ and budget $\epsilon_j$. Its seven pattern
+variables account for overlapping errors. The optimum lower-bounds integral
+referral for that fixed reader under unit cost; it says nothing about measured
+batch latency or a different reader family.
+
+The fixed screen uses all six saved visual development endpoints. An isolated
+$2{,}048$-anchor permutation provides $1{,}024$ reader-fitting, $512$ gate-fitting
+and $512$ cutoff-calibration examples. An affine ridge reader and its width-$64$
+GELU residual extension predict healthy logits without new labels. Four gates
+use confidence, boundary distance, distance divided by predicted residual,
+or learned disagreement. Ten calibration-quantile cutoffs yield $80$ policies
+per endpoint, $480$ in total. The protocol advances a family only if every
+seed meets one-percent disagreement for all three consumers and its mean
+referral is at most $50\%$.
+
+\input{conditional_reference_table.tex}
+
+Neither backbone qualifies. The least-referral ResNet family uses the residual
+reader and normalized boundary gate; ViT's confidence gate ties the best
+boundary family. Both need about four fifths of inputs referred. No test or
+latency confirmation follows. Local replay reconstructs all $480$ policy
+outputs from the recovered cheap/reference logits and gate scores.
+
+\subsection{A Real Visual Auxiliary on New Fitted References}\label{app:vision_auxiliary_new}
+
+This follow-up targets the gap between supervised visual transfer and actual
+auxiliary benefit. It uses the same ImageNet weights and learned suffix scopes,
+but independently fits the healthy fine/coarse readers at reference seed $6200$.
+A new permutation reserves $10{,}000$ fitting inputs, $5{,}000$ validation inputs
+and $2{,}048$ isolated anchors from the official training population. A fixed
+Bernoulli-$0.2$ mask selects fitting labels. Clean and fixed augmented views
+share an FP32 frozen-prefix cache. No official test input is loaded.
+
+A $256$-unit ReLU decoder reconstructs bilinear, antialiased $8\times8$ RGB
+images from terminal features. Fitting-target variance normalizes MSE. Five
+detached warm-up epochs initialize the decoder; ten continuation epochs use
+CE on labeled inputs and reconstruction on all fitting inputs. The fixed
+auxiliary weights are $0.01,0.1,1$, with identical initialization, orders and
+views. The CE-only encoder has a separate dose-matched detached decoder for
+each comparison. Final primary readers use the same two-view labeled pool;
+online-head and refitted scores are recorded separately.
+
+An implementation check found that loading an optimizer state without copying
+its tensors could share decoder moments across branches. The first ResNet
+pilot is excluded as a technical failure. Its reissue deep-copies every state
+and verifies the untouched warm-state hash after each branch. The grid, split,
+seed, rates and decision rule were unchanged. An independent saved-state
+process also executes the healthy consumer, replacing the training driver's
+cached-reference check with a fresh forward pass.
+
+\input{vision_auxiliary_pilot_table.tex}
+
+The first-pilot rule requires at least $0.20$ points of primary gain and an MSE
+ratio at most $0.95$, with unchanged old decisions, before extending a weight
+to two further development seeds. Neither backbone passes. ResNet's CE-only
+branch also trails H by $1.02$ points. ViT's CE-only branch exceeds H by $2.38$
+points, triggering the separately specified reference-replication study.
+These six auxiliary outcomes remain development results; no auxiliary test
+confirmation is run.
