@@ -103,3 +103,35 @@ def merged_serving(p):
 def serve_merged_mlp(x,p):
     h=F.relu(F.linear(x,p['first_weight'],p['first_bias']));h=F.relu(F.linear(h,p['second_weight'],p['second_bias']))
     return F.linear(h,p['current_weight'],p['current_bias'])
+
+
+@torch.no_grad()
+def packed_serving(p):
+    """Pack fixed serving products; keep one copy of the healthy dense maps."""
+    s=p['support'];m=len(p['second_bias']);r=p['v'].shape[0]
+    first=torch.cat([p['first_weight'],p['first_weight'][s]+p['delta1']])
+    first_bias=torch.cat([p['first_bias'],p['first_bias'][s]+p['delta1_bias']])
+    second=torch.cat([p['second_weight'],p['v']])
+    second_bias=torch.cat([p['second_bias'],torch.zeros(r,dtype=first.dtype)])
+    correction=torch.cat([p['columns']+p['u']@p['v'][:,s],p['u']],1)
+    return dict(first_weight=first,first_bias=first_bias,second_weight=second,second_bias=second_bias,
+        correction=correction,delta2_bias=p['delta2_bias'],support=s,width=m,rank=r,
+        current_weight=p['current_weight'],current_bias=p['current_bias'],old_weight=p['old_weight'],old_bias=p['old_bias'])
+
+
+def serve_packed_mlp(x,p):
+    m=p['width'];a=F.relu(F.linear(x,p['first_weight'],p['first_bias']))
+    old=a[:,:m];difference=a[:,m:]-old[:,p['support']]
+    second=F.linear(old,p['second_weight'],p['second_bias']);base=second[:,:m]
+    correction=F.linear(torch.cat([difference,second[:,m:]],1),p['correction'],p['delta2_bias'])
+    return F.linear(F.relu(base+correction),p['current_weight'],p['current_bias']),F.linear(F.relu(base),p['old_weight'],p['old_bias'])
+
+
+def serve_prefix_mlp(x,p,merged):
+    """Strong reuse control: share the healthy first map, recompute both second maps."""
+    pre=F.linear(x,p['first_weight'],p['first_bias']);old1=F.relu(pre)
+    selected=F.relu(pre[:,p['support']]+F.linear(x,p['delta1'],p['delta1_bias']))
+    current1=old1.index_copy(1,p['support'],selected)
+    current2=F.relu(F.linear(current1,merged['second_weight'],merged['second_bias']))
+    old2=F.relu(F.linear(old1,p['second_weight'],p['second_bias']))
+    return F.linear(current2,p['current_weight'],p['current_bias']),F.linear(old2,p['old_weight'],p['old_bias'])

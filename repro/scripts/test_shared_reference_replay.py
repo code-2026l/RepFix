@@ -3,7 +3,7 @@ import pytest
 import torch
 from torch import nn
 from torch.nn import functional as F
-from shared_reference_replay import SharedReferenceMLP,linear_delta_states,convolution_delta_states,serve_mlp,merged_serving,serve_merged_mlp
+from shared_reference_replay import SharedReferenceMLP,linear_delta_states,convolution_delta_states,serve_mlp,merged_serving,serve_merged_mlp,packed_serving,serve_packed_mlp,serve_prefix_mlp
 
 
 class Healthy(nn.Module):
@@ -60,3 +60,12 @@ def test_float32_serving_uses_no_second_full_encoder_and_matches_folded_current(
     x=torch.randn(19,9);now,old=serve_mlp(x,p)
     assert torch.allclose(now,serve_merged_mlp(x,merged_serving(p)),atol=1e-6)
     assert torch.allclose(old,F.linear(h(x).double(),A,B).float(),atol=2e-6)
+
+
+@pytest.mark.parametrize('k',[0,3])
+def test_packed_and_prefix_serving_preserve_both_functions(k):
+    torch.manual_seed(202);h=Healthy();u=SharedReferenceMLP(h,torch.arange(k),torch.randn(2,7),torch.randn(4,7,dtype=torch.float64),torch.randn(4,dtype=torch.float64))
+    with torch.no_grad():u.u.normal_(0,.2);u.delta1.normal_(0,.3);u.delta1_bias.normal_(0,.1)
+    p=u.serving();x=torch.randn(29,9);expected=serve_mlp(x,p)
+    for actual in [serve_packed_mlp(x,packed_serving(p)),serve_prefix_mlp(x,p,merged_serving(p))]:
+        assert all(torch.allclose(a,b,atol=3e-6,rtol=2e-6) for a,b in zip(actual,expected))
