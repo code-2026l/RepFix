@@ -25,3 +25,15 @@ def test_head_rebasing_retains_the_initial_affine_function():
     torch.manual_seed(513);x=torch.randn(27,13);w=torch.randn(5,13);b=torch.randn(5);mean=torch.randn(13);sd=torch.rand(13)+.2
     head=NormalizedHead(w*sd,b+w@mean,mean,sd)
     assert torch.allclose(head(x),nn.functional.linear(x,w,b),atol=4e-6,rtol=2e-6)
+
+def test_last_attention_pruning_matches_the_full_transformer_and_input_gradient():
+    from torchvision.models.vision_transformer import VisionTransformer
+    from token_suffix import TokenPrefix,TokenSuffix
+    torch.manual_seed(711);m=VisionTransformer(image_size=32,patch_size=16,num_layers=2,num_heads=2,hidden_dim=12,mlp_dim=24).double().eval();m.heads=nn.Identity()
+    prefix=TokenPrefix(copy.deepcopy(m));suffix=TokenSuffix(m.encoder.layers[-1],m.encoder.ln).double()
+    x=torch.randn(5,3,32,32,dtype=torch.float64,requires_grad=True)
+    actual=suffix(prefix(x));expected=m(x)
+    assert torch.allclose(actual,expected,atol=1e-13,rtol=1e-13)
+    ga=torch.autograd.grad(actual.square().sum(),x,retain_graph=True)[0]
+    gb=torch.autograd.grad(expected.square().sum(),x)[0]
+    assert torch.allclose(ga,gb,atol=2e-13,rtol=2e-11)

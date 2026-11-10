@@ -14,8 +14,14 @@ from late_replay import ResidualHead
 from readout_transfer_audit import fit_head
 from consumer_contracts import evaluate_contracts
 
-NAMES=['nonlinear_suffix_cpu.py','nonlinear_suffix.py','late_vision_cpu.py','late_replay.py','shared_reference_vision.py','readout_transfer_audit.py','consumer_contracts.py']
+NAMES=['nonlinear_suffix_cpu.py','nonlinear_suffix.py','token_suffix.py','late_vision_cpu.py','late_replay.py','shared_reference_vision.py','readout_transfer_audit.py','consumer_contracts.py']
 def sources():return {n:hashlib.sha256(Path(__file__).with_name(n).read_bytes()).hexdigest() for n in NAMES}
+
+def build_for(ref):
+    if ref.get('family')=='attention':
+        from token_suffix import build_token
+        return build_token()
+    return build_full(ref['arch'])
 
 def augment(images):
     generator=torch.Generator().manual_seed(3901);n=len(images);offsets=torch.randint(0,9,(n,2),generator=generator);flips=torch.rand(n,generator=generator)<.5
@@ -44,19 +50,25 @@ def fit_reader(h,y):
 
 def prepare(a):
     start=time.time();torch.manual_seed(3800);old=torch.load(a.reference,map_location='cpu',weights_only=True);prior=torch.load(a.reference.with_name('cache.pt'),map_location='cpu',weights_only=True)
-    prefix,healthy=build_full(old['arch']);healthy.eval();images,y,coarse,sha=late.images(True);assert sha==old['data_sha256']
-    idx=old['fitting'][old['labeled']];aug,aug_info=augment(images[idx]);x0=prior['train']['residual'];x1=collect(prefix,aug,old['metadata']['image_size'])
-    xx=torch.stack([x0,x1]);h0=embed(healthy,x0);h1=embed(healthy,x1);hh=torch.stack([h0,h1]);labels=prior['train']['y'];n=len(labels)
+    prefix,healthy=build_for(dict(arch=old['arch'],family=a.family));healthy.eval();images,y,coarse,sha=late.images(True);assert sha==old['data_sha256']
+    idx=old['fitting'][old['labeled']];aug,aug_info=augment(images[idx])
+    x0=collect(prefix,images[idx],old['metadata']['image_size']) if a.family=='attention' else prior['train']['residual']
+    x1=collect(prefix,aug,old['metadata']['image_size'])
+    xx=torch.stack([x0,x1]);x0,x1=xx[0],xx[1]
+    h0=embed(healthy,x0);h1=embed(healthy,x1);hh=torch.stack([h0,h1]);labels=prior['train']['y'];n=len(labels)
     values=hh.flatten(0,1);mean=values.mean(0);sd=values.std(0,unbiased=False);floor=.1*sd[sd>0].median();sd=sd.clamp_min(floor)
     affine=old['heads']['fine'];head=NormalizedHead(affine['weight']*sd,affine['bias']+affine['weight']@mean,mean,sd)
-    train=dict(x=xx,h=hh,y=labels);part=dict(x=prior['validation']['residual'],h=prior['validation']['h'],y=prior['validation']['y'],coarse=prior['validation']['coarse'])
+    validation_x=collect(prefix,images[old['validation_indices']],old['metadata']['image_size']) if a.family=='attention' else prior['validation']['residual']
+    train=dict(x=xx,h=hh,y=labels);part=dict(x=validation_x,h=prior['validation']['h'],y=prior['validation']['y'],coarse=prior['validation']['coarse'])
     probe=fit_reader(torch.cat([richer(healthy,x0),richer(healthy,x1)]),labels.repeat(2))
-    subset=torch.randperm(n,generator=torch.Generator().manual_seed(54800))[:1024]
-    loss=F.cross_entropy(head(healthy(x0[subset])),labels[subset]);gradients=torch.autograd.grad(loss,[m.weight for m in healthy.maps])
-    right=[torch.linalg.svd(g.flatten(1).double(),full_matrices=False).Vh[:64].float() for g in gradients]
+    right=[]
+    if a.family!='attention':
+        subset=torch.randperm(n,generator=torch.Generator().manual_seed(54800))[:1024]
+        loss=F.cross_entropy(head(healthy(x0[subset])),labels[subset]);gradients=torch.autograd.grad(loss,[m.weight for m in healthy.maps])
+        right=[torch.linalg.svd(g.flatten(1).double(),full_matrices=False).Vh[:64].float() for g in gradients]
     healthy.requires_grad_(False)
     folder=a.out.parent/(a.out.stem+'_states');folder.mkdir(exist_ok=True,parents=True)
-    reference=dict(arch=old['arch'],healthy=healthy.state_dict(),head=head.state_dict(),heads=old['heads'],thresholds=old['thresholds'],
+    reference=dict(arch=old['arch'],family=a.family,healthy=healthy.state_dict(),head=head.state_dict(),heads=old['heads'],thresholds=old['thresholds'],
         hidden_probe=probe,right=right,labeled=old['labeled'],fitting=old['fitting'],validation_indices=old['validation_indices'],metadata=old['metadata'],
         splits=old['splits'],plan_sha256=a.plan_sha256,source_reference_sha256=paired.state_hash(old))
     torch.save(reference,folder/'reference.pt');torch.save(dict(train=train,validation=part),folder/'cache.pt')
@@ -72,11 +84,13 @@ def init_head(ref):
 def make_model(ref,healthy,mode,seed):
     torch.manual_seed(seed);head=init_head(ref);update=None
     if mode=='N':head=ResidualHead(head)
-    elif mode in ['L','U']:
+    elif mode in ['L','M','U']:
         update=copy.deepcopy(healthy).requires_grad_(True)
-        update.norm1.requires_grad_(False);update.norm2.requires_grad_(False)
-        if mode=='L':
-            update.requires_grad_(False);update.maps[-1].requires_grad_(True)
+        for layer in update.modules():
+            if isinstance(layer,torch.nn.LayerNorm):layer.requires_grad_(False)
+        if mode in ['L','M']:
+            update.requires_grad_(False)
+            for layer in (update.maps[-1:] if mode=='L' else update.maps[-2:]):layer.requires_grad_(True)
     elif mode=='R64':update=healthy.lowrank(ref['right'],64)
     groups=[dict(params=head.parameters(),lr=.0001)]
     if update is not None:groups.append(dict(params=[p for p in update.parameters() if p.requires_grad],lr=.00003))
@@ -102,15 +116,15 @@ def branch(a):
     assert json.loads(prepared.read_text())['complete']
     ref=torch.load(a.reference,map_location='cpu',weights_only=True);cached=torch.load(a.reference.with_name('cache.pt'),map_location='cpu',weights_only=True)
     assert ref['plan_sha256']==a.plan_sha256
-    _,healthy=build_full(ref['arch']);healthy.load_state_dict(ref['healthy']);healthy.requires_grad_(False);train=cached['train'];part=cached['validation']
-    modes=['F','N','H','L','U','R64'];phase='development';monitor=None
+    _,healthy=build_for(ref);healthy.load_state_dict(ref['healthy']);healthy.requires_grad_(False);train=cached['train'];part=cached['validation']
+    modes=['F','N','H','M','U'] if ref.get('family')=='attention' else ['F','N','H','L','U','R64'];phase='development';monitor=None
     if a.choice is not None:
         selected=json.loads(a.choice.read_text())['backbones'][ref['arch']]['selected'];assert selected in ['U','R64'];phase='confirmation'
         test=torch.load(a.test_cache,map_location='cpu',weights_only=True);assert test['reference_state_sha256']==paired.state_hash(ref);part=test['test']
         monitor=np.random.default_rng(13700001+a.seed).choice(len(part['y']),1024,replace=False)
-        modes=list(dict.fromkeys(['F','N','H','L','U',selected]))
+        modes=list(dict.fromkeys(['F','N','H','M' if ref.get('family')=='attention' else 'L','U',selected]))
     folder=a.out.parent/(a.out.stem+'_states');folder.mkdir(exist_ok=True,parents=True)
-    out=dict(complete=False,device='cpu',phase=phase,arch=ref['arch'],seed=a.seed,plan_sha256=a.plan_sha256,source_sha256=sources(),
+    out=dict(complete=False,device='cpu',phase=phase,family=ref.get('family','nonlinear'),arch=ref['arch'],seed=a.seed,plan_sha256=a.plan_sha256,source_sha256=sources(),
         reference_state_sha256=paired.state_hash(ref),selection_sha256=None if a.choice is None else hashlib.sha256(a.choice.read_bytes()).hexdigest(),
         splits=dict(ref['splits'],official_test_loaded=phase=='confirmation',test_metrics_computed=phase=='confirmation'),
         configuration=dict(epochs=10,batch=128,head_lr=.0001,update_lr=.00003,head_l2=.0001,adamw_decay=.0001,views=2,threads=12),
@@ -169,7 +183,10 @@ def prepare_test(a):
     prefix,tail,norm,_=late.build_backbone(ref['arch'],True)
     tail.load_state_dict(original['tail']);norm.load_state_dict(original['norm'])
     values=late.collect(prefix,tail,norm,images,torch.arange(len(images)),ref['metadata']['image_size'],torch.ones(len(images),dtype=torch.bool))
-    part=dict(x=values['residual'],h=values['h'],y=y,coarse=coarse)
+    xx=values['residual']
+    if ref.get('family')=='attention':
+        token_prefix,_=build_for(ref);xx=collect(token_prefix,images,ref['metadata']['image_size'])
+    part=dict(x=xx,h=values['h'],y=y,coarse=coarse)
     folder=a.out.parent/(a.out.stem+'_states');folder.mkdir(exist_ok=True,parents=True)
     cache=dict(test=part,reference_state_sha256=paired.state_hash(ref),data_sha256=sha)
     torch.save(cache,folder/'test_cache.pt')
@@ -180,5 +197,6 @@ def prepare_test(a):
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--stage',choices=['prepare','branch','test'],required=True);p.add_argument('--reference',type=Path,required=True)
     p.add_argument('--original-reference',type=Path)
+    p.add_argument('--family',choices=['nonlinear','attention'],default='nonlinear')
     p.add_argument('--seed',type=int);p.add_argument('--choice',type=Path);p.add_argument('--test-cache',type=Path);p.add_argument('--plan-sha256',required=True);p.add_argument('--out',type=Path,required=True);a=p.parse_args()
     torch.set_num_threads(12);torch.set_num_interop_threads(1);{'prepare':prepare,'branch':branch,'test':prepare_test}[a.stage](a)
