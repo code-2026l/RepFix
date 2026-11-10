@@ -78,7 +78,7 @@ def run(a):
     legacy=heads['coarse'];thresholds=confidence_thresholds(linear(hfit,legacy));fit_cache=cached(first,second,xfit);val_cache=cached(first,second,xval)
     # Gradient support/basis is fixed from a training-only labeled calibration batch.
     idx=labeled[torch.randperm(len(labeled),generator=torch.Generator().manual_seed(a.seed+51000))[:1024]]
-    f=copy.deepcopy(first);s=copy.deepcopy(second);loss=F.cross_entropy(normalized(dense_block(xfit[idx],f,s).mean((-2,-1))),fine[fit[idx]])
+    f=copy.deepcopy(first).requires_grad_(True);s=copy.deepcopy(second).requires_grad_(True);loss=F.cross_entropy(normalized(dense_block(xfit[idx],f,s).mean((-2,-1))),fine[fit[idx]])
     g1,gb,g2=torch.autograd.grad(loss,[f.weight,f.bias,s.weight]);support=(g1.square().flatten(1).sum(1)+gb.square()).argsort(descending=True,stable=True)
     right=torch.linalg.svd(g2.flatten(1).double(),full_matrices=False).Vh;del f,s,loss,g1,gb,g2
     folder=a.out.parent/(a.out.stem+'_states');folder.mkdir(exist_ok=True,parents=True)
@@ -97,7 +97,7 @@ def run(a):
         head=copy.deepcopy(normalized)
         if mode=='F':model=head;groups=[dict(params=head.parameters(),lr=.001)]
         elif mode=='U':
-            f,s=copy.deepcopy(first),copy.deepcopy(second);model=(f,s,head)
+            f,s=copy.deepcopy(first).requires_grad_(True),copy.deepcopy(second).requires_grad_(True);model=(f,s,head)
             groups=[dict(params=[*f.parameters(),*s.parameters()],lr=.0001),dict(params=head.parameters(),lr=.001)]
         else:
             model=SharedReferenceBlock(first,second,support[:k],right[:r],head)
