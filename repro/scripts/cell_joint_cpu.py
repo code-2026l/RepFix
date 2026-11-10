@@ -88,7 +88,8 @@ def run(a):
     configurations += [('protected',arch,obj,lam) for arch in ['affine','residual32'] for obj in FAMILIES for lam in LAMBDAS]
     if a.smoke:configurations=[('protected','residual32','cell_logodds',1.)];epochs=1
     out=dict(complete=False,device='cpu',cuda_visibility='',phase='development',route='joint_guidance',domain=domain,seed=seed,smoke=a.smoke,
-        plan_sha256=a.plan_sha256,metric_addendum_plan_sha256=a.addendum_sha256,source_record_sha256=hashlib.sha256(a.record.read_bytes()).hexdigest(),
+        plan_sha256=a.plan_sha256,metric_addendum_plan_sha256=a.addendum_sha256,resource_addendum_plan_sha256=a.resource_sha256,
+        source_record_sha256=hashlib.sha256(a.record.read_bytes()).hexdigest(),
         source_sha256={n:hashlib.sha256(Path(__file__).with_name(n).read_bytes()).hexdigest() for n in SOURCES},splits=splits,thresholds=thresholds,
         configuration=dict(epochs=epochs,dose=dose,batch=256,lr=.001,gradient_clip=5.,head_weight_decay=0.,
             reader_input_normalizer='fixed healthy fitting mean/std',reader_runtime_dtype='float32'),branches=[])
@@ -110,5 +111,6 @@ def run(a):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--record',type=Path,required=True);p.add_argument('--plan-sha256',required=True)
-    p.add_argument('--addendum-sha256',required=True);p.add_argument('--smoke',action='store_true');p.add_argument('--out',type=Path,required=True)
+    p.add_argument('--addendum-sha256',required=True);p.add_argument('--resource-sha256',default=None)
+    p.add_argument('--smoke',action='store_true');p.add_argument('--out',type=Path,required=True)
     a=p.parse_args();torch.set_num_threads(4);torch.set_num_interop_threads(1);run(a)

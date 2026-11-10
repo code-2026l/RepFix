@@ -12,7 +12,7 @@ class RecoveryReader(nn.Module):
         self.linear=nn.Linear(width,classes)
         with torch.no_grad():
             self.linear.weight.copy_((initial['weight'].double()*sd.reshape(-1)).float())
-            self.linear.bias.copy_((initial['bias'].double()+initial['weight'].double()@mean.reshape(-1)).float())
+            self.linear.bias.copy_((initial['bias'].double()+initial['weight'].double()@mean.double().reshape(-1)).float())
         if architecture=='quadratic':self.quadratic=nn.Linear(width,classes,bias=False);nn.init.zeros_(self.quadratic.weight)
         elif architecture=='residual32':
             self.hidden=nn.Linear(width,32);self.output=nn.Linear(32,classes,bias=False);nn.init.zeros_(self.output.weight)

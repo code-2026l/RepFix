@@ -4,9 +4,10 @@ from recovery_readers import RecoveryReader,export_reader,reader_logits,pack_out
 
 
 @pytest.mark.parametrize('architecture',['affine','quadratic','residual32'])
-def test_served_map_and_packed_current_output_match_unfolded_reader(architecture):
+@pytest.mark.parametrize('dtype',[torch.float32,torch.float64])
+def test_served_map_and_packed_current_output_match_unfolded_reader(architecture,dtype):
     torch.manual_seed(331);width,classes=7,4
-    mu=torch.randn(1,width,dtype=torch.float64);sd=torch.rand(1,width,dtype=torch.float64)+.5
+    mu=torch.randn(1,width,dtype=dtype);sd=torch.rand(1,width,dtype=dtype)+.5
     initial=dict(weight=torch.randn(classes,width,dtype=torch.float64),bias=torch.randn(classes,dtype=torch.float64))
     reader=RecoveryReader(width,classes,architecture,mu,sd,initial)
     with torch.no_grad():
