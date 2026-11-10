@@ -27,3 +27,16 @@ def test_reference_only_quantization_does_not_change_current_fp32_function(trans
         assert any(t.dtype==torch.bfloat16 for t in model.old.buffers())
         traced=torch.jit.freeze(torch.jit.trace(model,x[:1],check_trace=False));z,old_z=traced(x)
         assert torch.allclose(z,expected,atol=6e-6,rtol=2e-6) and torch.isfinite(old_z).all()
+
+def test_standard_amp_control_keeps_fp32_consumer_and_restores_execution_settings():
+    from whole_amp import WholeAMPReadout
+    from benchmark_suffix_cpu import trace_amp
+    torch.manual_seed(943);body=FullSuffix([AffineMap(nn.Conv2d(4,4,3,padding=1)),AffineMap(nn.Conv2d(4,4,3,padding=1))]).eval()
+    reader=dict(weight=torch.randn(3,4),bias=torch.randn(3));model=WholeAMPReadout(nn.Identity(),body,reader).eval().requires_grad_(False);x=torch.randn(7,4,4,4)
+    original=torch.backends.mha.get_fastpath_enabled()
+    with torch.no_grad():
+        traced=trace_amp(model,x[:1]);z=traced(x)
+        assert z.dtype==torch.float32 and torch.isfinite(z).all()
+        assert torch.allclose(z,model(x),atol=.01,rtol=.01)
+    assert torch.backends.mha.get_fastpath_enabled()==original and not torch.is_autocast_enabled('cpu')
+    assert model.weight.dtype==torch.float32 and all(p.dtype==torch.float32 for p in body.parameters())
