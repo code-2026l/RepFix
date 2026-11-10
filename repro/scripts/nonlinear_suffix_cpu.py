@@ -20,7 +20,7 @@ def sources():return {n:hashlib.sha256(Path(__file__).with_name(n).read_bytes())
 def build_for(ref):
     if ref.get('family')=='attention':
         from token_suffix import build_token
-        return build_token()
+        return build_token(ref.get('attention_blocks',1))
     return build_full(ref['arch'])
 
 def augment(images):
@@ -50,7 +50,7 @@ def fit_reader(h,y):
 
 def prepare(a):
     start=time.time();torch.manual_seed(3800);old=torch.load(a.reference,map_location='cpu',weights_only=True);prior=torch.load(a.reference.with_name('cache.pt'),map_location='cpu',weights_only=True)
-    prefix,healthy=build_for(dict(arch=old['arch'],family=a.family));healthy.eval();images,y,coarse,sha=late.images(True);assert sha==old['data_sha256']
+    prefix,healthy=build_for(dict(arch=old['arch'],family=a.family,attention_blocks=a.attention_blocks));healthy.eval();images,y,coarse,sha=late.images(True);assert sha==old['data_sha256']
     idx=old['fitting'][old['labeled']];aug,aug_info=augment(images[idx])
     x0=collect(prefix,images[idx],old['metadata']['image_size']) if a.family=='attention' else prior['train']['residual']
     x1=collect(prefix,aug,old['metadata']['image_size'])
@@ -68,7 +68,7 @@ def prepare(a):
         right=[torch.linalg.svd(g.flatten(1).double(),full_matrices=False).Vh[:64].float() for g in gradients]
     healthy.requires_grad_(False)
     folder=a.out.parent/(a.out.stem+'_states');folder.mkdir(exist_ok=True,parents=True)
-    reference=dict(arch=old['arch'],family=a.family,healthy=healthy.state_dict(),head=head.state_dict(),heads=old['heads'],thresholds=old['thresholds'],
+    reference=dict(arch=old['arch'],family=a.family,attention_blocks=a.attention_blocks,healthy=healthy.state_dict(),head=head.state_dict(),heads=old['heads'],thresholds=old['thresholds'],
         hidden_probe=probe,right=right,labeled=old['labeled'],fitting=old['fitting'],validation_indices=old['validation_indices'],metadata=old['metadata'],
         splits=old['splits'],plan_sha256=a.plan_sha256,source_reference_sha256=paired.state_hash(old))
     torch.save(reference,folder/'reference.pt');torch.save(dict(train=train,validation=part),folder/'cache.pt')
@@ -124,7 +124,7 @@ def branch(a):
         monitor=np.random.default_rng(13700001+a.seed).choice(len(part['y']),1024,replace=False)
         modes=list(dict.fromkeys(['F','N','H','M' if ref.get('family')=='attention' else 'L','U',selected]))
     folder=a.out.parent/(a.out.stem+'_states');folder.mkdir(exist_ok=True,parents=True)
-    out=dict(complete=False,device='cpu',phase=phase,family=ref.get('family','nonlinear'),arch=ref['arch'],seed=a.seed,plan_sha256=a.plan_sha256,source_sha256=sources(),
+    out=dict(complete=False,device='cpu',phase=phase,family=ref.get('family','nonlinear'),attention_blocks=ref.get('attention_blocks',1),arch=ref['arch'],seed=a.seed,plan_sha256=a.plan_sha256,source_sha256=sources(),
         reference_state_sha256=paired.state_hash(ref),selection_sha256=None if a.choice is None else hashlib.sha256(a.choice.read_bytes()).hexdigest(),
         splits=dict(ref['splits'],official_test_loaded=phase=='confirmation',test_metrics_computed=phase=='confirmation'),
         configuration=dict(epochs=10,batch=128,head_lr=.0001,update_lr=.00003,head_l2=.0001,adamw_decay=.0001,views=2,threads=12),
@@ -198,5 +198,6 @@ if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--stage',choices=['prepare','branch','test'],required=True);p.add_argument('--reference',type=Path,required=True)
     p.add_argument('--original-reference',type=Path)
     p.add_argument('--family',choices=['nonlinear','attention'],default='nonlinear')
+    p.add_argument('--attention-blocks',type=int,choices=[1,2],default=1)
     p.add_argument('--seed',type=int);p.add_argument('--choice',type=Path);p.add_argument('--test-cache',type=Path);p.add_argument('--plan-sha256',required=True);p.add_argument('--out',type=Path,required=True);a=p.parse_args()
     torch.set_num_threads(12);torch.set_num_interop_threads(1);{'prepare':prepare,'branch':branch,'test':prepare_test}[a.stage](a)

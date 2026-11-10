@@ -1,4 +1,5 @@
 import copy
+import pytest
 import torch
 from torch import nn
 from nonlinear_suffix import AffineMap,FullSuffix,AttentionPrefix
@@ -26,11 +27,12 @@ def test_head_rebasing_retains_the_initial_affine_function():
     head=NormalizedHead(w*sd,b+w@mean,mean,sd)
     assert torch.allclose(head(x),nn.functional.linear(x,w,b),atol=4e-6,rtol=2e-6)
 
-def test_last_attention_pruning_matches_the_full_transformer_and_input_gradient():
+@pytest.mark.parametrize('blocks',[1,2])
+def test_last_attention_pruning_matches_the_full_transformer_and_input_gradient(blocks):
     from torchvision.models.vision_transformer import VisionTransformer
     from token_suffix import TokenPrefix,TokenSuffix
     torch.manual_seed(711);m=VisionTransformer(image_size=32,patch_size=16,num_layers=2,num_heads=2,hidden_dim=12,mlp_dim=24).double().eval();m.heads=nn.Identity()
-    prefix=TokenPrefix(copy.deepcopy(m));suffix=TokenSuffix(m.encoder.layers[-1],m.encoder.ln).double()
+    prefix=TokenPrefix(copy.deepcopy(m),blocks);suffix=TokenSuffix(m.encoder.layers[-1],m.encoder.ln,list(m.encoder.layers.children())[-blocks:-1]).double()
     x=torch.randn(5,3,32,32,dtype=torch.float64,requires_grad=True)
     actual=suffix(prefix(x));expected=m(x)
     assert torch.allclose(actual,expected,atol=1e-13,rtol=1e-13)

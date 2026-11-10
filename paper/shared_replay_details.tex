@@ -40,7 +40,7 @@ Adding the unchanged shortcut and applying ReLU gives the merged current
 block in real arithmetic. Before the visual study, fixed BN is folded into
 the healthy convolutions; this defines the numerical reference from the start.
 
-\subsection{Rank Requirement and Dense Replay}\label{app:shared_replay_rank}
+\subsection{Dense Replay, Support and Update Rank}\label{app:shared_replay_rank}
 
 Row support is one admissible structure, not the only one. Replace the first map
 by $W_1^0+PQ$ with $P\in\mathbb R^{m\times s}$, $Q\in\mathbb R^{s\times d}$, the
@@ -52,17 +52,20 @@ substitution into $(W_2^0+UV)a_1+b_2^0+\delta b_2$ gives
  \label{eq:dense_replay}
 \end{equation}
 exactly, for any coordinatewise $\sigma$. The correction is dense, so the extra
-MACs are $sd+ms+mm+2rm+2n_cm$: the saving comes from reusing the healthy dense
+MACs above the folded current-only graph are $sd+ms+m^2+2rm+n_cm$:
+the saving comes from reusing the healthy dense
 products, not from sparsity.
 
-Equation~\eqref{eq:dense_replay} also makes the requirement measurable. For each
+For each
 saved full-joint endpoint we truncate the first- and second-map deltas by SVD,
 keep everything else fixed, and score the official test split
 (Table~\ref{tab:rank}). A truncated update is a member of the dense low-rank
 family, so a nonnegative gap proves that this structure can reproduce joint
 accuracy. A negative gap does not prove that no trained member can: the trained
-rank-$16/12$ SNR arm below reaches parity although the first map alone needs
-rank $32$ in the projection.
+rank-$16/12$ SNR arm below reaches parity although rank $32$ is needed to
+reach the same accuracy tolerance when truncating this particular first-map
+update. This retrospective projection does not identify a necessary rank
+for a trained family or explain the sparse-to-dense gain by rank alone.
 
 \begin{table}[h]
 \centering
@@ -103,19 +106,28 @@ prediction.
 The HAR gate rejects the same family: primary differences are $\DenseHarDevLow$
 to $\DenseHarDevHigh$ points on development while reconstruction improves, so no
 HAR configuration was confirmed. Extra capacity is not a free improvement; it
-helps where the required change is dense, as on SNR, and costs task accuracy
-where few channels suffice, as on HAR. The sparse HAR arm and its confirmed
+improves this SNR endpoint but reduces HAR accuracy under the specified
+recipe. The sparse HAR arm and its confirmed
 reconstruction result are unchanged.
 
-The dense SNR arm needs $\DenseSnrMacs$ extra MACs, $\DenseSnrCostFraction\%$ of
-the $24{,}576$-MAC encoder, against $6{,}848$ ($27.9\%$) for the confirmed sparse
-arm. The rank that reaches joint accuracy in projection would cost
-$\RankSnrCostFraction\%$ of the encoder on SNR and $\RankHarCostFraction\%$ on
-HAR; training within the family beats the projection on SNR, so these are
-conservative prices. On HAR the same capacity did not preserve the primary task,
-which is why the family stops at development. Measured packed latency for the
-dense arm is reported with the other serving numbers in
+The matched SNR current-only graph costs $21{,}184$ MACs after folding its
+final affine map into the primary head. Dense replay adds $11{,}456$ MACs
+($54.1\%$), versus $6{,}848$ ($32.3\%$) for sparse replay. The earlier
+$12{,}288$ count mixed an extra head already present in the current baseline
+with $128$ bias additions and divided by the unfused $24{,}576$-MAC encoder;
+we retain that historical record and use the matched graph here. Neither
+an SVD projection nor this chosen program supplies a lower bound on all
+compatible implementations. Measured latency is reported separately in
 Appendix~\ref{app:shared_replay_cost}.
+
+Layerwise update rank also depends on the parameterization. The standard
+positive-rescaling symmetry of ReLU networks~\citep{dinh2017sharp} gives a
+simple check: $(W_1,b_1,W_2,b_2)\mapsto(2W_1,2b_1,W_2/2,b_2)$ preserves
+the function, while both matrix differences can have full row rank.
+Our SVD results therefore concern saved updates in fixed coordinates,
+rather than an intrinsic rank of the learned function. The support/rank
+factorial in Appendix~\ref{app:frontier_factorial} measures the distinction
+directly under matched future training orders.
 
 \subsection{Development, Selection and Fresh Confirmation}\label{app:shared_replay_protocol}
 
@@ -217,7 +229,7 @@ reported as the utility endpoint of the frontier, not as a deployment proposal.
 For a fixed input dimension of $561$, the same sparse implementation improves
 from $1.53\times$ at width $64$ to $1.12\times$ at width $1024$ for batch $1024$,
 and remains between $1.56\times$ and $4.70\times$ at batch $1$; the batch-$1$
-target is not reachable for two-output paths of this form at these widths.
+target is not met by any measured two-output path at these widths.
 
 \subsection{ResNet-18 Capacity Boundary}\label{app:shared_replay_vision}
 

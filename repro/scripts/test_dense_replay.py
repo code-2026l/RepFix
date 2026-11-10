@@ -86,3 +86,15 @@ def test_dense_delta_states_accepts_cached_healthy_trace():
     cached = dense_delta_states(x, pre1, pre2, model.second.weight, model.p, model.q,
                                 model.delta1_bias, model.u, model.v, model.delta2_bias)
     assert all(torch.equal(a, b) for a, b in zip(cached, model.forward_states(x)))
+
+def test_update_rank_is_not_an_intrinsic_measure_of_function_change():
+    healthy,model,_,_=build(906,3,2)
+    first=healthy.encoder[0];second=healthy.encoder[2]
+    x=torch.randn(41,9,dtype=torch.float64)
+    old=F.relu(second(F.relu(first(x))))
+    # Positive ReLU rescaling changes both parameter matrices at full rank,
+    # while cancelling exactly before the second nonlinearity.
+    new=F.relu(F.linear(F.relu(F.linear(x,2*first.weight,2*first.bias)),.5*second.weight,second.bias))
+    assert torch.allclose(old,new,atol=1e-14,rtol=1e-14)
+    assert int(torch.linalg.matrix_rank(first.weight))==7
+    assert int(torch.linalg.matrix_rank(-.5*second.weight))==7
