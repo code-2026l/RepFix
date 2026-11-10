@@ -1,7 +1,7 @@
 """Isolated matched TorchScript serving and full-prefix endpoint replay."""
 import os
 os.environ['CUDA_VISIBLE_DEVICES']=''
-import argparse,copy,hashlib,json,time,warnings
+import argparse,copy,hashlib,io,json,time,warnings
 from pathlib import Path
 import numpy as np
 import torch
@@ -18,6 +18,9 @@ def trace(module,sample):
     with warnings.catch_warnings():
         warnings.simplefilter('ignore',torch.jit.TracerWarning)
         return torch.jit.freeze(torch.jit.trace(module.eval(),sample,check_trace=False))
+
+def export_bytes(module):
+    stream=io.BytesIO();torch.jit.save(module,stream);return stream.tell()
 
 def cache_save(path,value):
     path.parent.mkdir(exist_ok=True,parents=True);temporary=path.with_suffix('.%d.tmp'%os.getpid())
@@ -187,6 +190,15 @@ def main(a):
                     raw_full[str(batch)]=(full_own,full_legacy)
                     full_precision[str(batch)]=report(full,full_own,full_legacy)
         out['serving'][mode]=dict(timings=timing,chosen=chosen,full_precision=full_precision)
+        if a.timing_only and mode=='U' and a.reference_precision:
+            # Storage is a descriptive cost, collected after latency sampling.
+            prefix_bytes=export_bytes(ts_prefix)
+            sizes=dict(mono_current=export_bytes(mono0),modular_current=prefix_bytes+export_bytes(ts0),
+                mono_protected=export_bytes(mono1),modular_protected=prefix_bytes+export_bytes(ts1),
+                fp32_reference_modular=prefix_bytes+export_bytes(precision32),bf16_reference_mono=export_bytes(precision16mono),
+                bf16_reference_modular=prefix_bytes+export_bytes(precision16))
+            if reference_amp is not None:sizes.update(autocast_reference_mono=export_bytes(reference_amp_mono),autocast_reference_modular=prefix_bytes+export_bytes(reference_amp))
+            out['serving'][mode]['serialized_program_bytes']=sizes
         raw_amp={}
         if a.whole_amp_control and not a.timing_only:
             amp_results={}
