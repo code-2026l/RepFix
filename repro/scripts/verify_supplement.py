@@ -534,9 +534,11 @@ def main():
         if args.paper:
             print('Building and comparing the manuscript...', flush=True)
             expected_pages=manifest['manuscript_snapshot']['total_pages']
+            expected_main=manifest['manuscript_snapshot']['main_text_pages']
             _, elapsed = execute([sys.executable, 'repro/scripts/build_cpu_paper.py'], copy)
             build = json.loads((copy / 'tmp/cpu_build/build_report.json').read_text())
-            if build['warnings'] or build['main_text_pages'] != 9 or build['total_pages'] != expected_pages:
+            if (build['warnings'] or not 1<=expected_main<=9 or
+                    build['main_text_pages'] != expected_main or build['total_pages'] != expected_pages):
                 raise ValueError('Unexpected manuscript build: ' + json.dumps(build))
             import fitz
             with fitz.open(ROOT / 'paper/RepFix_ICLR2027.pdf') as old, \
@@ -550,7 +552,7 @@ def main():
             if text_matches != expected_pages or pixel_matches != expected_pages:
                 raise ValueError('Rendered manuscript differs: text %s, pixels %s of %s. '
                     'Check the LaTeX and figure font environment.' % (text_matches, pixel_matches,expected_pages))
-            report['checks']['paper'] = dict(main_text_pages=9,total_pages=expected_pages,warnings=[],
+            report['checks']['paper'] = dict(main_text_pages=expected_main,total_pages=expected_pages,warnings=[],
                 matching_page_text=text_matches,matching_page_pixels_at_72dpi=pixel_matches,elapsed_seconds=elapsed)
     print(json.dumps(report, indent=2))
 

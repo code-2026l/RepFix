@@ -1,6 +1,7 @@
 # Reading the current evidence
 
-Start with the two main figures and the deployment-frontier table. Figure 1
+The eight-page main text follows failure mechanism, repair target and preservation
+cost. Start with the two main figures and the deployment-frontier table. Figure 1
 separates useful task information from an old readout's scale-sensitive failure.
 Figure 2 shows shared-prefix preservation and fresh ResNet-18/ViT-B/32 gains over
 head-only and richer frozen-feature controls. The table adds actual old decisions

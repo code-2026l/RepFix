@@ -135,7 +135,7 @@ text keeps that scope while presenting positive results directly.
 
 ## Recovered evidence and release verification
 
-The manuscript has 9 main pages and 92 total pages.
+The manuscript has 8 main pages and 93 total pages.
 The release contains 27 independently regenerated vector figures and 132 passing
 focused structural checks. The extracted source is rebuilt and compared page
 by page in both text and rendered pixels; the final result is in REVIEW_CHECKS.json.
@@ -180,3 +180,12 @@ work. The contribution cannot be the generic observation of staleness or the
 invention of label-free repair. Scale interventions, specified decision rules
 and the measured preservation/utility/cost comparison carry the narrower case.
 The new screen failures are conditional evidence, not impossibility results.
+
+
+## Argument and English finish
+
+The current eight-page main text follows the consumer-maintenance argument.
+Detailed unsigned-proxy calibration moves to the appendix; the existing consumer
+disagreement inequality moves into the serving check. Mathematical statements,
+proofs, tables, numerical inputs and figure data are unchanged. The language
+and structural audit is in STORY_FINAL_20261110.md and STORY_INTEGRITY_20261110.json.

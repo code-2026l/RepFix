@@ -55,6 +55,8 @@ different pretraining and an effective online intervention remain open.
 
 The 27th figure separates development screening from reference-level confirmation
 and shows all continuation seeds. All 26 earlier figures retain their numerical
-artist signatures. The manuscript remains nine main pages and 92 pages overall.
+artist signatures. The scientific follow-up release had nine main pages and 92 pages overall.
+The subsequent argument/English revision has eight main pages and 93 total;
+its unchanged-science audit is in STORY_INTEGRITY_20261110.json.
 The compact source/supplement archives include complete records and executable
 review checks; raw datasets, large caches and model tensors are stored separately.

@@ -1,7 +1,7 @@
 # Reproducing the supplementary artifact
 
 Run commands from the extracted `repfix_supplementary` directory. The supplied
-PDF has nine main pages. The exact full-page count is recorded in
+PDF has eight main pages. The exact full-page count is recorded in
 `ARTIFACT_MANIFEST.json` and the extracted-archive build report.
 
 ## File and record checks

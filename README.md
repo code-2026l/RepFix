@@ -32,10 +32,11 @@ at development. See the [follow-up report](docs/FOLLOWUP_REPORT_20261110.md).
 
 ## Paper and files
 
-- [Final paper](paper/RepFix_ICLR2027.pdf): 9 main pages, 92 total.
-- [Supplementary archive](artifacts/2026-11-10/RepFix_ReferenceAudit_20261110_supplement.zip)
-- [Editable source and evidence](artifacts/2026-11-10/RepFix_ReferenceAudit_20261110_source.zip)
+- [Final paper](paper/RepFix_ICLR2027.pdf): 8 main pages, 93 total.
+- [Supplementary archive](artifacts/2026-11-10/RepFix_ICLR_StoryFinal_20261110_supplement.zip)
+- [Editable source and evidence](artifacts/2026-11-10/RepFix_ICLR_StoryFinal_20261110_source.zip)
 - [Reading guide](docs/REVIEWER_GUIDE.md) · [Evidence index](docs/EVIDENCE_INDEX.md)
+- [Final argument and English](docs/STORY_FINAL_20261110.md) · [Scientific integrity](docs/STORY_INTEGRITY_20261110.json)
 - [Editorial and figure refinement](docs/EDITORIAL_FINISH_20261110.md) · [Integrity checks](docs/EDITORIAL_VISUAL_VERIFICATION_20261110.json)
 
 ## Verify the artifact

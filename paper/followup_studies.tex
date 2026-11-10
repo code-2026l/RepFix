@@ -60,13 +60,11 @@ views. The CE-only encoder has a separate dose-matched detached decoder for
 each comparison. Final primary readers use the same two-view labeled pool;
 online-head and refitted scores are recorded separately.
 
-An implementation check found that loading an optimizer state without copying
-its tensors could share decoder moments across branches. The first ResNet
-pilot is excluded as a technical failure. Its reissue deep-copies every state
-and verifies the untouched warm-state hash after each branch. The grid, split,
-seed, rates and decision rule were unchanged. An independent saved-state
-process also executes the healthy consumer, replacing the training driver's
-cached-reference check with a fresh forward pass.
+The initial ResNet pilot was excluded after an optimizer-state alias check.
+The unchanged protocol was reissued with independent copied moments and
+warm-state hash checks. Executed sources and technical failures remain in the
+artifact. Separate saved-model processes replay the valid branches and healthy
+consumers.
 
 \input{vision_auxiliary_pilot_table.tex}
 
@@ -86,8 +84,8 @@ Each reference independently permutes the official training population,
 selects its label mask and fits healthy fine/coarse readers. The ImageNet
 pretraining, two-view construction, suffix scope and training recipe remain
 fixed. Validation labels score the frozen confirmation protocol; the official
-test split stays closed. This varies the reference-fitting and data conditions,
-rather than repeating continuation seeds for one fitted reference.
+test split stays closed. These groups vary reference fitting, label masks and partitions under the same
+pretrained backbone.
 
 \begin{figure}[H]
 \centering
@@ -111,7 +109,9 @@ means, each averaging three paired continuations, are the replication units
 within each reference, the gain is $\ReferenceViTGainStrongest$ points
 $[\ReferenceViTGainStrongestLow,\ReferenceViTGainStrongestHigh]$. All continuation
 seeds and reference means appear in Figure~\ref{fig:reference_replication}.
-Thus the positive transfer result extends beyond the original fitted reference
-and partition. It remains conditional on this pretrained backbone and training
-population; the failed real-auxiliary screen is a separate result. The original
-serving-cost confirmation is not repeated on these new endpoints.
+Transfer remains positive across these reference and partition changes.
+Saved-model replay retains all three old decision rules on the new endpoints;
+the largest legacy-logit rounding difference is $1.05\times10^{-5}$.
+The pretrained backbone and training population remain shared, and serving
+costs come from the original paired study. The visual auxiliary screen remains
+a separate negative result.
