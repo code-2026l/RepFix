@@ -32,8 +32,10 @@ class TokenSuffix(nn.Module):
         h=F.scaled_dot_product_attention(q,k,v).transpose(1,2).reshape(b,1,d)
         return x[:,0]+self.maps[1](h[:,0])
     def hidden(self,x):return F.gelu(self.maps[2](self.ln_mlp(self.attention(x))))
-    def forward(self,x):
-        h=self.attention(x);return self.norm2(h+self.maps[3](F.gelu(self.maps[2](self.ln_mlp(h)))))
+    def features(self,x):
+        h=self.attention(x);hidden=F.gelu(self.maps[2](self.ln_mlp(h)))
+        return self.norm2(h+self.maps[3](hidden)),hidden
+    def forward(self,x):return self.features(x)[0]
     def dense(self):return copy.deepcopy(self)
 
 def build_token(blocks=1):

@@ -50,10 +50,11 @@ class FullSuffix(nn.Module):
         h=x
         for layer in self.maps[:-1]:h=F.relu(layer(h))
         return h
-    def forward(self,x):
+    def features(self,x):
         h=self.hidden(x);value=self.maps[-1](h)
-        if self.vit:return self.norm2(value+x)
-        return F.relu(value+x).mean((-2,-1))
+        if self.vit:return self.norm2(value+x),h
+        return F.relu(value+x).mean((-2,-1)),h.mean((-2,-1))
+    def forward(self,x):return self.features(x)[0]
     @torch.no_grad()
     def dense(self):
         result=copy.deepcopy(self);result.maps=nn.ModuleList([m.dense() for m in self.maps]);return result

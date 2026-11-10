@@ -43,6 +43,10 @@ def main(a):
                 branch=next(b for b in record['branches'] if b['mode']==mode and ((b.get('k')==s and b.get('rank')==r) if supported else (b['rank1']==s and b['rank2']==r)))
                 raw=torch.load(states/branch['state_file'],map_location='cpu',weights_only=True);p=raw['serving']
                 assert paired.state_hash(p)==branch['serving_sha256'] and paired.state_hash(raw['model'])==branch['final_state_sha256']
+                model=(sparse.SharedReferenceMLP(healthy,p['support'],p['v'],reference['A'],reference['B']) if supported else
+                    dense.DenseReferenceMLP(healthy,p['q'],p['v'],reference['A'],reference['B']))
+                model.load_state_dict(raw['model'])
+                assert paired.state_hash(model.serving())==paired.state_hash(p)
                 native=NativeReplay(binary,pack(p,supported),c)
                 merged=module.merged_serving(p);packed=module.packed_serving(p)
                 def current(t):return module.serve_merged_mlp(t,merged)
