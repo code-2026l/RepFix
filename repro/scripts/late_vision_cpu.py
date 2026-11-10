@@ -119,7 +119,12 @@ def evaluate(update,head,mode,part,tail,norm,ref,monitor=None):
 
 
 def branch(a):
-    start=time.time();ref=torch.load(a.reference,map_location='cpu',weights_only=True);cached=torch.load(a.reference.with_name('cache.pt'),map_location='cpu',weights_only=True)
+    start=time.time();reference_record=a.reference.parent.parent/(a.reference.parent.name.removesuffix('_states')+'.json')
+    while not reference_record.exists():
+        if time.time()-start>1800:raise TimeoutError('Reference preparation did not complete')
+        time.sleep(2)
+    assert json.loads(reference_record.read_text())['complete']
+    ref=torch.load(a.reference,map_location='cpu',weights_only=True);cached=torch.load(a.reference.with_name('cache.pt'),map_location='cpu',weights_only=True)
     assert ref['plan_sha256']==a.plan_sha256
     _,tail,norm,_=build_backbone(ref['arch'],True);tail.load_state_dict(ref['tail']);norm.load_state_dict(ref['norm'])
     train=cached['train'];part=cached['validation'];modes=['F','U','N','H','r16','r64','r128']
