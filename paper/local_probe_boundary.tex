@@ -29,11 +29,11 @@ the probe and the exact variance derivative agree in sign. If $1-\alpha q>\Delta
 The chain rule gives $\dot V=-u^\top K(g_p+\alpha g_a)/B$. Substitute $K=k(I+E)$, divide by $N$, and add and subtract $1-\alpha q$. The triangle inequality bounds $|\mathcal E|$ by $\Delta$.
 \end{proof}
 
-The margin is sufficient and checkpoint-local. Computing it requires the exact flux, so it serves as an offline explanation of the cheap probe. On $405$ HAR checkpoints, the frozen certificate fires on $2$; the signed balance $\psi=d-\alpha a$ with a combined residual certifies $10$ at the same scale. Per-checkpoint scale optimization raises the counts to $15$ and $154$ (Table~\ref{tab:probe_arms}). Every certified sign is correct. The corrected balance alone agrees in sign on $58\%$ of checkpoints, leaving substantial encoder-geometry mismatch.
+The checkpoint-local margin uses the exact flux to explain the cheap probe offline. On $405$ HAR checkpoints, the frozen certificate fires on $2$; the signed balance $\psi=d-\alpha a$ with a combined residual certifies $10$ at the same scale. Per-checkpoint scale optimization raises the counts to $15$ and $154$ (Table~\ref{tab:probe_arms}). Every certified sign is correct. The corrected balance alone agrees in sign on $58\%$ of checkpoints, leaving substantial encoder-geometry mismatch.
 
 In the identity metric ($E=0$), $\dot V/N=d-\alpha a$. If $a=q$ and $0<d<\alpha q<1$, the nominal gate stays closed while variance contracts: the primary norm overstates restoration. If $a=-q$, the same unsigned gate can open while the auxiliary expands variance. Drift after calibration contributes through $a-q$. These examples identify concrete sources of a wrong sign.
 
-The mismatch term also separates into actionable components. If $a_0$ is signed loading at calibration for the actual auxiliary, then
+The mismatch separates into drift, sign and estimation components. If $a_0$ is signed loading at calibration for the actual auxiliary, then
 \begin{equation}
  |a_t-q|\le |a_t-a_0|+|a_0-|a_0||+\bigl||a_0|-q\bigr|.
  \label{eq:mismatch_split}

@@ -61,23 +61,19 @@ not imply decision compatibility.}
 \label{fig:chart_confirmation}
 \end{figure}
 
-The complete target fails. The repaired consumers change $\ChartDisagreement\%$
-of healthy predictions on average. A separate forty-consumer family uses total
+The repaired consumers still change $\ChartDisagreement\%$ of healthy
+predictions on average, missing the decision target. A separate forty-consumer family uses total
 $\delta=0.05$, $1{,}024$ uniform monitor inputs and a $0.05$ error budget.
 None of the ten repaired joint consumers certifies; their upper remainder
-disagreement bounds range from $0.406$ to $0.543$. The check abstains; it does
-not report a loss increase, since the paired accuracy differences are positive.
-An accuracy repair is not a decision repair.
+disagreement bounds range from $0.406$ to $0.543$. The monitor therefore abstains despite the positive paired accuracy differences.
 
 On one CPU thread, alternating $31$ timed repetitions after five warm-ups give
 mean median-latency ratios $0.900$ at batch $1$ and $\ChartLatency$ at batch
 $1{,}024$. Both branches evaluate final-affine features and primary logits in
 float64. The rebased head stores float64 parameters; the native fp32 head is
-cast for logit evaluation. We interpret the result as near-native encoder cost,
-not an algorithmic speedup. Auxiliary heads are not included in these primary
+cast for logit evaluation. The result is near-native encoder cost. Auxiliary heads are not included in these primary
 inference timings. The chart and current heads are composed offline; inference
-does not require the reference encoder or a separate projection. Fitting still
-requires anchor feature extraction and matrix estimation, not constant time.
+does not require the reference encoder or a separate projection. Offline fitting requires anchor feature extraction and matrix estimation.
 
 All native model/Adam states, fitted charts, deployed models, source hashes and
 timing samples are retained locally. Drivers are \texttt{posthoc\_chart\_cpu.py}

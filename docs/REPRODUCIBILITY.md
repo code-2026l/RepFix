@@ -67,7 +67,9 @@ coordinated generators reconstruct all 26 included figures from shipped
 records. It compares plotted numerical artists and dimensions with the release
 manifest. Files are exported as PDF, PNG, and SVG at a 5.5-inch width.
 
-Figures use Times New Roman when available, with STIX/DejaVu fallback fonts.
+Figures use Arial when available, with Helvetica/DejaVu Sans fallback fonts
+and STIX mathematical notation. Mechanism drawings use layered vector slabs;
+quantitative panels retain flat axes, seed values and their recorded uncertainty.
 Font availability can change rendering on another system while the numerical
 artist checks remain meaningful. The included vector PDFs reproduce the delivered
 manuscript's appearance.

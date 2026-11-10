@@ -1,7 +1,7 @@
 # Manuscript-to-evidence index
 
 This index refers to *Silent Scale Shift: When Shared Updates Break Existing
-Readouts*, the supplied 91-page manuscript. Figure numbers follow that PDF.
+Readouts*, the supplied 90-page manuscript. Figure numbers follow that PDF.
 Paths are relative to the artifact root. `C` below abbreviates
 `repro/results/CPUCONT/`.
 

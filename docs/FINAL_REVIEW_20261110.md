@@ -99,7 +99,7 @@ All nine fixed unlabeled affine repair arms fail the visual one-percent gate
 on the three development seeds. They use 2048 isolated anchors; paired maps
 require old/new features, whereas marginal-statistic repairs do not. No repair
 uses test outcomes or a tuned ridge. They do not support the proposed generic
-CIFAR miracle of recovering almost all old performance by marginal rescaling.
+CIFAR recovery by marginal rescaling alone.
 
 The later one-forward distilled legacy-head study is explicitly registered
 after unconstrained test loading. Its fixed lambda grid 1/10/100 fails all six
@@ -129,7 +129,7 @@ text keeps that scope while presenting positive results directly.
 
 ## Recovered evidence and release verification
 
-The manuscript has 9 main pages and 91 total pages.
+The manuscript has 9 main pages and 90 total pages.
 The release contains 26 independently regenerated vector figures and 117 passing
 focused structural checks. The extracted source is rebuilt and compared page
 by page in both text and rendered pixels; the final result is in REVIEW_CHECKS.json.

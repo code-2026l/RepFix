@@ -5,9 +5,8 @@ BC-Aligner~\citep{hu2022backward} provides this baseline, while model
 stitching~\citep{bansal2021stitching,mai2026stitching} studies related
 representation interfaces. We compare alignment targets under a matched
 parameterization before testing the HAR construction on new training seeds.
-The protocol and development choices were publicly committed before the
-corresponding numerical runs; they are fixed protocols rather than registry
-entries.
+The fixed protocol and development choices were publicly committed before
+the corresponding numerical runs.
 
 Development reuses the healthy checkpoints, Adam moments, splits and future
 minibatches of seeds $800$--$802$. Both new families learn a bias-free
@@ -32,9 +31,8 @@ to float32. Table~\ref{tab:alignment_development} includes every candidate.
 On HAR, feature alignment selects $0.01$ and loses $0.63$ primary points,
 missing the half-point utility gate. Stronger feature penalties have viable
 validation tradeoffs: at $\lambda=1$, primary changes by $-0.09$ points, MSE
-is $0.715$ of detachment, and disagreement is $1.29\%$. The failed gate
-therefore concerns the fixed selection policy, not the feature-alignment
-family. Logit-map $0.1$ and the direct-head OLS fit pass and open HAR
+is $0.715$ of detachment, and disagreement is $1.29\%$. Thus the compatibility-only selection policy misses a viable
+feature-alignment tradeoff. Logit-map $0.1$ and the direct-head OLS fit pass and open HAR
 confirmation. On SNR, feature-map $100$ still changes $16.5\%$ of decisions;
 logit-map $10$ and direct-head OLS lose $0.62$ and $0.65$ primary points.
 None opens confirmation, and no coefficient is retuned.
@@ -90,7 +88,5 @@ Independent tensor replay reproduces all $50$ metric sets and the protected
 readers' bounds exactly, including the OLS fitting conditions. Casting OLS
 to float32 changes $11$ seed--example predictions among $29{,}470$ comparisons
 with its float64 fit, with maximum logit difference $0.182$; all reported OLS
-certificates evaluate the actual float32 reader. The retained contract is a
-bounded fraction of legacy decisions. These confirmations establish the HAR
-construction on fresh training seeds, while the SNR development failures and
-the vision boundaries continue to limit its scope.
+certificates evaluate the actual float32 reader. The fresh HAR confirmation therefore retains a bounded fraction of legacy
+decisions under the actual float32 implementation.

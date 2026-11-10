@@ -2,8 +2,7 @@
 
 Silent Scale Shift: When Shared Updates Break Existing Readouts
 
-This repository accompanies the 9-main-page manuscript and its full supplementary
-material. It contains editable LaTeX, vector figures, numerical records, analysis,
+This repository accompanies the manuscript and its full supplementary material. It contains editable LaTeX, vector figures, numerical records, analysis,
 fixed study plans and review checks. Previous positive and negative studies remain.
 
 An accurate current head does not show whether an existing readout still works.
@@ -26,10 +25,11 @@ reports every failed budget, negative control and remaining scope condition.
 
 ## Paper and files
 
-- [Final paper](paper/RepFix_ICLR2027.pdf): 9 main pages, 91 total.
-- [Supplementary archive](artifacts/2026-11-10/RepFix_InterfaceFrontier_20261110_supplement.zip)
-- [Editable source and evidence](artifacts/2026-11-10/RepFix_InterfaceFrontier_20261110_source.zip)
+- [Final paper](paper/RepFix_ICLR2027.pdf): 9 main pages, 90 total.
+- [Supplementary archive](artifacts/2026-11-10/RepFix_ICLR_Refined_20261110_supplement.zip)
+- [Editable source and evidence](artifacts/2026-11-10/RepFix_ICLR_Refined_20261110_source.zip)
 - [Reading guide](docs/REVIEWER_GUIDE.md) · [Evidence index](docs/EVIDENCE_INDEX.md)
+- [Editorial and figure refinement](docs/EDITORIAL_FINISH_20261110.md) · [Integrity checks](docs/EDITORIAL_VISUAL_VERIFICATION_20261110.json)
 
 ## Verify the artifact
 

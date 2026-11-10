@@ -17,10 +17,9 @@ At second-map rank $8$, dense minus sparse joint accuracy is $+0.37$ points
 with a paired three-seed $95\%$ interval $[-0.63,1.37]$. Raising the second
 rank from $8$ to $12$ changes sparse accuracy by $+0.18$ points and dense
 accuracy by $-0.05$. The dense first map also has $1072$ more update
-parameters and a bias on all $64$ channels rather than $16$. These small
-development comparisons separate the changed factors; they do not identify
-a rank-only cause or an orientation-only effect. The retrospective SVD
-projection and fresh dense SNR confirmation retain their original scope.
+parameters and a bias on all $64$ channels rather than $16$. The intervals cover zero, and the parameter-count difference prevents
+attributing the sparse-to-dense gain to rank alone. The SVD projection
+and fresh dense confirmation describe the respective saved and trained updates.
 
 \subsection{Opening a Complete Nonlinear Suffix}\label{app:nonlinear_suffix}
 
@@ -28,8 +27,7 @@ All three pretrained backbones use a fixed healthy reference and split:
 $42{,}952$ CIFAR-100 fitting inputs, $5000$ validation inputs and $2048$
 isolated anchors. A fixed Bernoulli mask provides $8705$ fine-labeled
 fitting inputs. Healthy fine-$100$ and coarse-$20$ affine heads are fitted
-on that same subset. Coarse labels are derivable from fine labels; they
-are not an inaccessible-annotation assumption. Continuation does not use
+on that same subset. Coarse labels are derivable from the fine labels. Continuation does not use
 coarse labels or a consumer-preservation loss.
 
 The ImageNet-V1 ResNet-18 and ImageNet-V2 ResNet-50 use $64\times64$
@@ -80,17 +78,14 @@ fresh continuation seeds $3810$--$3819$ then gain
 $\SuffixRNGainHead$ points $[\SuffixRNGainHeadLow,\SuffixRNGainHeadHigh]$
 over F and $\SuffixRNGainRichHead$ $[\SuffixRNGainRichHeadLow,\SuffixRNGainRichHeadHigh]$
 over H (Table~\ref{tab:suffix_confirmation}). U exceeds L by
-$\SuffixRNGainLastMap$ points. These intervals concern continuation on
-one fixed healthy reference, label mask and data split, not variation across
-independently pretrained models or populations.
+$\SuffixRNGainLastMap$ points. Intervals describe continuation variability conditional on the healthy
+reference, label mask and split.
 
 \input{suffix_confirmation_table.tex}
 
 H reaches $46.96\%$ test accuracy without changing the encoder; U reaches
-$\SuffixRNAcc\%$. The two improvements have different interpretations.
-H is an established frozen-feature readout control, while U learns the
-nonlinear suffix. Its smaller additional gain over H is reported alongside
-the larger gain over F. The cached-prefix FP32 U path changes none of the
+$\SuffixRNAcc\%$. H improves the readout on frozen features; U learns the nonlinear suffix
+and adds the smaller gain shown against H. The cached-prefix FP32 U path changes none of the
 three old decisions on any test input; all $30$ specified U contracts certify
 the five-point remainder budget, with largest upper bound $\SuffixRNBound$.
 Full-prefix implementation checks are reported separately from this
@@ -112,9 +107,8 @@ Under the same views, rates, loss and final-refit recipe, U reaches
 $77.04\%$, $77.00\%$ and $76.96\%$ on development seeds $3800$--$3802$.
 All three clear the fixed gate; M, which opens only the final MLP maps,
 remains near $75\%$. This choice is publicly fixed before official test
-loading. The scope comparison tests nonlinear learning capacity under one
-recipe. Prefix sharing, late fine-tuning and low-rank updates are established
-operations, rather than new learning algorithms.
+loading. The scope comparison isolates the nonlinear learning capacity required
+by this transfer recipe.
 
 Ten fresh continuations $3810$--$3819$ reach $\SuffixViTAcc\%$ test accuracy.
 The paired gain over F is $\SuffixViTGainHead$ points
@@ -123,8 +117,7 @@ $\SuffixViTGainRichHead$ $[\SuffixViTGainRichHeadLow,\SuffixViTGainRichHeadHigh]
 U also exceeds the final-MLP M control by $\SuffixViTGainFinalMLP$ points.
 All $30$ class/selective contracts in this cached-prefix FP32 comparison
 certify, with zero observed changes and maximum remainder bound
-$\SuffixViTBound$. These are the same fixed-reference continuation intervals
-as the ResNet-18 study, not a full-backbone fine-tuning or population comparison.
+$\SuffixViTBound$. As in the ResNet-18 study, the reference, label mask and split are fixed.
 
 \input{two_block_confirmation_table.tex}
 
@@ -137,8 +130,7 @@ timing are retained separately. Development chooses the fastest absolute
 implementation: native at batch $1$, TorchScript at $1024$. This choice is
 frozen before independent full-corpus serving checks on the ten saved HAR
 and dense SNR states. The original TorchScript and slower native large-batch
-paths remain in the evidence. A better ratio against a slower baseline is
-not treated as a deployment improvement.
+paths remain in the evidence. Absolute runtime determines selection; each ratio uses the matched current-only implementation.
 Both selected implementations retain every old class/selective decision on
 the full small-model corpora. Independent current merging differs on two
 near-tied predictions in the optimized audit; real-arithmetic equality does
@@ -147,8 +139,7 @@ not imply bitwise identity. Every primary metric uses its stated arithmetic.
 For vision, monolithic, modular-prefix and grouped dense suffix programs
 compete against equivalently optimized one-version current programs.
 Grouped convolutions and batched projections apply to both one- and
-two-version implementations. The packed program does not win by assumption.
-FP32 ResNet-18 development serving is about $1.12\times$ at batch $1$ and
+two-version implementations. FP32 ResNet-18 development serving is about $1.12\times$ at batch $1$ and
 $1.20\times$ at $128$; ViT is about $1.12/1.112\times$. The full-precision
 batch-$128$ results miss the $1.10$ target. H reuses a healthy trace for its
 own richer features and old head, so it has a different, cheaper frontier.
@@ -157,10 +148,9 @@ Timings use an isolated twelve-thread CPU process, twelve warmups and
 $31$ alternating repetitions. Current-only, protected and independent
 function evaluations receive the same preprocessing and pruning. Input
 decoding/preprocessing, compilation and warmup are outside forward latency.
-The host is an Intel Xeon Platinum 8570, using PyTorch $2.7.1$ and
-torchvision $0.22.1$ with CPU tensors and empty CUDA visibility. AVX-512,
-BF16 and AMX capability are recorded; individual kernel dispatch is not
-profiled. These measurements do not predict another processor's latency.
+The Intel Xeon Platinum 8570 runs PyTorch $2.7.1$ and torchvision
+$0.22.1$ on CPU. AVX-512, BF16 and AMX capability are recorded; individual
+kernel dispatch is not profiled.
 The chosen ABI is fixed on development, not selected on test timing. Full
 chosen-code replay is separated from isolated timing; identical H functions
 are counted once, with each seed's monitor certificate recomputed from its
@@ -242,9 +232,9 @@ No arm passes all three consumers in every seed (Figure~\ref{fig:suffix_repairs}
 The best worst-consumer arm is Procrustes on ResNet-18, with $24.0\%$
 disagreement; paired ridge reaches $9.16\%$ on ViT. The direct old readout
 on new features reaches $25.86/15.44\%$ worst-consumer disagreement.
-These are failures under this anchor count, fixed estimator family and
-recipe. They show why a retained healthy suffix is useful here; the
-successful HAR scale repair supplies no general affine-repair guarantee.
+With $2048$ anchors and the fixed estimator family, affine repair leaves
+substantial residual disagreement. Retaining the healthy suffix avoids
+that residual in this transfer setting.
 
 \input{suffix_direct_flows_table.tex}
 
@@ -253,15 +243,14 @@ these three development seeds it rises from $54.00\%$ to $55.79\%$ on
 ResNet-18; ViT remains close at $82.89\%$ versus $82.66\%$ healthy. Yet
 $4.75\%$ and $3.40\%$ of inputs, respectively, move from correct to wrong.
 The corresponding beneficial corrections are $6.54\%$ and $3.63\%$.
-Preservation therefore concerns a specified regression/decision contract;
-it does not assert that every old prediction is preferable to an update.
+Thus aggregate accuracy and preservation of specified decisions measure
+different effects of the update.
 
 \subsection{A Cheaper Learned Legacy Head}\label{app:vision_head_control}
 
 A subsequent control asks whether a learned affine coarse head can avoid
-the retained reference suffix. This follow-up is registered after opening
-the unconstrained test results and uses development only. The original
-models and serving choices remain fixed. Initialize the added head to the
+the retained reference suffix. This follow-up is planned after opening
+the unconstrained test results and uses development only. It leaves the original models and serving choices fixed. Initialize the added head to the
 healthy coarse function, then train it and the same current suffix with
 fine-label CE/L2 plus $\lambda\,\mathrm{KL}(p_0\|p_\theta)$, temperature one.
 Targets are healthy coarse predictions on the same $8705$ labeled fitting
@@ -272,15 +261,14 @@ It adds $10{,}260$ parameters on ResNet-18 and $15{,}380$ on ViT.
 
 \input{vision_protected_head_table.tex}
 
-The fixed weights $\lambda\in\{1,10,100\}$ all fail the joint gate on
-pilot seed $3800$ (Table~\ref{tab:vision_protected_head}). There is no
-development-grid extension or test confirmation. A read-only initialization
+All fixed weights $\lambda\in\{1,10,100\}$ fail the joint gate on
+pilot seed $3800$, ending this control at development
+(Table~\ref{tab:vision_protected_head}). A read-only initialization
 audit reconstructs both initial functions on all $17{,}410$ fitting views
 and $5000$ validation inputs: initial KL is below $10^{-5}$, and every
 validation class/selective decision agrees with the original reference.
-The teacher and cached features are consistent before the learned updates.
-This fixed-recipe loss control leaves its complete outcomes available;
-different schedules, data budgets or nonlinear legacy heads are untested.
+This confirms that the disagreement emerges during learning, rather than
+from inconsistent teacher targets or cached features.
 
 \subsection{Actual Serving Outputs and Isolated Cost}\label{app:served_frontier}
 
@@ -298,31 +286,31 @@ $1.115$ ratio, versus approximately $1003/941$\,ms for selected reference-
 only autocast at fixed-current FP32. Whole AMP is faster in absolute time
 but misses its matched $1.10$ gate in the final development run. Its earlier
 timing run passed. Both records are retained, and it stops at development.
-Thus the selected mixed implementation describes a fixed-current-fidelity
-frontier on this CPU, not the fastest possible reduced-precision system.
+The selected mixed implementation trades some of that absolute speed
+for FP32 current outputs.
 
 Every selected endpoint is reconstructed from its saved state, then run
 from image tensors through the actual frozen TorchScript prefix and chosen
-suffix code at both registered batch sizes. F/N/H/L or M controls use the
+suffix code at both fixed batch sizes. F/N/H/L or M controls use the
 same physically evaluated FP32 prefix. The original healthy coarse logits
 remain the reference. Full-precision replay and the approximate reference
 receive separate class, selective, NLL/ECE and logit-error checks. The fresh
 monitor uses RNG $14700001+\mathrm{seed}$, $1024$ inputs and tail allocation
 $0.05/2000$; the one-percent empirical and five-percent remainder gates are
 unchanged. Full-corpus output arrays are recovered for local recalculation
-of accuracy, disagreements, decision flows and certificates. This output
-replay is distinct from a second execution of the pretrained backbone.
+of accuracy, disagreements, decision flows and certificates. Local replay recalculates these metrics from the recovered outputs;
+the complete backbone forward is checked by the numerical driver.
 Serialized program sizes are collected after latency sampling, counting a
 modular prefix once. They measure exported code/constants, separately from
 runtime activation memory and process RSS; no size measurement selects an ABI.
 
 \input{served_frontier_table.tex}
 
-ResNet-18's selected actual serving has maximum class/selective disagreement $0.39\%$, with $60/60$ checks certified and largest remainder bound $0.0233$. Its full-precision control has maximum disagreement $0.00\%$ and largest logit error $8.68e-05$. The check count is three rules, two batch implementations and ten current endpoints, not independently trained old tasks.
+ResNet-18's selected actual serving has maximum class/selective disagreement $0.39\%$, with $60/60$ checks certified and largest remainder bound $0.0233$. Its full-precision control has maximum disagreement $0.00\%$ and largest logit error $8.68e-05$. Each set contains three rules, two batch implementations and ten current endpoints.
 
 At batch $1$, current/selected/full-reference serialized programs occupy $42.8/60.9/60.9$ MiB. At batch $128$, current/selected/full-reference serialized programs occupy $42.8/51.9/60.9$ MiB. These export sizes exclude activations and runtime libraries.
 
-ViT-B/32's selected actual serving has maximum class/selective disagreement $0.14\%$, with $60/60$ checks certified and largest remainder bound $0.0178$. Its full-precision control has maximum disagreement $0.00\%$ and largest logit error $7.25e-05$. The check count is three rules, two batch implementations and ten current endpoints, not independently trained old tasks.
+ViT-B/32's selected actual serving has maximum class/selective disagreement $0.14\%$, with $60/60$ checks certified and largest remainder bound $0.0178$. Its full-precision control has maximum disagreement $0.00\%$ and largest logit error $7.25e-05$. The same three rules and two batch implementations are checked at every endpoint.
 
 At batch $1$, current/selected/full-reference serialized programs occupy $334.0/361.1/388.1$ MiB. At batch $128$, current/selected/full-reference serialized programs occupy $334.0/361.0/388.1$ MiB. These export sizes exclude activations and runtime libraries.
 

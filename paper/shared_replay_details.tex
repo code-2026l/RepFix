@@ -1,9 +1,8 @@
 \subsection{Shared-Reference Replay}\label{app:shared_replay}
 
 The earlier one-encoder controls either restrict a common feature interface
-or learn a replacement readout. Shared-reference replay retains a different
-object: the healthy input-to-output function on a separate output path. Its
-current features need not support the old weights. The reference parameters
+or learn a replacement readout. Shared-reference replay retains the healthy input-to-output function
+on a separate path, freeing the current features to change. The reference parameters
 remain available, but their dense computation is shared with the current
 model. This access condition differs from repairing terminal features alone.
 No old-label or distillation loss is added to continuation.
@@ -28,8 +27,7 @@ network. Measured latency differs substantially from these arithmetic ratios.
 \caption{Shared products for the original sparse-row construction, followed by
 all ten fresh HAR and SNR outcomes. HAR reconstruction improves; sparse SNR
 gains over detachment but loses accuracy against unrestricted joint training.
-The dense follow-up below closes that accuracy gap. This earlier figure and
-its failed CPU targets are retained separately from the nonlinear-suffix study.}
+The dense follow-up below closes that accuracy gap. CPU cost remains above target.}
 \label{fig:shared_products}
 \end{figure}
 
@@ -40,8 +38,7 @@ The healthy ReLU activations vanish, whereas the change matrix has entries
 $\max\{i-j+\tfrac12,0\}$. It is lower triangular with diagonal $1/2$
 and hence has rank $n$. Row support supplies the invariant used in our
 construction: after any coordinatewise nonlinearity, $\delta a_1$ is still
-supported on $S$. This explains the hybrid restriction; it is not a lower
-bound against every possible implementation of dense low-rank updates.
+supported on $S$. This invariant motivates the hybrid restriction.
 
 The same identity applies to an identity residual block with fixed
 normalization. Updating $k$ output channels of its first convolution confines
@@ -72,11 +69,10 @@ saved full-joint endpoint we truncate the first- and second-map deltas by SVD,
 keep everything else fixed, and score the official test split
 (Table~\ref{tab:rank}). A truncated update is a member of the dense low-rank
 family, so a nonnegative gap proves that this structure can reproduce joint
-accuracy. A negative gap does not prove that no trained member can: the trained
-rank-$16/12$ SNR arm below reaches parity although rank $32$ is needed to
-reach the same accuracy tolerance when truncating this particular first-map
-update. This retrospective projection does not identify a necessary rank
-for a trained family or explain the sparse-to-dense gain by rank alone.
+accuracy. Training and truncation give different results: the trained rank-$16/12$
+SNR arm below reaches parity, whereas truncating the saved first-map update
+requires rank $32$ for the same tolerance. Thus this retrospective screen
+characterizes a saved update, rather than the necessary rank of a trained family.
 
 \begin{table}[h]
 \centering
@@ -116,9 +112,8 @@ prediction.
 
 The HAR gate rejects the same family: primary differences are $\DenseHarDevLow$
 to $\DenseHarDevHigh$ points on development while reconstruction improves, so no
-HAR configuration was confirmed. Extra capacity is not a free improvement; it
-improves this SNR endpoint but reduces HAR accuracy under the specified
-recipe. The sparse HAR arm and its confirmed
+HAR configuration was confirmed. The larger update family helps SNR and reduces HAR accuracy under the
+specified recipe. The sparse HAR arm and its confirmed
 reconstruction result are unchanged.
 
 The matched SNR current-only graph costs $21{,}184$ MACs after folding its
@@ -126,9 +121,7 @@ final affine map into the primary head. Dense replay adds $11{,}456$ MACs
 ($54.1\%$), versus $6{,}848$ ($32.3\%$) for sparse replay. The earlier
 $12{,}288$ count mixed an extra head already present in the current baseline
 with $128$ bias additions and divided by the unfused $24{,}576$-MAC encoder;
-we retain that historical record and use the matched graph here. Neither
-an SVD projection nor this chosen program supplies a lower bound on all
-compatible implementations. Measured latency is reported separately in
+we retain that historical record and use the matched graph here. Measured latency is reported in
 Appendix~\ref{app:shared_replay_cost}.
 
 Layerwise update rank also depends on the parameterization. The standard
@@ -161,7 +154,7 @@ primary-gain interval and mean accuracy within $0.5$ points of unrestricted
 joint training. Eligible configurations are ranked by extra MACs. This
 selects HAR $(4,4)$ and SNR $(16,8)$. No test score enters selection.
 
-The native development cost screen fails the registered batch-$1/1024$
+The native development cost screen fails the fixed batch-$1/1024$
 limits of $1.20/1.10$. This failure is recorded before confirmation; the
 fixed plan permits a partial utility/compatibility frontier. Twenty new warm
 checkpoints, seeds $2500$--$2509$ on each task, then train the frozen
@@ -187,7 +180,7 @@ $1.092\%$ on HAR and $0.917\%$ on SNR. These findings establish useful
 learning with class and selective compatibility, while leaving a cost
 failure and an SNR capacity cost.
 
-The dense companion study was registered separately before its outcomes. Its
+The dense companion study was planned separately before its outcomes. Its
 grid is $(s,r)\in\{(16,12),(24,16),(32,24)\}$; the same development seeds,
 warm checkpoints, orders, initialization rule and gate decide selection, and
 seeds $2520$--$2529$ confirm the chosen pair. HAR fails the primary gate at all
@@ -201,9 +194,8 @@ $8.84\times10^{-6}$ on SNR; their actual decisions are the ones monitored.
 An independent raw-state replay verifies all $40$ structured endpoints and
 $120$ contracts. Packed and independently merged current serving differ by
 at most $1.53\times10^{-5}$, with two near-tied current classifications
-changing across all replayed endpoints. Thus the algebraic identity is not
-a claim of bitwise equality after floating-point reassociation. Reported
-utility uses the actual packed two-output implementation.
+changing across all replayed endpoints. Floating-point reassociation accounts for these near-tie differences.
+Reported utility uses the actual packed two-output implementation.
 
 \subsection{Native Serving and Strong Reuse Controls}\label{app:shared_replay_cost}
 

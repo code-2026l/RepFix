@@ -5,9 +5,7 @@ An ImageNet-V1 ResNet-18 emits $512$ features for CIFAR-100 at $64\times64$.
 The current head predicts $100$ fine classes and the legacy head predicts
 $20$ coarse classes~\citep{krizhevsky2009cifar}. Both healthy heads fit the same
 $20\%$ labeled subset. Coarse labels are excluded from continuation and OLS
-fitting; they remain available to an explicitly supervised refit. Because the
-coarse label follows from the fine label, this setup does not claim that coarse
-supervision is inaccessible.
+fitting; they remain available to an explicitly supervised refit. The coarse label is derivable from the fine label.
 
 Seed $1800$ partitions the official training split into $42{,}952$ fitting,
 $2{,}048$ isolated anchor and $5{,}000$ validation inputs. Healthy features are
@@ -51,9 +49,7 @@ $44.56\%$ of coarse decisions, above the $5\%$ budget. OLS improves coarse
 accuracy while leaving $41.20\%$ of decisions changed. The stronger P
 coefficients $1$ and $10$ produce nonfinite losses. The bounded queue stops
 after these two failures: B ($0.1$) is interrupted, and B ($1,10$) are never
-launched. These are unmeasured branches, not negative feature-alignment
-endpoints. The failed utility gate independently rules out advancing this
-recipe. We do not retune it or open the official test split. The saved complete
+launched. The B branches remain unmeasured. The failed utility gate ends the screen
+before official test evaluation. The saved complete
 endpoints undergo independent checkpoint/reader replay; failure logs and queue
-states are retained separately. This screen establishes neither a cross-task
-positive construction nor generalization to foundation-model scale.
+states are retained separately. This initial full-backbone recipe yields no positive utility/compatibility result.
