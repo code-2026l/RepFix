@@ -42,6 +42,10 @@ joint and stored D on the two cached prefix views. This tests instance-pair
 recovery, not semantic retrieval. Report four-reference paired differences;
 retain all outcomes, and do not change any primary gate using this secondary
 post-training measure.
+Also apply the unchanged healthy coarse head directly to the updated suffix
+features, as a descriptive need-for-protection control. Record its class and
+threshold disagreement, negative flips and feature-trace ratio. It does not
+enter implementation selection or the certificate family.
 
 No official-test inputs, new labels for compatibility or GPU. Code, analysis,
 figures, manuscript integration and builds stay local. Remote roots stay opaque;

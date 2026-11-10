@@ -24,6 +24,8 @@ def main(a):
         for name in ['current','detached']:
             assert float((raw[name+'_logits'].argmax(1)==labels).double().mean())==record['native'][name]['acc']
             assert float(raw['pair_retrieval_hits'][name].double().mean())==record['native']['cached_prefix_pair_retrieval'][name]
+        unprotected=decisions(raw['unprotected_logits'],thresholds)!=old_decision
+        assert all(int(unprotected[:,j].sum())==round(len(labels)*c['disagreement']) for j,c in enumerate(record['native']['unprotected_contracts'].values()))
         rows.append(dict(endpoint=path.stem,consumer_checks=checks,state_sha256=record['state_sha256']))
     assert len(rows)==12
     result=dict(complete=True,endpoints=rows,total_consumer_checks=sum(r['consumer_checks'] for r in rows),all_decision_counts_exact=True,

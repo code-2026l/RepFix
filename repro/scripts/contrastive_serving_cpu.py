@@ -63,8 +63,9 @@ def main(a):
     setup_s=time.time()-setup;audits={};timings={};arrays={}
     if a.mode=='audit':
         physical=torch.cat([prefix(late.preprocess(images[j:j+128],size)) for j in range(0,len(images),128)])
-        raw_current=late.linear(base.embeds(current,physical),reader)
-        old=late.linear(torch.cat([healthy(b) for b in physical.split(128)]),legacy)
+        current_features=base.embeds(current,physical);raw_current=late.linear(current_features,reader)
+        old_features=torch.cat([healthy(b) for b in physical.split(128)]);old=late.linear(old_features,legacy)
+        unprotected=late.linear(current_features,legacy)
         assert record['baseline']
         control=json.loads(a.baseline_record.read_text());info=next(b for b in control['branches'] if b['mode']=='D')
         bp=a.baseline_record.parent/(a.baseline_record.stem+'_states')/'D.pt';assert base.digest(bp)==info['state_sha256']==record['baseline']['state_sha256']
@@ -72,6 +73,7 @@ def main(a):
         dz=late.linear(base.embeds(dmodel,physical),detached['reader'])
         monitor=torch.randperm(len(val),generator=torch.Generator().manual_seed(7300))[:1024].numpy()
         arrays=dict(labels=y,coarse=coarse,healthy_logits=old,detached_logits=dz,current_logits=raw_current,thresholds=ref['thresholds'],served={})
+        arrays['unprotected_logits']=unprotected
         for batch in ['1','128']:
             audits[batch]={}
             for role,key in [('chosen','protected'),('full_precision','full_precision_protected')]:
@@ -92,6 +94,8 @@ def main(a):
             difference_from_cached_primary=paired.metrics(raw_current,y)['acc']-record['validation']['acc'])
         retrieval={name:paired_retrieval(model,cache['x'][:,val],state['head']) for name,model in [('current',current),('detached',dmodel)]}
         native['cached_prefix_pair_retrieval']={name:float(hits.double().mean()) for name,hits in retrieval.items()}
+        native['unprotected_contracts']=evaluate_contracts(unprotected,old,coarse,ref['thresholds'])
+        native['feature_trace_ratio']=float(current_features.var(0,unbiased=False).sum()/old_features.var(0,unbiased=False).sum())
         arrays['pair_retrieval_hits']=retrieval
     else:
         native=None

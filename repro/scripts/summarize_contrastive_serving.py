@@ -42,6 +42,9 @@ def main(a):
     passes=gain['ci95'][0]>0 and selected['maximum_disagreement']<=.01 and selected['certified']==selected['consumer_checks'] and selected['current_class_changes']==0 and selected['batch1_individual_current_class_changes']==0 and all(cost[b]['chosen']['upper_ci_within_budget'] for b in ['1','128'])
     result=dict(complete=True,reference_groups=groups,native_gain_pp=gain,cost=cost,fidelity=fidelity,combined_native_gate=passes,
         secondary_paired_view_retrieval_gain_pp=interval([r['paired_view_retrieval_gain_pp'] for r in groups]),
+        unprotected_class_disagreement=interval([np.mean([r['native']['unprotected_contracts']['classification']['disagreement'] for r in native if r['reference_seed']==ref]) for ref in range(6201,6205)]),
+        maximum_unprotected_consumer_disagreement=max(c['disagreement'] for r in native for c in r['native']['unprotected_contracts'].values()),
+        feature_trace_ratio=interval([np.mean([r['native']['feature_trace_ratio'] for r in native if r['reference_seed']==ref]) for ref in range(6201,6205)]),
         source_sha256={Path(__file__).name:hashlib.sha256(Path(__file__).read_bytes()).hexdigest()},
         maximum_cached_primary_difference=max(abs(r['native']['difference_from_cached_primary']) for r in native),
         scope='four fitted references, one shared pretrained checkpoint, clean validation population; timing seed6310 per reference')

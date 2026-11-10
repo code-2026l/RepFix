@@ -1,5 +1,6 @@
 import torch
 from contrastive_benefit_cpu import contrastive
+from contrastive_serving_cpu import paired_retrieval
 
 
 def test_paired_view_order_and_common_batch_permutation_preserve_the_objective():
@@ -15,3 +16,10 @@ def test_correct_positives_improve_loss_and_both_views_have_gradients():
     assert loss<contrastive(a,b.roll(1,0),mu,sd)
     loss.backward();assert a.grad is not None and b.grad is not None
     assert torch.isfinite(a.grad).all() and torch.isfinite(b.grad).all()
+
+
+def test_bidirectional_retrieval_checks_instance_pair_identity():
+    from torch import nn
+    features=torch.eye(8);head=dict(mean=torch.zeros(8),sd=torch.ones(8))
+    assert paired_retrieval(nn.Identity(),torch.stack([features,features]),head).all()
+    assert not paired_retrieval(nn.Identity(),torch.stack([features,features.roll(1,0)]),head).any()
