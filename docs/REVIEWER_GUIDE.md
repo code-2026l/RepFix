@@ -1,24 +1,22 @@
 # Reading the evidence
 
-The main result is a separation: a shared representation can retain task
-information while an existing affine readout stops working. Pure scale admits
-exact boundaries; trained updates require additional geometric and
-consumer-specific checks. The intervention methods are established controls.
+The paper separates retained information from compatibility with an existing
+consumer. Its new construction shares a healthy computation while structured
+updates learn current nonlinear features. Fresh useful-learning evidence now
+spans HAR and SNR, with explicit accuracy and serving-cost failures.
 
-| Question | Read first | Numerical evidence |
+| Question | Read first | Evidence |
 |---|---|---|
-| Is the old reader broken while information remains? | Main Sections 1--2, Figure 1 | Matched continuation and reconstruction records |
-| What does the cheap gradient probe omit? | Main Section 3, Appendix A | Signed checkpoint/Adam audits and executable boundary checks |
-| Can useful learning retain the old interface? | Main Section 5, Appendix H.19 | Fresh HAR seeds 1300--1309, original fixed monitor and serving criterion |
-| Are the controls competitive and contracts explicit? | Appendix H.20 | Matched full-feature/OLS controls, negative flips and selective consumers |
-| Does this transfer to a stronger different-task consumer? | Appendix H.22 | Stopped ResNet fine-to-coarse screen; no official test outcomes |
-| Can the article and figures be reconstructed? | `docs/REPRODUCIBILITY.md` | `REVIEW_CHECKS.json` and `ARTIFACT_MANIFEST.json` |
+| Can information survive a broken readout? | Sections 1--2, Figure 1 | Matched continuation, unlabeled scale repair, reconstruction |
+| What does conflict omit? | Section 3, Appendix A | Signed variance/Adam audits and local validity assumptions |
+| Can learning retain class and confidence decisions? | Section 5, Figure 2, Appendix I | 20 fresh shared-replay runs, 120 monitored contracts |
+| Does the construction beat unrestricted updates or reuse baselines? | Appendix I.2--I.3 | SNR noninferiority failure; matched native absolute times and ratios |
+| Does it transfer to ResNet-18? | Appendix I.4 | All six capacity candidates fail the fixed gain gate; test unused |
+| Is a new cell loss better than standard distillation? | Appendix I.5--I.6 | 426 development endpoints; stop before confirmation |
+| Are earlier positives and negatives preserved? | Appendix H | Original and fresh HAR, SNR, CNN, alignment and stopped vision studies |
+| Can the release be reconstructed? | docs/REPRODUCIBILITY.md | Manifest, focused tests, figure artists and page comparisons |
 
-The original HAR 9/10 study, its retrospective audit, the fresh HAR 10/10
-confirmation and the latest larger-bank audit are separate studies. Each
-retains its original monitor, access and verdict. A new audit does not rescue
-or invalidate an earlier fixed decision by changing its allocation.
-
-The open scientific risks are the size of the increment over known methods,
-transfer of a positive useful-learning result beyond HAR, and compatibility
-with probability-dependent consumers. See `docs/FINAL_REVIEW_20261110.md`.
+Class decisions, threshold decisions and complete logits are different
+contracts. Reference replay also has different access from repairing the new
+features alone. The narrative and figures state those differences explicitly.
+See docs/FINAL_REVIEW_20261110.md for the scientific assessment and remaining gap.

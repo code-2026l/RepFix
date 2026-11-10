@@ -1,7 +1,7 @@
 # Reproducing the supplementary artifact
 
 Run commands from the extracted `repfix_supplementary` directory. The supplied
-PDF is the polished manuscript: nine main pages and 74 pages in total.
+PDF is the polished manuscript: nine main pages and 81 pages in total.
 
 ## File and record checks
 
@@ -37,7 +37,7 @@ thread. The hardware timings reported in the paper retain their original setup.
 python repro/scripts/verify_supplement.py --tests
 ```
 
-The 65 tests cover finite-corpus disagreement bounds, repair availability, affine
+The 91 tests cover finite-corpus disagreement bounds, repair availability, affine
 scale boundaries, normalized-head nullspaces, constrained affine folding,
 nonlinear fusion, exact-count selection at a zero-benefit tie, invertible chart folding,
 vision access/split controls, and teacher-head fitting on affine and nonlinear
@@ -52,7 +52,7 @@ python repro/scripts/verify_supplement.py --figures
 ```
 
 The helper runs `repro/scripts/render_paper_figures.py` in a temporary copy. The
-thirteen coordinated generators reconstruct all 21 included figures from shipped
+coordinated generators reconstruct all 23 included figures from shipped
 records. It compares plotted numerical artists and dimensions with the release
 manifest. Files are exported as PDF, PNG, and SVG at a 5.5-inch width.
 
@@ -187,3 +187,34 @@ raw logs and 55 model-state files remain local outside the compact archive.
 Scrubbed review logs are in `logs/final_completion/`. The default verifier checks
 these recorded checks and preserved negative decisions; it does not load the
 excluded tensors or rerun training. See `docs/FINAL_REVIEW_20261110.md` for scope.
+
+## Shared-reference replay and consumer-cell studies
+
+The immutable 2026-11-10 plans specify the fixed cell grids, class-only ablation,
+shared-replay architecture, development choices, failed cost verdict and later
+capacity check. `cell_development_stop.json` preserves the formal class-only
+HAR eligibility and the separate futility stop; it does not report test outcomes.
+
+`shared_replay_cpu.py` produces the six development records. The frozen choice
+is `shared_replay_development_choice.json`. `shared_replay_confirm_cpu.py` trains
+the 20 new confirmation seeds and full-update controls. `summarize_shared_replay.py`
+computes paired intervals. `audit_shared_replay_cpu.py` reconstructs the two
+functions from raw states; `benchmark_shared_replay_cpu.py` and the separate
+Inductor pilot retain absolute times, ratios, setup and strong reuse controls.
+The numerical runtime is CPU PyTorch 2.7.1; dataset-free review uses the local
+environment listed above. Timing results are not hardware-independent.
+
+`vision_shared_replay_cpu.py` and `vision_replay_capacity_cpu.py` produce the two
+fixed ResNet grids; `audit_vision_replay_cpu.py` independently reloads all ten
+completed endpoint states. Both grids stop before official test scoring. The
+study is last-block primary-task adaptation, not full-backbone or auxiliary
+transfer. `shared_reference_replay.py` and `shared_reference_vision.py` implement
+the real-arithmetic identities and separately measured serving arithmetic.
+
+`recovery_replay_execution_audit.json` records every new queue and file digest,
+all 630 transferred `.pt` files, approximately 1.20 GB remote bytes, and the
+retained technical failures. Source bytes that differ from current helpers
+are preserved by digest under `repro/source_versions/`. Scrubbed technical
+tracebacks are in `logs/shared_replay/`. These omitted tensor files are needed
+for a fresh prediction replay; the compact verifier checks the shipped records
+and hashes rather than claiming to load them.

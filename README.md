@@ -2,7 +2,7 @@
 
 **Silent Scale Shift: When Shared Updates Break Existing Readouts**
 
-This artifact accompanies the 74-page manuscript in
+This artifact accompanies the 81-page manuscript in
 [`paper/RepFix_ICLR2027.pdf`](paper/RepFix_ICLR2027.pdf), with nine main-text pages.
 It contains the source, complete recorded outcomes, analysis and figure scripts,
 fixed study protocols, and structural checks.
@@ -27,11 +27,22 @@ A distinct-consumer ResNet screen stops at its utility/numerical gates, without
 opening the official test split. See [the final review](docs/FINAL_REVIEW_20261110.md)
 and [reading guide](docs/REVIEWER_GUIDE.md) for the supported claims and open gaps.
 
+
+The shared-replay study adds an exact two-version computation and 20 fresh
+HAR/SNR runs: HAR reconstruction MSE is 0.929 of detachment; SNR primary gain
+is +0.678 points [0.383, 0.973]. All 120 class/selective contract audits certify
+with zero observed changes. SNR still loses 0.792 points to unrestricted joint
+training, CPU cost exceeds budget, and both fixed ResNet capacity screens stop
+before official test scoring. [The assessment](docs/FINAL_REVIEW_20261110.md)
+separates this partial frontier from a complete deployment claim.
+
+![Shared-reference replay](paper/figures/fig_shared_replay.png)
+
 ## Paper and downloads
 
-- [Read the final paper](paper/RepFix_ICLR2027.pdf) — 9 main pages, 74 pages total.
-- [Download supplementary material](artifacts/2026-11-10/RepFix_FinalEvidence_20261110_supplement.zip)
-- [Download manuscript source and evidence](artifacts/2026-11-10/RepFix_FinalEvidence_20261110_source.zip)
+- [Read the final paper](paper/RepFix_ICLR2027.pdf) — 9 main pages, 81 pages total.
+- [Download supplementary material](artifacts/2026-11-10/RepFix_SharedReplay_20261110_supplement.zip)
+- [Download manuscript source and evidence](artifacts/2026-11-10/RepFix_SharedReplay_20261110_source.zip)
 - [Reproduction guide](docs/REPRODUCIBILITY.md) · [Evidence index](docs/EVIDENCE_INDEX.md)
 
 ![Readout compatibility overview](paper/figures/fig_readout_overview.png)
@@ -73,8 +84,8 @@ See [the reproduction guide](docs/REPRODUCIBILITY.md) for each check and its inp
 
 ## What can be reproduced
 
-The archive supports dataset-free file/provenance checks, 65 focused structural
-tests, reconstruction of all 21 included figures from recorded results, and a local
+The archive supports dataset-free file/provenance checks, 91 focused structural
+tests, reconstruction of all 23 included figures from recorded results, and a local
 LaTeX build. The validation choice and failed nonlinear development gate can be
 inspected without rerunning training.
 

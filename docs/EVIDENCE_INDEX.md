@@ -129,3 +129,18 @@ Full-feature HAR alignment is competitive; auxiliary-learning readers' selective
 counts remain 0/10 under the new monitor and bank. Detached + OLS has 4/10 and
 3/10 without reconstruction progress. Earlier confirmation counts are unchanged.
 See `docs/FINAL_REVIEW_20261110.md` and `docs/REVIEWER_GUIDE.md`.
+
+## Shared-reference construction and fixed loss screens
+
+| Claim or figure | Records | Driver or analysis |
+|---|---|---|
+| Figure 2: exact replay and fresh HAR/SNR outcomes | shared_replay_development/, shared_replay_confirmation/, shared_replay_confirmation_summary.json | shared_reference_replay.py, shared_replay_cpu.py, shared_replay_confirm_cpu.py, summarize_shared_replay.py, plot_shared_replay.py |
+| Native cost failure and reuse controls | shared_replay_native_development.json, shared_replay_inductor_development.json | benchmark_shared_replay_cpu.py, benchmark_replay_inductor_cpu.py |
+| Independent 40-endpoint replay | shared_replay_independent_audit.json | audit_shared_replay_cpu.py |
+| Two stopped ResNet grids | vision_shared_replay/, vision_shared_replay_choice.json, vision_shared_replay_independent_audit.json | vision_shared_replay_cpu.py, vision_replay_capacity_cpu.py, audit_vision_replay_cpu.py, plot_replay_vision.py |
+| Failed cell-loss development; no test confirmation | cell_stage_a/, cell_stage_b/, cell_class_secondary/, cell_development_stop.json | consumer_cells.py, recovery_readers.py, select_cell_recovery.py, select_joint_cells.py |
+| 630 new states retrieved; CPU queues ended | recovery_replay_execution_audit.json | Per-file SHA-256 and preserved source versions |
+
+Paths in the records column are relative to repro/results/CPUCONT/. The prior
+release assessment is preserved in docs/archive/. No historical monitor or
+negative verdict is replaced by the newer study.

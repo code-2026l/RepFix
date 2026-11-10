@@ -22,16 +22,18 @@ def main():
                    'repro/scripts/plot_chart_confirmation.py',
                    'repro/scripts/plot_protected_audit.py',
                    'repro/scripts/plot_alignment_confirmation.py',
-                   'repro/scripts/plot_consumer_contracts.py']:
+                   'repro/scripts/plot_consumer_contracts.py',
+                   'repro/scripts/plot_shared_replay.py',
+                   'repro/scripts/plot_replay_vision.py']:
         runpy.run_path(str(ROOT / script), run_name='__main__')
-    assert len(EXPORTS) == 21
+    assert len(EXPORTS) == 23
     assert all(abs(v['width_inches'] - 5.5) < 1e-10 for v in EXPORTS.values())
     report = dict(figures=EXPORTS, figures_rebuilt=len(EXPORTS),
                   all_vector_type42=True, all_text_within_canvas=True,
                   legacy_visual_changes_preserve_numerical_artists=True)
     (ROOT / 'paper/figures/publication_figure_manifest.json').write_text(
         json.dumps(report, indent=2) + '\n',encoding='utf-8',newline='\n')
-    print('Rebuilt all twenty-one included figures at final 5.5-inch width.')
+    print('Rebuilt all twenty-three included figures at final 5.5-inch width.')
 
 
 if __name__ == '__main__':

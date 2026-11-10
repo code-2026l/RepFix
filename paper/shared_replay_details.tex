@@ -1,0 +1,164 @@
+\subsection{Shared-Reference Replay}\label{app:shared_replay}
+
+The earlier one-encoder controls either restrict a common feature interface
+or learn a replacement readout. Shared-reference replay retains a different
+object: the healthy input-to-output function on a separate output path. Its
+current features need not support the old weights. The reference parameters
+remain available, but their dense computation is shared with the current
+model. This access condition differs from repairing terminal features alone.
+No old-label or distillation loss is added to continuation.
+
+For a width-$m$ two-nonlinearity trunk, first-map changes have row support
+$S$, $|S|=k$, and the second-map change is $UV$ of rank at most $r$.
+Proposition~\ref{prop:shared_replay} evaluates both nonlinearities without
+linearizing the update. The final affine encoder map and current task head
+remain trainable; their product is folded for native serving. The healthy
+final affine map can similarly be folded into the old head. One healthy
+dense first and second map is stored, along with sparse/low-rank updates
+and both heads. The serving package omits a second full encoder.
+Extra multiply--accumulates (MACs), excluding biases and elementwise work,
+are $kd+km+2rm+Cm$ for input dimension $d$ and $C$ old outputs.
+For the selected HAR and SNR configurations these are $3{,}396$ and
+$6{,}848$, respectively: $8.4\%$ and $32.3\%$ above the merged current
+network. Measured latency differs substantially from these arithmetic ratios.
+
+Low-rank parameters alone do not give a low-rank activation difference.
+For $n$ scalar inputs $x_i=i$, take $W_1^0=0$, biases
+$b_j=-(j-\tfrac12)$, and the rank-one update $\Delta W_1=\mathbf1$.
+The healthy ReLU activations vanish, whereas the change matrix has entries
+$\max\{i-j+\tfrac12,0\}$. It is lower triangular with diagonal $1/2$
+and hence has rank $n$. Row support supplies the invariant used in our
+construction: after any coordinatewise nonlinearity, $\delta a_1$ is still
+supported on $S$. This explains the hybrid restriction; it is not a lower
+bound against every possible implementation of dense low-rank updates.
+
+The same identity applies to an identity residual block with fixed
+normalization. Updating $k$ output channels of its first convolution confines
+the activation difference to those channels. A $3\times3$ rank-reducing
+convolution followed by a $1\times1$ expansion represents the second update.
+Adding the unchanged shortcut and applying ReLU gives the merged current
+block in real arithmetic. Before the visual study, fixed BN is folded into
+the healthy convolutions; this defines the numerical reference from the start.
+
+\subsection{Development, Selection and Fresh Confirmation}\label{app:shared_replay_protocol}
+
+The fixed plan precedes development and is included with its source hashes.
+Development uses saved healthy checkpoints, optimizer states and fitting/
+validation splits for seeds $800$--$802$ on both tasks. The four configurations
+are $(k,r)\in\{(0,4),(4,4),(8,8),(16,8)\}$. On $1{,}024$ fitting inputs,
+the original joint-loss gradient ranks first-map rows and initializes the
+right second-map factors from its singular vectors. Update amplitudes start
+at zero. This training-only initialization rule is fixed before outcomes.
+The paired detached and joint arms share support, factors, inherited moments,
+and future minibatches. New update parameters start with zero Adam moments.
+We retain the original unclipped Adam, learning rate $10^{-3}$, batch $256$,
+$30/25$ HAR/SNR epochs, doses $100/1$, and $10\%/20\%$ primary labels.
+
+Development requires every old-contract disagreement to be at most $1\%$.
+HAR additionally requires mean reconstruction ratio at most $0.95$ and mean
+primary difference at least $-0.5$ points; SNR requires a positive paired
+primary-gain interval and mean accuracy within $0.5$ points of unrestricted
+joint training. Eligible configurations are ranked by extra MACs. This
+selects HAR $(4,4)$ and SNR $(16,8)$. No test score enters selection.
+
+The native development cost screen fails the registered batch-$1/1024$
+limits of $1.20/1.10$. This failure is recorded before confirmation; the
+fixed plan permits a partial utility/compatibility frontier. Twenty new warm
+checkpoints, seeds $2500$--$2509$ on each task, then train the frozen
+structured pair and ordinary full-update detached/joint controls. These are
+new training seeds on the existing data splits, not new populations.
+Fresh $1{,}024$-input monitors use RNG $10700001+\text{seed}$, plus $100000$
+for HAR, and tail probability $0.05/600$. Each evaluates classification and
+two fixed confidence thresholds calibrated on healthy fitting features.
+Certificates concern the finite test-corpus remainder with a five-point
+budget. Utility intervals are paired, two-sided $95\%$ $t$ intervals over
+all ten seeds; the criteria and cost limits are unchanged.
+
+\input{shared_replay_table.tex}
+
+HAR confirms reconstruction progress and primary noninferiority relative
+to its structured detached arm. SNR confirms positive auxiliary transfer,
+but misses the half-point noninferiority criterion against full joint
+training. The unrestricted SNR pair gains $1.073$ points; the structured
+pair gains $\ReplaySnrGain$. Both nonlinear layers change their parameters
+and observed ReLU gates. All $120$ old-contract bounds pass, with no
+observed decision changes. The largest remaining-disagreement bound is
+$1.092\%$ on HAR and $0.917\%$ on SNR. These findings establish useful
+learning with class and selective compatibility, while leaving a cost
+failure and an SNR capacity cost.
+
+The full reference path reproduces stored healthy logits exactly under
+the declared evaluation arithmetic. The compressed native-float32 old
+heads have maximum errors $1.27\times10^{-5}$ on HAR and
+$8.84\times10^{-6}$ on SNR; their actual decisions are the ones monitored.
+An independent raw-state replay verifies all $40$ structured endpoints and
+$120$ contracts. Packed and independently merged current serving differ by
+at most $1.53\times10^{-5}$, with two near-tied current classifications
+changing across all replayed endpoints. Thus the algebraic identity is not
+a claim of bitwise equality after floating-point reassociation. Reported
+utility uses the actual packed two-output implementation.
+
+\subsection{Native Serving and Strong Reuse Controls}\label{app:shared_replay_cost}
+
+An isolated four-thread CPU process measures both arms of all six selected
+development endpoints. Both outputs use float32; the merged current-only
+baseline folds the same final affine maps and emits the same current
+function in real arithmetic. We compare eager and TorchScript serving,
+two independently evaluated functions, and a stronger control sharing the
+healthy first map but recomputing both dense second maps. Packed replay
+combines small products before serving. Each measurement warms all paths,
+alternates operation order, and retains $71$ repetitions. Table~\ref{tab:replay_cost}
+reports medians across the six paired endpoint measurements per task.
+
+\input{shared_replay_cost_table.tex}
+
+Kernel launches, strided intermediates and small products dominate these
+small networks. At batch $1$, sharing fewer arithmetic operations is slower
+than evaluating two independently folded functions. At batch $1024$, HAR
+replay is modestly faster than that control; SNR replay is slower. A separate
+fixed-shape Inductor experiment on the joint seed-$800$ states yields
+matched packed/current ratios $1.44/1.46$ for HAR and $1.50/1.73$ for SNR
+at batch $1/1024$, still above budget. Its current-only batch-$1$ latencies
+are $41.8/38.9\,\mu$s, slower than TorchScript's $20.6/16.8\,\mu$s.
+Initial setup ranges from $0.10$ to $13.88$ seconds across compiled paths.
+Both absolute times and ratios are retained; the smaller compiled ratio
+does not establish a faster deployment. No universal latency claim follows
+from the exact identity or MAC count.
+
+\subsection{ResNet-18 Capacity Boundary}\label{app:shared_replay_vision}
+
+The prospective ImageNet-V1 ResNet-18/CIFAR-100 screen uses $64\times64$
+images, $42{,}952$ fitting, $5{,}000$ validation and $2{,}048$ isolated
+anchor images, and a fixed $20\%$ fine-labeled fitting mask. Healthy fine-100
+and coarse-20 heads use the same labeled subset. Coarse labels are not used
+in continuation; their derivability from fine labels is explicit. Earlier
+blocks and normalization are fixed; only the last identity-residual block
+can change. Current-head normalization remains fixed to healthy labeled
+features. Three AdamW epochs use identical original fitting-index orders,
+batch $128$, head learning rate $10^{-3}$ and weight decay $10^{-4}$.
+The ordinary dense-block control uses learning rate $10^{-4}$.
+
+The initial $(k,r)=(0,8),(8,8),(16,16)$ screen at update rate $10^{-3}$
+does not pass the prescribed two-point gain over both healthy and head-only
+accuracy, with a half-point tolerance against the dense control. A second
+fixed capacity screen, declared before execution, tests $(64,32),(128,64),
+(256,128)$ at the dense block's update rate $10^{-4}$. Figure~\ref{fig:replay_vision}
+retains all six outcomes. The largest configuration reaches $45.30\%$,
+against $43.74\%$ healthy, $43.48\%$ head-only and $45.74\%$ dense.
+Its $1.56$-point net gain still misses the fixed two-point gate. Every old
+decision is unchanged, but neither screen proceeds to more development
+seeds or official test scoring. A folded-bias gradient initialization error
+before the first continuation is retained as a technical failure, separately
+from these completed scientific outcomes.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/fig_replay_vision.pdf}
+\caption{All six ResNet-18 shared-replay capacity candidates at seed $2600$.
+Bars show validation accuracy gain over the healthy fine head. The dense
+last-block control reaches the fixed two-point gate; the structured updates
+do not. The two grids use their prospectively fixed update rates. Old coarse
+class and selective decisions are unchanged. This development screen uses
+no official test examples and is not an auxiliary-benefit study.}
+\label{fig:replay_vision}
+\end{figure}

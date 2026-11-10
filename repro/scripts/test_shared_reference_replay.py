@@ -69,3 +69,12 @@ def test_packed_and_prefix_serving_preserve_both_functions(k):
     p=u.serving();x=torch.randn(29,9);expected=serve_mlp(x,p)
     for actual in [serve_packed_mlp(x,packed_serving(p)),serve_prefix_mlp(x,p,merged_serving(p))]:
         assert all(torch.allclose(a,b,atol=3e-6,rtol=2e-6) for a,b in zip(actual,expected))
+
+
+def test_rank_one_weight_update_can_have_full_rank_activation_difference():
+    n=8;x=torch.arange(1,n+1,dtype=torch.float64).reshape(n,1)
+    old=torch.zeros(n,1,dtype=torch.float64);delta=torch.ones_like(old);bias=-(torch.arange(n,dtype=torch.float64)+.5)
+    changes=F.relu(F.linear(x,old+delta,bias))-F.relu(F.linear(x,old,bias))
+    assert torch.linalg.matrix_rank(delta)==1
+    assert torch.linalg.matrix_rank(changes)==n
+    assert torch.allclose(torch.diag(changes),torch.full((n,),.5,dtype=torch.float64))

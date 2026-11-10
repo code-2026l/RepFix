@@ -25,7 +25,10 @@ TESTS = [
     'test_legacy_head_fit.py',
     'test_alignment_objectives.py',
     'test_consumer_contracts.py',
+    'test_consumer_cells.py','test_recovery_readers.py',
+    'test_shared_reference_replay.py','test_shared_reference_vision.py',
 ]
+EXPECTED_TESTS=91
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -300,6 +303,78 @@ def verify_files(root):
             any(q['running'] or not q['finished'] or q['max_workers']>2 for q in execution['queues'].values())):
         raise ValueError('Completion resource/transport audit is incomplete')
 
+    # Loss-only routes remain stopped before test, including the formally
+    # eligible class-only HAR candidate that was dominated by standard KL.
+    for folder,pattern,count,endpoints in [('cell_stage_a','a',6,19),('cell_stage_b','b',6,36),('cell_class_secondary','s',6,16)]:
+        family=[name for name in files if re.fullmatch(base+folder+'/'+pattern+r'\d{3}\.json',name)]
+        if len(family)!=count:raise ValueError('Incomplete cell development: '+folder)
+        for name in family:
+            row=json.loads((root/name).read_text())
+            if (not row['complete'] or row['phase']!='development' or row['smoke'] or len(row['branches'])!=endpoints or
+                    row['splits']['test_metrics_computed'] or any('test' in b for b in row['branches'])):
+                raise ValueError('Cell development scope changed: '+name)
+    stop=json.loads((root/base/'cell_development_stop.json').read_text())
+    if (any(stop['primary_three_consumer_gate'].values()) or not stop['secondary_har_gate_passed'] or
+            stop['test_confirmation_started'] or not stop['futility_stop_is_additional_development_judgment']):
+        raise ValueError('Cell development verdict or stopping scope changed')
+    replay_choice=base+'shared_replay_development_choice.json';choice_sha=digest(root/replay_choice)
+    replay_dev=[name for name in files if re.fullmatch(base+r'shared_replay_development/d\d{3}\.json',name)]
+    replay_confirm=[name for name in files if re.fullmatch(base+r'shared_replay_confirmation/c\d{3}\.json',name)]
+    if (len(replay_dev),len(replay_confirm))!=(6,20):raise ValueError('Incomplete shared-replay evidence')
+    for name in replay_dev:
+        row=json.loads((root/name).read_text())
+        if not row['complete'] or row['phase']!='development' or row['smoke'] or len(row['branches'])!=8 or row['splits']['test_metrics_computed']:
+            raise ValueError('Shared-replay development scope changed')
+    replay_records=[]
+    for name in replay_confirm:
+        row=json.loads((root/name).read_text());replay_records.append(row)
+        if (not row['complete'] or row['phase']!='confirmation' or row['selection_sha256']!=choice_sha or
+                not 2500<=row['seed']<=2509 or len(row['branches'])!=2 or set(row['full_controls'])!={'detach','joint'}):
+            raise ValueError('Shared-replay confirmation changed: '+name)
+        if len({b['minibatch_order_sha256'] for b in [*row['branches'],*row['full_controls'].values()]})!=1:
+            raise ValueError('Shared-replay future orders differ')
+        for b in row['branches']:
+            if b['test']['changed_first_relu_gates']<=0 or b['test']['changed_second_relu_gates']<=0:
+                raise ValueError('A nonlinear update did not change its gates')
+            for c in b['test']['contracts'].values():
+                cert=c['certificate']
+                if (c['disagreement']!=0 or not cert['certified'] or cert['monitor_examples']!=1024 or
+                        cert['allocated_tail_probability']!=.05/600):
+                    raise ValueError('Shared-replay consumer evidence changed')
+    summary=json.loads((root/base/'shared_replay_confirmation_summary.json').read_text())
+    if summary['cost_gate_passed'] or not summary['domains']['har']['utility_compatibility_confirmed'] or summary['domains']['radioml']['utility_compatibility_confirmed']:
+        raise ValueError('The partial frontier was upgraded to a complete target')
+    for domain in ['har','radioml']:
+        rows=[r for r in replay_records if r['domain']==domain]
+        if {r['seed'] for r in rows}!=set(range(2500,2510)):raise ValueError('Fresh replay seeds differ')
+        pairs=[{b['mode']:b for b in r['branches']} for r in rows]
+        values={
+            'primary_gain':[p['joint']['test']['own']['acc']-p['detach']['test']['own']['acc'] for p in pairs],
+            'primary_difference_to_full_joint':[p['joint']['test']['own']['acc']-r['full_controls']['joint']['test']['own']['acc'] for p,r in zip(pairs,rows)],
+            'auxiliary_mse_ratio':[p['joint']['test']['auxiliary_mse']/p['detach']['test']['auxiliary_mse'] for p in pairs]}
+        import statistics,math
+        for key,v in values.items():
+            item=summary['domains'][domain][key];m=statistics.mean(v);half=2.2621571628540993*statistics.stdev(v)/math.sqrt(10)
+            if max(abs(m-item['mean']),abs(m-half-item['ci95'][0]),abs(m+half-item['ci95'][1]))>1e-10:
+                raise ValueError('Shared-replay paired interval mismatch')
+    audit=json.loads((root/base/'shared_replay_independent_audit.json').read_text())
+    if not audit['complete'] or len(audit['branches'])!=40 or not all(v['contracts_match'] and v['current_metrics_match'] and v['full_reference_bitwise_equal'] for v in audit['branches']):
+        raise ValueError('Independent shared-replay audit is incomplete')
+    visual=json.loads((root/base/'vision_shared_replay_choice.json').read_text())
+    if visual['continue_development'] or visual['official_test_evaluated'] or len(visual['all_candidates'])!=6 or any(v['passes'] for v in visual['all_candidates']):
+        raise ValueError('The visual capacity stop was changed')
+    va=json.loads((root/base/'vision_shared_replay_independent_audit.json').read_text())
+    if not va['complete'] or len(va['branches'])!=10 or any(v['maximum_metric_error']!=0 or not v['contracts_match'] for v in va['branches']):
+        raise ValueError('Visual replay is incomplete')
+    transport=json.loads((root/base/'recovery_replay_execution_audit.json').read_text())
+    if (transport['unfinished_campaigns_not_included'] or transport['gpu_compute_used'] or transport['new_state_files_sha256_verified']!=630 or
+            transport['total_new_remote_bytes']>=4*2**30 or any(q['running'] or not q['finished'] for q in transport['queues'].values())):
+        raise ValueError('New CPU transport or resource checks are incomplete')
+    finite=json.loads((root/base/'recovery_replay_finite_state_audit.json').read_text())
+    if (not finite['complete'] or not finite['all_floating_tensors_finite'] or finite['states']!=630 or
+            finite['transport_audit_sha256']!=digest(root/base/'recovery_replay_execution_audit.json')):
+        raise ValueError('Transferred floating tensor check is incomplete')
+
     return manifest, dict(payload_files=len(files), manuscript_figures=len(figures),
         numerical_inputs=len(inputs), completed_cpu_records=records,
         recorded_source_hashes_checked=sources, recorded_plan_hashes_checked=plans,
@@ -311,6 +386,10 @@ def verify_files(root):
         matched_completion_records=10,expanded_consumer_endpoints_replayed=100,distinct_expanded_endpoints=90,
         strong_control_native_serving_records=40,new_vision_completed_endpoints=3,new_vision_consumers_replayed=7,
         new_vision_test_evaluated=False,
+        cell_development_endpoints=426,shared_replay_development_records=6,shared_replay_confirmation_records=20,
+        shared_replay_independently_replayed_endpoints=40,shared_replay_monitored_contracts=120,
+        shared_replay_cost_gate_passed=False,residual_block_candidates=6,residual_block_endpoints_replayed=10,
+        new_scientific_states_sha256_verified=630,
         nonlinear_development_records=len(development), nonlinear_confirmation_tasks=0,
         manuscript_pdf_sha256=manifest['pdf_sha256'])
 
@@ -330,7 +409,7 @@ def execute(command, root):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--tests', action='store_true', help='Run 65 structural checks on CPU')
+    parser.add_argument('--tests', action='store_true', help='Run the focused structural checks on CPU')
     parser.add_argument('--figures', action='store_true', help='Rebuild all included figures and compare numerical artists')
     parser.add_argument('--paper', action='store_true', help='Rebuild the manuscript and compare page text and pixels')
     args = parser.parse_args()
@@ -353,9 +432,9 @@ def main():
             stdout, elapsed = execute([sys.executable, '-m', 'pytest'] +
                 ['repro/scripts/' + name for name in TESTS] + ['-q'], copy)
             passed = re.search(r'(\d+) passed', stdout)
-            if not passed or int(passed.group(1)) != 65:
+            if not passed or int(passed.group(1)) != EXPECTED_TESTS:
                 raise ValueError('Unexpected focused-test result: ' + stdout[-1000:])
-            report['checks']['structural_tests'] = dict(passed=65, elapsed_seconds=elapsed)
+            report['checks']['structural_tests'] = dict(passed=EXPECTED_TESTS, elapsed_seconds=elapsed)
         if args.figures:
             print('Rebuilding all included figures from recorded results...', flush=True)
             reference = json.loads((ROOT / 'paper/figures/publication_figure_manifest.json').read_text())

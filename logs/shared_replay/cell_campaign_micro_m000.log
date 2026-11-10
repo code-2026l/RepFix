@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "<cpu-path>", line 32, in <module>
+    p=argparse.ArgumentParser();p.add_argument('--out',type=Path,required=True);a=p.parse_args();torch.set_num_interop_threads(1);main(a)
+                                                                                                                                  ^^^^^^^
+  File "<cpu-path>", line 20, in main
+    reader=RecoveryReader(64,c,'residual32',torch.zeros(64),torch.ones(64),initial)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<cpu-path>", line 15, in __init__
+    self.linear.bias.copy_((initial['bias'].double()+initial['weight'].double()@mean.reshape(-1)).float())
+                                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~
+RuntimeError: expected scalar type Double but found Float
