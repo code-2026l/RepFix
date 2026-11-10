@@ -35,6 +35,14 @@ upper interval limits. Model construction, preprocessing and tracing are timed
 separately and excluded from forward latency, as in the preceding study.
 This is one host and one pretrained checkpoint, not a hardware-wide guarantee.
 
+Before any retrieval outcomes, add a secondary utility measure: bidirectional
+top1 paired-view retrieval among all5000 validation images. Use the same fixed
+healthy normalizer and unit-normalized suffix features as NT-Xent. Evaluate
+joint and stored D on the two cached prefix views. This tests instance-pair
+recovery, not semantic retrieval. Report four-reference paired differences;
+retain all outcomes, and do not change any primary gate using this secondary
+post-training measure.
+
 No official-test inputs, new labels for compatibility or GPU. Code, analysis,
 figures, manuscript integration and builds stay local. Remote roots stay opaque;
 CPU execution has no per-process RSS cap and retains the256GiB host reserve.

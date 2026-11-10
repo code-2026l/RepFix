@@ -13,7 +13,8 @@ def main(a):
     groups=[]
     for ref in range(6201,6205):
         rows=[r for r in native if r['reference_seed']==ref];assert len(rows)==3
-        groups.append(dict(reference_seed=ref,gain_pp=float(np.mean([100*(r['native']['current']['acc']-r['native']['detached']['acc']) for r in rows]))))
+        groups.append(dict(reference_seed=ref,gain_pp=float(np.mean([100*(r['native']['current']['acc']-r['native']['detached']['acc']) for r in rows])),
+            paired_view_retrieval_gain_pp=float(np.mean([100*(r['native']['cached_prefix_pair_retrieval']['current']-r['native']['cached_prefix_pair_retrieval']['detached']) for r in rows]))))
     cost={}
     for batch,limit in [('1',1.20),('128',1.10)]:
         roles={}
@@ -40,6 +41,7 @@ def main(a):
     gain=interval([r['gain_pp'] for r in groups]);selected=fidelity['chosen']
     passes=gain['ci95'][0]>0 and selected['maximum_disagreement']<=.01 and selected['certified']==selected['consumer_checks'] and selected['current_class_changes']==0 and selected['batch1_individual_current_class_changes']==0 and all(cost[b]['chosen']['upper_ci_within_budget'] for b in ['1','128'])
     result=dict(complete=True,reference_groups=groups,native_gain_pp=gain,cost=cost,fidelity=fidelity,combined_native_gate=passes,
+        secondary_paired_view_retrieval_gain_pp=interval([r['paired_view_retrieval_gain_pp'] for r in groups]),
         source_sha256={Path(__file__).name:hashlib.sha256(Path(__file__).read_bytes()).hexdigest()},
         maximum_cached_primary_difference=max(abs(r['native']['difference_from_cached_primary']) for r in native),
         scope='four fitted references, one shared pretrained checkpoint, clean validation population; timing seed6310 per reference')

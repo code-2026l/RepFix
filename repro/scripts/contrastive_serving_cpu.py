@@ -27,6 +27,19 @@ def trace(module,x,amp=False):
 
 
 @torch.no_grad()
+def paired_retrieval(model,views,head):
+    hs=[F.normalize((base.embeds(model,x)-head['mean'])/head['sd'],dim=1) for x in views]
+    correct=[]
+    for query,gallery in [(hs[0],hs[1]),(hs[1],hs[0])]:
+        hits=[]
+        for start in range(0,len(query),256):
+            scores=query[start:start+256]@gallery.T
+            hits.append(scores.argmax(1)==torch.arange(start,start+len(scores)))
+        correct.append(torch.cat(hits))
+    return torch.stack(correct)
+
+
+@torch.no_grad()
 def main(a):
     started=time.time();record=json.loads(a.record.read_text());assert record['complete']
     cache=torch.load(a.population,map_location='cpu',weights_only=True,mmap=True)
@@ -77,6 +90,9 @@ def main(a):
         arrays['monitor']=torch.from_numpy(monitor)
         native=dict(current=paired.metrics(raw_current,y),detached=paired.metrics(dz,y),individual_batch1=individual,
             difference_from_cached_primary=paired.metrics(raw_current,y)['acc']-record['validation']['acc'])
+        retrieval={name:paired_retrieval(model,cache['x'][:,val],state['head']) for name,model in [('current',current),('detached',dmodel)]}
+        native['cached_prefix_pair_retrieval']={name:float(hits.double().mean()) for name,hits in retrieval.items()}
+        arrays['pair_retrieval_hits']=retrieval
     else:
         native=None
         for batch in ['1','128']:

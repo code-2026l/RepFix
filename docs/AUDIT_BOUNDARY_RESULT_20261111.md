@@ -36,13 +36,15 @@ See [PPI](https://arxiv.org/abs/2301.09633) and
 predictor differ from the preceding small-budget forecast study; their MAEs
 should not be treated as a direct head-to-head comparison.
 
-Two controls explain the distinction between mean prediction and localization.
+Two controls examine the distinction between mean prediction and localization.
 The fixed fit-anchor predictor has mean squared correlation 0.127 with binary
 consumer errors. Even an oracle Gaussian law fitted to all validation-reference
 residuals reaches only 0.244 on clean inputs (0.256 on augmented inputs). The
 oracle is retrospective and pays for all reference outputs; it is not an
 operational low-budget method. Both residual-law estimation and missing
 sample-level dependence remain plausible contributors.
+Four strata also split tail probabilities more finely; the controls do not
+attribute the entire query penalty to residual dependence.
 
 For a separate coupling control, each endpoint supplies 256 fixed examples and
 its exact residual multiset. Minimum and maximum linear assignments preserve
