@@ -49,6 +49,7 @@
 \input{shared_replay_numbers.tex}
 \input{dense_replay_numbers.tex}
 \input{frontier_numbers.tex}
+\input{served_frontier_numbers.tex}
 
 % ─── Compact table style (tighter spacing/format) ───
 \setlength{\tabcolsep}{4pt}          % default 6pt -> tighter column padding
@@ -63,7 +64,7 @@
 \maketitle
 
 \begin{abstract}
-Shared encoders can improve their training tasks while breaking deployed readouts. We distinguish retained task information, compatibility with a specified consumer, and the cost of preserving its function. Across ten matched HAR seeds, frozen accuracy falls to $\CpuHarJointMid$ while the current head reaches $\CpuHarOwnMid$; unlabeled scale correction restores $\MechHarScalarMid$. With a reconstruction auxiliary, error falls to $\ReconHarMseRatioHigh$ of detachment while frozen accuracy drops to $\ReconHarFrozenHigh$; paired alignment restores $\ReconHarPairedLinearHigh$. Exact affine boundaries explain the scale component, and a signed update audit separates it from gradient conflict. For preservation, shared dense products or a frozen prefix retain a healthy output while current nonlinear features learn. Matched HAR/SNR confirmation establishes useful auxiliary updates; dense SNR updates remove the measured gap to unrestricted joint training. A complete ResNet-18 suffix adds $\SuffixRNGainHead$ accuracy points over head-only continuation and $\SuffixRNGainRichHead$ over a stronger frozen-feature probe on CIFAR-100, across ten fresh continuation seeds. Alignment and distillation offer cheaper classification interfaces without preserving fixed confidence thresholds. Actual consumer decisions, strong controls and CPU measurements identify the useful frontier; small-network latency still misses its targets.
+Shared encoders can improve their training tasks while breaking existing readouts. We separate retained task information, a specified consumer's decisions, and the computation needed to preserve its function. Across ten matched HAR seeds, unlabeled scale correction restores frozen accuracy from $\CpuHarJointMid$ to $\MechHarScalarMid$ while the current head remains accurate. A real reconstruction auxiliary exhibits the same separation between learning progress and readout compatibility. Exact affine crossings explain the scale component, and a signed update audit distinguishes contraction from gradient conflict. For preservation, shared-reference computation retains a healthy output path while current nonlinear features learn. Matched HAR/SNR studies establish useful auxiliary learning; complete-suffix transfer on CIFAR-100 improves over stronger frozen-feature probes by $\ServedRNGainRichHead$ points on ResNet-18 and $\ServedViTGainRichHead$ on ViT-B/32, across ten fresh continuation seeds per backbone. Actual class and fixed-threshold outputs are checked separately from accuracy, and full-precision and approximate reference implementations have distinct measured costs. The selected ViT implementation meets the declared CPU latency and disagreement budgets with FP32 current outputs; small-network overhead remains above budget.
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
@@ -82,12 +83,12 @@ low-cost classification compatibility on HAR, but not fixed confidence
 thresholds. We then derive an exact shared-computation construction: sparse
 channel updates confine activation differences, and low-rank corrections
 reuse the healthy dense products. Twenty fresh HAR/SNR runs retain useful
-learning and all three specified consumers. Its accuracy and measured cost
+learning and all three specified consumers. The resulting accuracy--cost
 frontier makes the access and capacity tradeoffs explicit. Dense low-rank
 updates remove the SNR accuracy shortfall, while a support/rank factorial
-shows why this result does not identify rank alone as its cause. Opening a
-complete nonlinear suffix also yields positive ResNet-18 transfer beyond a
-strong frozen-feature control. Scores, classes and selective decisions are
+shows why this result does not identify rank alone as its cause. Opening complete
+nonlinear suffixes also yields positive ResNet-18 and ViT-B/32 transfer
+beyond strong frozen-feature controls, with separately measured CPU costs. Scores, classes and selective decisions are
 different interfaces; evaluation must identify which one survives.
 
 \begin{figure}[t]
@@ -99,7 +100,7 @@ different interfaces; evaluation must identify which one survives.
 
 \section{When Existing Readouts Fail}\label{sec:formulation}
 
-Let $h_\theta(x)\in\mathbb R^m$ be the shared features. An existing readout applies the fixed map $W_0D_0^{-1}(h_\theta(x)-\mu_0)+b_0$, with healthy means $\mu_0$, positive diagonal scales $D_0$, weights $W_0$, and bias $b_0$. We call this complete input-to-output map the \emph{consumer}. During continuation, the current task head learns with the encoder, while the old consumer stays fixed. A refitted probe tests what the new features can support; the old consumer tests whether its interface still works.
+Let $h_\theta(x)\in\mathbb R^m$ be the shared features. The old readout is the fixed map $C_0(h)=W_0D_0^{-1}(h-\mu_0)+b_0$, with healthy means $\mu_0$, positive diagonal scales $D_0$, weights $W_0$, and bias $b_0$. A \emph{consumer} also specifies the output rule, such as a class decision or fixed confidence threshold. Continuation holds this interface fixed while changing its input $h_\theta(x)$; the complete function of $x$ can therefore change. A refitted probe tests what the new features support; the old consumer tests whether its interface still works.
 
 Pure contraction separates the two questions. For $H_c=cH$, an affine readout has logits $cWh+b$, which approach $b$ as $c\to0$. A unique bias winner then makes the prediction constant, although every $c>0$ preserves linear decodability.
 
@@ -225,21 +226,13 @@ A waveform CNN on the same I/Q split reaches $\CnnHealthy$ healthy-readout accur
 
 \section{Preserving a Specified Consumer}\label{sec:stf}\label{sec:stfcal}
 
-Real reconstruction tests repair while the auxiliary makes progress (Table~\ref{tab:reconstruction_full}, Appendix~\ref{app:reconstruction_paired}). At HAR dose $100$, frozen accuracy falls from $\ReconHarPrimary$ under detachment to $\ReconHarFrozenHigh$, while the current head reaches $\ReconHarOwnHigh$. Test reconstruction MSE falls to $\ReconHarMseRatioHigh$ of detachment, with $0/5$ scatter collapses. Per-feature recalibration reaches $\ReconHarRecalHigh$; paired linear alignment reaches $\ReconHarPairedLinearHigh$ (Figure~\ref{fig:overview}c). Repair changes only the consumer input, retaining the auxiliary improvement.
+Input repair can retain useful auxiliary learning. At HAR reconstruction dose $100$, the current head reaches $\ReconHarOwnHigh$ while frozen accuracy falls to $\ReconHarFrozenHigh$. Paired linear alignment restores $\ReconHarPairedLinearHigh$, retaining the learned encoder and its reconstruction MSE of $\ReconHarMseRatioHigh$ relative to detachment (Figure~\ref{fig:overview}c).
 
-\input{benefit_confirmation_table.tex}
+For an unchanged feature interface, let $A=W_0\operatorname{diag}(1/s_0)$ and let $P_\perp$ project onto $\ker A$. The reference-anchored features $H_0+(H_\theta-H_0)P_\perp$ preserve all healthy logits (Proposition~\ref{prop:consumer_nullspace}). Ten fresh SNR seeds retain an auxiliary gain of $\BenefitGuardGain$ points $[\BenefitGuardGainLow,\BenefitGuardGainHigh]$, against $\BenefitJointGain$ for ordinary joint training, with half-point noninferiority. The price is two encoders at $\BenefitLatencyRatio\times$ CPU cost (Appendix~\ref{app:benefit_confirmation}). Freezing the nonlinear trunk permits single-encoder folding but loses the gain: freezing accounts for $-3.53$ points, while the compatibility constraint adds $-0.003$ (Appendix~\ref{app:compiled_interface}).
 
+Aggregate recovery is a weaker target. A post-hoc chart raises old-reader accuracy by $\ChartOldGain$ points, with improved NLL and ECE, yet changes $\ChartDisagreement\%$ of decisions and certifies none of ten readers. A training-time margin hinge retains a $0.72$-point SNR gain but still changes $29.2\%$ of decisions. On a pretrained vision backbone, frozen accuracy can even rise by $8.5$ points while $42.1\%$ of decisions change, including $7.2\%$ correct-to-wrong flips (Appendices~\ref{app:posthoc_chart}--\ref{app:vision_boundary}).
 
-
-Let $A=W_0\operatorname{diag}(1/s_0)$ and let $P_\perp$ project onto $\ker A$. The reference-anchored control $H_0+(H_\theta-H_0)P_\perp$ preserves all healthy logits while emitting one shared $64$-vector (Proposition~\ref{prop:consumer_nullspace}, Figure~\ref{fig:nullspace_control}). Validation selects SNR dose $1$ from six fixed candidates using $20\%$ of fitting primary labels. Ten new seeds confirm an ordinary auxiliary gain J--D of $\BenefitJointGain$ percentage points, paired $95\%$ interval $[\BenefitJointGainLow,\BenefitJointGainHigh]$, and a guarded gain GJ--GD of $\BenefitGuardGain$, $[\BenefitGuardGainLow,\BenefitGuardGainHigh]$ (Table~\ref{tab:benefit_confirmation}). The guarded model clears the declared $0.5$-point noninferiority margin against J, and its predictions, NLL, and ECE match the reference to a maximum logit error of $\BenefitLogitError$; its ten endpoints also satisfy a separate five-point disagreement budget. Frozen accuracy barely moves, while ECE rises from $\BenefitHealthyECE$ to $\BenefitJointECE$. Both encoders remain at inference, at a measured $\BenefitLatencyRatio\times$ CPU cost (Appendix~\ref{app:benefit_confirmation}).
-
-Removing reference inference exposes a different constraint. Freezing the nonlinear trunk and folding the last-affine protection loses the SNR gain: freezing accounts for $-3.53$ points, while the constraint adds $-0.003$ (Appendix~\ref{app:compiled_interface}). Fitting a chart \emph{after} unrestricted learning retains a $\ChartGain$-point gain at $\ChartLatency\times$ native CPU cost. Old-reader accuracy improves by $\ChartOldGain$ points and NLL and ECE fall, yet $\ChartDisagreement\%$ of predictions change; none of ten repaired consumers meets the five-point budget (Appendix~\ref{app:posthoc_chart}). Aggregate recovery does not establish decision compatibility.
-
-A training-time margin hinge retains a $0.72$-point SNR gain, against $0.97$ for joint training, and halves decision changes to $29.2\%$. It still misses the budget; pinning logits also certifies none (Table~\ref{tab:compatibility_frontier}, Appendix~\ref{app:decision_preserving}). The distinction extends to a pretrained vision backbone: primary-only continuation raises frozen accuracy by $8.5$ points while changing $42.1\%$ of decisions, including $7.2\%$ of examples moving from correct to wrong (Appendix~\ref{app:vision_boundary}).
-
-A learned legacy head relaxes the fixed-weight contract through joint distillation~\citep{hinton2015distilling,li2016lwf}. On ten fresh HAR seeds with $10\%$ primary labels and reconstruction dose $100$, MSE is $\FreshMse$ of detachment and primary accuracy differs by $+\FreshGain$ points $[\FreshGainLow,\FreshGainHigh]$, clearing the half-point noninferiority margin. Mean legacy disagreement is $\FreshDirectChanged\%$; all ten prescribed monitor bounds meet the five-point budget. Current and legacy outputs use one encoder at $\FreshDirectLatency\times$ native float32 CPU cost. An OLS reader reaches $\FreshOlsChanged\%$ disagreement with the same task outcomes and ten certificates (Appendix~\ref{app:alignment_confirmation}). A retrospective matched completion finds that development-selected full-feature alignment also retains progress: MSE $\CompleteFeatureMse$, primary difference $+\CompleteFeatureGain$ points $[\CompleteFeatureGainLow,\CompleteFeatureGainHigh]$. Joint training followed by OLS changes $\CompleteJointOlsChanged\%$ of decisions, against $\FreshDirectChanged\%$ for the distilled head; neither approach certifies either fixed confidence-threshold consumer (Appendix~\ref{app:completion_controls}). The original HAR $9/10$ and unsuccessful SNR studies remain separate.
-
-\input{decision_preserving_table.tex}
+A learned legacy head instead relaxes the fixed-weight requirement through distillation~\citep{hinton2015distilling,li2016lwf}. Ten fresh low-label HAR runs retain reconstruction MSE of $\FreshMse$ relative to detachment, with primary difference $+\FreshGain$ points $[\FreshGainLow,\FreshGainHigh]$. Mean class disagreement is $\FreshDirectChanged\%$ and all ten monitor bounds certify, at $\FreshDirectLatency\times$ native FP32 cost. OLS and full-feature alignment offer related cheaper class interfaces, but neither approach certifies either fixed confidence threshold (Appendices~\ref{app:alignment_confirmation}--\ref{app:completion_controls}). The output rule determines whether this repair suffices.
 
 \subsection{Sharing the Healthy Computation}
 
@@ -275,18 +268,18 @@ terminal features. Continuation uses only the original task losses.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{figures/fig_shared_replay.pdf}
-\caption{Exact shared computation and the utility frontier.
-(a) Healthy dense products are reused; sparse first-map and low-rank
-second-map updates supply the nonlinear current path. The healthy consumer
-includes its activation and folded readout. Planes are schematic.
-(b,c) Ten fresh seeds per task with the sparse-row arm; points show every seed
-and diamonds paired $95\%$ intervals. HAR reconstruction improves; this arm
-gains against its matched detached arm but loses accuracy against unrestricted
-joint training. A dense low-rank variant closes that gap
-(Appendix~\ref{app:shared_replay_rank}). All $120$ monitored old
-class/selective contracts pass. Serving cost exceeds the predeclared budget
-(Appendix~\ref{app:shared_replay_cost}).}
+\includegraphics[width=\linewidth]{figures/fig_suffix_frontier.pdf}
+\caption{Shared computation with enough nonlinear learning capacity.
+(a) A frozen prefix feeds healthy and current suffixes. The old coarse
+readout keeps its class and fixed-threshold rules; the current task uses
+fine labels. The reference parameters remain available.
+(b,c) Actual selected batch-$128$ serving gains over head-only F and the
+richer frozen-feature probe H. Dots show all ten fresh continuation seeds;
+diamonds and bars show paired $95\%$ intervals. One pretrained reference,
+label mask and split are shared within each backbone. These are supervised-
+transfer results. Exact-function algebra, full-precision execution and the
+registered reference approximation have separate fidelity and cost audits
+(Appendix~\ref{app:served_frontier}).}
 \label{fig:shared_replay}
 \end{figure}
 
@@ -315,21 +308,48 @@ $\DenseSnrContractChecks$ consumer checks. It adds $11{,}456$ MACs, $54.1\%$
 above the folded current-only graph. The same arm
 misses the HAR primary gate on development ($\DenseHarDevLow$ to
 $\DenseHarDevHigh$ points). SVD truncation concerns a particular saved update;
-the matched factorial with first-map rank ceiling $16$ also changes performance when its
-support family changes. Neither identifies an intrinsic rank requirement
+the matched factorial holds its first-map rank ceiling at $16$ while changing
+support and degrees of freedom. Neither identifies an intrinsic rank requirement
 (Appendices~\ref{app:shared_replay_rank} and~\ref{app:frontier_factorial}).
 
-A frozen prefix offers a different tradeoff: evaluate a healthy and a current
-nonlinear suffix on the same input. After the earlier negative capacity screens,
-a fixed ten-epoch, two-view transfer recipe opens the complete final residual
-block. Ten fresh ResNet-18 continuations gain $\SuffixRNGainHead$ points
-$[\SuffixRNGainHeadLow,\SuffixRNGainHeadHigh]$ over head-only continuation,
-and $\SuffixRNGainRichHead$ $[\SuffixRNGainRichHeadLow,\SuffixRNGainRichHeadHigh]$
-over a richer frozen-feature probe. The final-map-only control loses
-$\SuffixRNGainLastMap$ points to the full suffix. The original coarse consumer
-retains its class and selective decisions. These are supervised-transfer
-results on one fixed reference and split, with measured serving costs
-(Appendix~\ref{app:nonlinear_suffix}).
+A frozen prefix offers a different tradeoff: evaluate healthy and current
+nonlinear suffixes on the same input (Figure~\ref{fig:shared_replay}). A fixed
+two-view transfer recipe opens the complete final ResNet-18 residual block.
+Ten fresh continuations gain $\ServedRNGainHead$ points
+$[\ServedRNGainHeadLow,\ServedRNGainHeadHigh]$ over head-only F and
+$\ServedRNGainRichHead$ $[\ServedRNGainRichHeadLow,\ServedRNGainRichHeadHigh]$
+over the richer frozen-feature probe H. On ViT-B/32, opening only the final
+MLP or one attention block fails the development gate. Opening two complete
+blocks then gains $\ServedViTGainHead$ points
+$[\ServedViTGainHeadLow,\ServedViTGainHeadHigh]$ over F and
+$\ServedViTGainRichHead$ $[\ServedViTGainRichHeadLow,\ServedViTGainRichHeadHigh]$
+over H on ten fresh continuations. The L/M controls isolate the smaller
+learned scopes. Each study conditions on one healthy reference and split;
+these are supervised-transfer gains, separate from the HAR/SNR auxiliary
+results (Appendices~\ref{app:nonlinear_suffix}--\ref{app:attention_scope}).
+
+The cheaper alternatives receive matched checks. None of nine unlabeled
+repairs meets the visual one-percent class/selective disagreement gate on
+all development seeds. A later one-forward distilled-head control also
+fails its fixed three-weight pilot and stops before test. Both controls use the fixed recipes and agreement gate
+(Appendices~\ref{app:suffix_repairs}--\ref{app:vision_head_control}).
+
+\input{deployment_frontier_table.tex}
+
+Actual implementation changes this frontier (Table~\ref{tab:deployment_frontier}).
+With current outputs held at FP32, selected ViT reference serving costs
+$\ServedViTCostOne/\ServedViTCostBatch\times$ at batches $1/128$, against
+$1.20/1.10$ budgets. Its largest class/selective disagreement is
+$\ServedViTDisagreement\%$ and all $60$ registered checks certify the
+five-point corpus-remainder budget. Full-precision reference serving is a
+separate fixed control, at $\ServedViTFullCostOne/\ServedViTFullCostBatch\times$.
+Its cost intervals and actual decisions are reported alongside the selected
+reference approximation.
+ResNet-18 still exceeds the batch-$128$ cost limit.
+The small MLPs remain over budget even with faster fused kernels. Whole-
+encoder AMP is retained with its own matched denominator and absolute times;
+this is a fixed-current-fidelity result on the measured CPU
+(Appendix~\ref{app:served_frontier}).
 
 \section{Evaluating a Shared Representation}\label{sec:standard}
 
@@ -372,9 +392,10 @@ explain its scale component, and signed audits separate contraction from
 gradient conflict. Alignment and distillation can retain a cheap class
 interface without retaining confidence-threshold decisions. Shared-reference
 replay instead retains the healthy function while nonlinear learning makes
-progress on HAR and SNR. Opening a full nonlinear suffix extends positive
-transfer to ResNet-18 beyond strong frozen-feature controls. Update support,
-learned scope and implementation determine the measured cost frontier.
+progress on HAR and SNR. Complete nonlinear suffixes extend positive
+transfer to ResNet-18 and ViT-B/32 beyond stronger frozen-feature readouts.
+Update structure, learned scope and numerical implementation determine the
+measured preservation cost.
 Shared features should be evaluated by what they predict and by whether
 a specified existing consumer can still use them.
 
@@ -1702,6 +1723,8 @@ Dense early audits and selected later audits record 620 dependent step observati
 
 \subsection{Readout-Nullspace Protection with a Useful Real Auxiliary}\label{app:benefit_confirmation}
 
+\input{benefit_confirmation_table.tex}
+
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/fig_nullspace_control.pdf}
@@ -1849,6 +1872,8 @@ The construction supports nonlinear updates with retained affine-consumer output
 \input{chart_study.tex}
 
 \subsection{A Decision-Preserving Training Constraint}\label{app:decision_preserving}
+
+\input{decision_preserving_table.tex}
 
 Each arm above fails one axis. A training-time constraint asks whether all
 three are reachable together. Continuation minimises

@@ -1,0 +1,23 @@
+\begin{table}[t]
+\centering
+\caption{Useful learning, legacy decisions and measured CPU cost. Each row
+uses ten fresh continuation seeds from its stated study. HAR reports auxiliary
+MSE relative to detachment; SNR reports primary gain over detachment; vision
+reports primary gain over the richer frozen-feature probe H. Intervals are
+paired $95\%$. Old change is the largest class/selective disagreement under
+actual selected serving. Vision keeps current outputs at FP32 and permits
+the registered reference approximation. Batches are $1/1024$ for MLPs and
+$1/128$ for vision; cost targets are $1.20/1.10$.}
+\label{tab:deployment_frontier}
+\small
+\begin{tabular}{llrr}
+\toprule
+Study & Learning outcome [95\% interval] & Old change & CPU ratios \\
+\midrule
+HAR & MSE $\ReplayHarMse$ [$\ReplayHarMseLow$, $\ReplayHarMseHigh$] & $0\%$ & $\SmallHarCostOne/\SmallHarCostBatch$ \\
+SNR & $+\DenseSnrGain$ pp [$\DenseSnrGainLow$, $\DenseSnrGainHigh$] & $0\%$ & $\SmallSnrCostOne/\SmallSnrCostBatch$ \\
+ResNet-18 & $+\ServedRNGainRichHead$ pp [$\ServedRNGainRichHeadLow$, $\ServedRNGainRichHeadHigh$] & $\ServedRNDisagreement\%$ & $\ServedRNCostOne/\ServedRNCostBatch$ \\
+ViT-B/32 & $+\ServedViTGainRichHead$ pp [$\ServedViTGainRichHeadLow$, $\ServedViTGainRichHeadHigh$] & $\ServedViTDisagreement\%$ & $\ServedViTCostOne/\ServedViTCostBatch$ \\
+\bottomrule
+\end{tabular}
+\end{table}

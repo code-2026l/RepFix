@@ -28,8 +28,10 @@ TESTS = [
     'test_consumer_cells.py','test_recovery_readers.py',
     'test_shared_reference_replay.py','test_shared_reference_vision.py',
     'test_dense_replay.py',
+    'test_late_replay.py','test_nonlinear_suffix.py','test_suffix_serving.py',
+    'test_paired_suffix.py','test_mixed_reference.py',
 ]
-EXPECTED_TESTS=97
+EXPECTED_TESTS=117
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -71,6 +73,10 @@ def verify_files(root):
             raise ValueError('Unmanifested manuscript input: ' + name)
     if len(figures) != manifest['publication_figures']:
         raise ValueError('Included manuscript figures differ from the release manifest')
+    exported=json.loads((root/'paper/figures/publication_figure_manifest.json').read_text(encoding='utf-8'))['figures']
+    included={PurePosixPath(name).stem for name in figures}
+    if len(included)!=len(figures) or included!=set(exported):
+        raise ValueError('A manuscript figure is duplicated, missing, or unused')
     if manifest['pdf_sha256'] != digest(root / 'paper/RepFix_ICLR2027.pdf'):
         raise ValueError('The manuscript PDF does not match the manifest')
 
@@ -441,6 +447,9 @@ def verify_files(root):
             finite['transport_audit_sha256']!=digest(root/base/'recovery_replay_execution_audit.json')):
         raise ValueError('Transferred floating tensor check is incomplete')
 
+    from verify_frontier_records import verify as verify_frontier
+    frontier=verify_frontier(root)
+
     return manifest, dict(payload_files=len(files), manuscript_figures=len(figures),
         numerical_inputs=len(inputs), completed_cpu_records=records,
         recorded_source_hashes_checked=sources, recorded_plan_hashes_checked=plans,
@@ -461,7 +470,7 @@ def verify_files(root):
         dense_packed_ratio_batch1=float(dense_medians['torchscript/1']),
         dense_packed_ratio_batch1024=float(dense_medians['torchscript/1024']),
         nonlinear_development_records=len(development), nonlinear_confirmation_tasks=0,
-        manuscript_pdf_sha256=manifest['pdf_sha256'])
+        frontier_extension=frontier,manuscript_pdf_sha256=manifest['pdf_sha256'])
 
 
 def execute(command, root):

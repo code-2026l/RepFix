@@ -1,7 +1,8 @@
 # Reproducing the supplementary artifact
 
 Run commands from the extracted `repfix_supplementary` directory. The supplied
-PDF is the polished manuscript: nine main pages and 82 pages in total.
+PDF has nine main pages. The exact full-page count is recorded in
+`ARTIFACT_MANIFEST.json` and the extracted-archive build report.
 
 ## File and record checks
 
@@ -24,6 +25,16 @@ states or recomputing predictions.
 python -m pip install -r requirements-review.txt
 ```
 
+`requirements-review-locked.txt` records the versions used for the local review.
+For CPU-only PyTorch wheels, install the matching official builds first, then
+the locked review environment:
+
+```text
+python -m pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cpu
+python -m pip install -r requirements-review-locked.txt
+```
+
+
 `requirements-review.txt` lists dependencies for dataset-free review, including
 pytest and PyMuPDF. `requirements.txt` describes the broader training environment.
 The release was
@@ -37,7 +48,7 @@ thread. The hardware timings reported in the paper retain their original setup.
 python repro/scripts/verify_supplement.py --tests
 ```
 
-The 97 tests cover finite-corpus disagreement bounds, repair availability, affine
+The 117 tests cover finite-corpus disagreement bounds, repair availability, affine
 scale boundaries, normalized-head nullspaces, constrained affine folding,
 nonlinear fusion, exact-count selection at a zero-benefit tie, invertible chart folding,
 vision access/split controls, and teacher-head fitting on affine and nonlinear
@@ -52,7 +63,7 @@ python repro/scripts/verify_supplement.py --figures
 ```
 
 The helper runs `repro/scripts/render_paper_figures.py` in a temporary copy. The
-coordinated generators reconstruct all 23 included figures from shipped
+coordinated generators reconstruct all 26 included figures from shipped
 records. It compares plotted numerical artists and dimensions with the release
 manifest. Files are exported as PDF, PNG, and SVG at a 5.5-inch width.
 
@@ -230,3 +241,60 @@ are preserved by digest under `repro/source_versions/`. Scrubbed technical
 tracebacks are in `logs/shared_replay/`. These omitted tensor files are needed
 for a fresh prediction replay; the compact verifier checks the shipped records
 and hashes rather than claiming to load them.
+
+
+## Nonlinear scope, actual serving and precision
+
+`nonlinear_suffix_cpu.py` and `token_suffix.py` define the complete residual-block
+and final attention-block studies. `nonlinear_suffix_choice.json` and
+`two_block_choice.json` freeze the development selections before their original
+test loading. The earlier final-map, residual-capacity, final-MLP, one-attention-
+block and ResNet-50 failures remain in distinct folders. Test intervals describe
+ten continuation seeds sharing one pretrained reference, split and label mask.
+
+`benchmark_suffix_cpu.py` reconstructs saved endpoints, measures isolated
+current/protected latency, and separately audits the actual full-prefix serving
+outputs at batches 1/128. `reference_precision_choice.json` freezes the selected
+implementation and its full-precision control after actual native validation.
+Protected-only BF16 and suffix autocast leave current/prefix FP32; standard
+whole-encoder AMP has its own matched baseline and retained development verdict.
+These are standard numerical implementations, with empirical old-decision
+contracts distinct from an exact real-arithmetic identity. All timings and
+negative outcomes, including export/bookkeeping stops and reissued jobs, remain.
+
+The numerical host is a Xeon Platinum 8570 with PyTorch 2.7.1/torchvision 0.22.1;
+all tensors are CPU and CUDA visibility is empty. The AVX-512/BF16/AMX capabilities
+are recorded in `frontier_hardware.json`; no individual kernel-dispatch claim is
+made. Vision timing uses 12 threads, 12 warmups and 31 alternating repetitions,
+with no owned training/replay job running concurrently. Model setup, compilation
+and preprocessing are outside forward latency. Small native MLP timings retain
+their separately documented single-thread/four-thread settings.
+
+`readout_alignment.py` supplies all nine fixed unlabeled affine controls in
+`suffix_repair_development/`. `vision_protected_head_cpu.py` supplies the later
+standard one-forward distillation control; its plan explicitly records that
+unconstrained test outcomes were already open when this follow-up was registered.
+Neither baseline is renamed as a new learning algorithm.
+
+The local analysis entry points are `analyze_frontier_extension.py` and
+`analyze_served_frontier.py`. `frontier_execution_audit.json` inventories the
+recovered numerical files and their hashes, including an immutable stopped
+screen's cache moved off the CPU host after verified local recovery.
+`check_frontier_states.py` checks their floating tensors; `replay_frontier_outputs.py`
+recalculates actual serving metrics and certificates from recovered output
+arrays. This output check is not a second execution of the pretrained backbone.
+Raw model states, representation caches and official weight files remain outside
+the compact submission archives; file checks in the default verifier inspect the
+recorded evidence rather than silently rerunning those numerical experiments.
+
+
+The full-corpus verifier initially hit an author-set 8 GiB/job ceiling on two
+ViT jobs, interrupting a third. This was a guard stop, not host exhaustion.
+After the user's resource clarification, the unchanged missing endpoints run
+without fixed per-job/aggregate RSS caps, with a 256 GiB host-available reserve
+and at most four 12-thread workers. Completed original records remain; the
+location index maps each published serving record to its original or resumed
+queue. Both sets use the same numerical program hashes and frozen choices.
+The isolated latency measurements were already complete and are not repeated
+under this concurrent replay load. See `frontier_memory_policy.json` and the
+resource plan for the exact operational change.

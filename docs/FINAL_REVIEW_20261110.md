@@ -1,135 +1,156 @@
-# Shared-replay evidence and scientific assessment
+# Scientific assessment of the interface frontier
 
-The new result is a partial constructive frontier, not a completed universal
-deployment method. A fixed sparse/low-rank architecture learns nonlinear
-features on two tasks while retaining the old function through shared healthy
-computation. Twenty fresh seeds confirm useful learning and all 120 specified
-class/selective contracts. The SNR full-update accuracy and CPU cost criteria
-remain failed; both stronger-backbone development screens stop before test.
+The new evidence establishes useful nonlinear-suffix transfer on ResNet-18 and
+ViT-B/32 beyond strong frozen-feature readouts. It complements the confirmed
+HAR reconstruction and SNR auxiliary-regression results. The actual serving
+frontier below states which numerical implementations meet the original budgets.
+These are measured conditional results, with complete failed controls retained.
 
-## Scientific increment
+## Scientific contribution and attribution
 
-The construction makes the two-version computation explicit. Sparse first-map
-row support survives a coordinatewise nonlinearity; a second low-rank update
-then admits an exact correction using the shared healthy trace. Rank alone
-does not supply that invariant: the paper gives a rank-one weight update whose
-activation change has arbitrary full rank. Independent merged-network and
-gradient checks include nonzero changes that cross ReLU gates.
+The central distinction is between retained task information, a specified
+consumer's decisions, and the computation needed to retain its old function.
+Matched continuation and unlabeled input repair expose the scale component;
+exact affine crossings and signed update audits identify what the old scatter
+and conflict diagnostics do not determine. Class agreement alone need not retain
+an original confidence-threshold decision.
 
-Low-rank adaptation, sparsity and incremental computation are established.
-The article cites LoRA, DeltaCNN, Punica and S-LoRA and does not claim general
-reuse, adapter serving or nullspace projection as new. The exact identity is
-elementary; its scientific role is to identify a structural condition and test
-its utility/cost consequences. A new method's broad novelty is not established
-by renaming these components or by this literature search alone.
+The constructive evidence then separates three mechanisms: coordinate repair,
+a learned legacy readout, and retained nonlinear reference computation. The
+same model can need more learned nonlinear scope for current-task benefit while
+reusing a large frozen prefix for its old output. The complete-suffix controls,
+strong frozen-feature probe, post-hoc repairs, standard distillation control and
+actual serving comparison test that explanation directly.
 
-The healthy function uses a separate output path. This relaxes the requirement
-that old weights read the new terminal features. Reference parameters remain;
-the method shares their dense computation rather than discarding the reference.
-It does not dominate the earlier common-feature nullspace control under identical
-access assumptions. Native old heads are affine-compressed and float32; full
-reference arithmetic and actual decision contracts are audited separately.
+Low-rank updates, model stitching, side-tuning, distillation and CPU AMP are
+established components. The paper cites their sources and uses them as controls;
+the shared-product identity specifies the retained and updated computations.
+The scientific contribution is the separation and measurement of consumer,
+capacity and cost conditions, including the complete-suffix gains and failures
+of cheaper repairs. The rank comparison, output contracts and measured CPU
+frontier provide the evidence for that interpretation.
 
-## Independent confirmation and adverse criteria
+## Fresh strong-backbone confirmation
 
-Development freezes HAR (k,r)=(4,4) and SNR (16,8) using seeds 800--802.
-Fresh seeds 2500--2509 train structured detached/joint pairs and ordinary
-full-update controls from matched healthy checkpoints and optimizer moments.
-The original task losses alone drive continuation; no consumer loss is added.
+| Backbone | Actual selected accuracy %, 95% interval | Gain over head-only F, pp | Gain over richer frozen probe H, pp | Utility gate |
+|---|---:|---:|---:|---|
+| ResNet-18 | 47.45 [47.33, 47.56] | 3.58 [3.47, 3.69] | 0.49 [0.37, 0.60] | pass |
+| ViT-B/32 | 77.45 [77.35, 77.54] | 2.38 [2.28, 2.47] | 1.59 [1.49, 1.68] | pass |
 
-| Outcome, paired 95% interval | HAR | SNR |
-|---|---:|---:|
-| Primary J-D, percentage points | -0.027 [-0.468, 0.413] | +0.678 [0.383, 0.973] |
-| Auxiliary MSE J/D | 0.929 [0.917, 0.941] | 0.817 [0.782, 0.853] |
-| Primary J-full J, percentage points | -0.024 [-0.689, 0.641] | -0.792 [-1.196, -0.388] |
-| Certified class / selective-80 / selective-50 readers | 20/20 each | 20/20 each |
+Each backbone has ten fresh continuation seeds, 3810--3819, on one fixed
+pretrained reference, fitting/validation split and label mask. The task is
+supervised fine-100 transfer; the old interface is coarse-20 classification plus
+two fixed confidence thresholds. Coarse labels are derivable from fine labels.
+No inaccessible-new-label assumption is needed. The intervals describe
+continuation variability, not independently pretrained references or populations.
+Only the stated final residual block / two attention blocks learn; full-backbone
+fine-tuning and foundation-scale auxiliary benefit are not established.
 
-HAR passes its primary noninferiority and reconstruction criteria. SNR confirms
-positive auxiliary transfer relative to the structured detached arm but fails
-noninferiority to ordinary joint training. No old decision changes on either
-task. The new 1024-input monitors and alpha=0.05/600 allocation are distinct
-from earlier studies; all original allocations and verdicts remain unchanged.
+The final-map, final-MLP, one-attention-block, ResNet-50 and original restricted
+ResNet screens remain negative under their fixed recipes. The full U scope has
+matched L/M and F/N/H controls. Every selected serving program runs from image
+tensors at both registered batch sizes; final task metrics come from its actual
+output arrays, not only a cached-prefix surrogate.
 
-Independent raw-state replay verifies 40 structured endpoints and 120 contracts.
-The declared full reference path matches healthy logits exactly. Compressed old
-float32 maximum errors are 1.27e-5 (HAR) and 8.84e-6 (SNR), with zero observed
-class/selective changes. Packed versus independently merged current serving
-has maximum error 1.53e-5 and two near-tied current-label differences across
-the replayed endpoints. Real-arithmetic equality is not bitwise equality.
+## Consumer fidelity and cost
 
-## Cost and stronger backbone
+Each backbone/precision has 60 checks: three output rules, two actual batch
+implementations and ten current endpoints. Those are repeated checks of fixed
+legacy interfaces, not 60 independently trained old tasks. The full-precision
+and approximate reference outputs, negative flips, NLL/ECE and maximum logit
+errors are separate records. A real-arithmetic identity is distinct from bitwise
+floating-point equality or a bounded decision contract.
 
-Native four-thread TorchScript packed/current ratios are 2.20/1.81 on HAR
-and 2.54/2.07 on SNR at batch 1/1024. Independent-function and shared-first-map
-controls show that fewer MACs do not ensure faster execution. Inductor's smaller
-matched ratios still fail, and its batch-one current baseline is slower in
-absolute time than TorchScript. Compilation setup and every repetition are
-retained. The original 1.20/1.10 cost target remains failed.
+| Backbone / batch | Reference implementation | Current / protected ms | Protected/current, paired 95% | Mean / upper interval budget |
+|---|---|---:|---:|---|
+| ResNet-18/1 | FP32 reference | 1.467 / 1.652 | 1.126 [1.121, 1.131] | pass / pass |
+| ResNet-18/1 | Selected reference | 1.467 / 1.652 | 1.126 [1.121, 1.131] | pass / pass |
+| ResNet-18/128 | FP32 reference | 34.227 / 41.994 | 1.228 [1.201, 1.256] | fail / fail |
+| ResNet-18/128 | Selected reference | 34.227 / 38.231 | 1.118 [1.095, 1.140] | fail / fail |
+| ViT-B/32/1 | FP32 reference | 15.824 / 17.745 | 1.122 [1.114, 1.129] | pass / pass |
+| ViT-B/32/1 | Selected reference | 15.824 / 18.080 | 1.143 [1.136, 1.150] | pass / pass |
+| ViT-B/32/128 | FP32 reference | 950.892 / 1035.193 | 1.089 [1.056, 1.122] | pass / fail |
+| ViT-B/32/128 | Selected reference | 950.892 / 1022.693 | 1.076 [1.057, 1.095] | pass / pass |
 
-ResNet-18/CIFAR-100 updates the last residual block with a distinct coarse
-consumer and fine current task. The initial three configurations fail. A fixed
-larger-capacity grid improves the best current validation score to 45.30%,
-against healthy 43.74%, head-only 43.48% and dense 45.74%. It misses the required
-two-point net gain, so the protocol stops at one development seed without
-decoding the official test pickle. Ten completed endpoint states are independently
-replayed with zero metric error. The initial folded-bias autograd stop occurs
-before any continuation outcome and is kept separately from scientific failures.
+The budgets remain 1.20 at batch 1 and 1.10 at batch 128. Every ratio holds the
+current function at FP32 and uses the development-selected current-only program.
+The Xeon 8570 is BF16-capable; PyTorch 2.7.1 uses CPU tensors and empty CUDA
+visibility. Per-kernel AMX dispatch is not profiled. Measurements are isolated,
+with 12 warmups/31 alternating repetitions, excluding preprocessing/compilation.
+Serialized program sizes are reported separately from runtime activation memory.
+Timing repeats are not treated as independent training replicates.
 
-## Rank frontier and dense replay
+Standard whole-encoder AMP remains an important faster absolute-time control:
+its final ViT batch-128 development times are approximately 580 ms current /
+647 ms protected, versus 941/1003 ms for old-only AMP with FP32 current. Whole
+AMP misses its own matched 1.10 budget in that final run, despite passing an
+earlier timing run. Both remain; no test selection chooses the favorable run.
+The selected policy is a fixed-current-fidelity frontier on this CPU.
 
-Truncating the saved full-joint deltas by SVD on the ten confirmation endpoints
-per task locates the SNR shortfall in the rank of the required change: first-map
-rank 16 loses 0.56 points and rank 32 loses 0.02; second-map rank 24 returns the
-joint result; HAR saturates near rank 16 on both maps. A projection is a member
-of the truncated family, so these are achievable accuracies, not lower bounds.
+For the small MLPs, a fused native implementation improves absolute batch-one
+time substantially, but the matched 1.20/1.10 limits remain failed. All old
+decisions survive both audited implementations; two current near-ties differ
+from independently merged arithmetic. The original SNR dense confirmation still
+matches unrestricted joint accuracy and retains useful auxiliary regression.
 
-A dense rank-s first map admits the same exact replay through one dense m*m
-correction. Its study is registered separately, with grid (16,12), (24,16),
-(32,24) on seeds 800--802. Only SNR passes the development gate, selecting
-(16,12). Ten fresh seeds then give a primary gain of 1.257 points
-[1.037, 1.477] over detachment, -0.008 points [-0.227, 0.210] to unrestricted
-joint training, and a reconstruction ratio of 0.788 [0.754, 0.822]. All 60
-consumer checks show zero disagreement, every certificate meets the five-point
-budget, the exact reference error is zero and packed serving differs by at most
-8.4e-6 logits. The arm needs 12,288 extra MACs, half the SNR encoder, and
-measured packed/current ratios are 3.02/2.57 at batch 1/1024, so the cost target
-remains failed. HAR fails the primary gate on development (-0.59 to -1.18
-points) and is stopped there; its confirmed sparse result is unchanged.
+## Strong cheap controls and corrected rank interpretation
 
-## Loss route and scope
+All nine fixed unlabeled affine repair arms fail the visual one-percent gate
+on the three development seeds. They use 2048 isolated anchors; paired maps
+require old/new features, whereas marginal-statistic repairs do not. No repair
+uses test outcomes or a tuned ridge. They do not support the proposed generic
+CIFAR miracle of recovering almost all old performance by marginal rescaling.
 
-The probability-cell study has 114 frozen-feature, 216 joint-continuation and
-96 class-only development endpoints. Neither task passes the three-consumer
-gate. The eligible class-only HAR cell candidate is dominated by standard KL;
-an explicitly additional development futility judgment stops it before test.
-The article retains its analytic projection and high-confidence KL saturation
-example without claiming a training advantage.
+The later one-forward distilled legacy-head study is explicitly registered
+after unconstrained test loading. Its fixed lambda grid 1/10/100 fails all six
+pilot configurations; no development expansion or test confirmation follows.
+A read-only teacher/initialization audit checks every fitting view and validation
+input, with zero initial class/selective differences and negligible initial KL.
+The failure is conditional on the fixed loss, rates, data budget and schedule,
+not an impossibility statement about all distillation methods.
 
-The remaining gap is cost and external validity. The SNR accuracy shortfall is
-closed with exact replay, but measured CPU latency still exceeds 1.20/1.10, the
-dense correction costs half the encoder, the dense family fails on HAR, and no
-foundation-model result exists. The cross-task claim is therefore structural:
-compatibility is priced by the rank a task requires, not by a single method.
+Retrospective SVD truncation concerns one saved update. ReLU rescaling symmetry
+can change parameter differences without changing a function. The matched
+support/rank factorial holds the first-map rank ceiling at 16 while changing
+orientation, bias support and degrees of freedom; its three-seed contrasts have
+intervals covering zero. The dense SNR result therefore does not identify rank
+alone as the cause of the original accuracy gap. The matched folded SNR graph
+has 21,184 current MACs and 11,456 extra dense replay MACs (54.1%); the old 12,288
+count mixed heads/bias operations and an encoder-only denominator.
 
-## Artifact and computation
+## Remaining scientific scope
 
-The article has nine main pages and 82 total pages, with 23 included vector
-figures. The focused suite has 97 passing checks. Standard SLSQP may emit its
-documented intermediate bound-clipping warning during the independent optimizer
-comparison; the solution and gradient assertions pass. No bold run-in prose
-headings are introduced. Longer probe and historical filter details move to
-the supplement so the main argument stays focused.
+The strongest remaining gaps are independent reference/split replication,
+full-backbone or foundation-scale auxiliary learning, and a validated adaptive
+online intervention. There is no broad dominance over existing backward-
+compatibility methods under every data, training or hardware budget. The evidence
+supports the specific interface and computation distinctions above. The main
+text keeps that scope while presenting positive results directly.
 
-Authoring, statistical analysis, plots and LaTeX compilation are local. All
-numerical campaigns use CPU with empty CUDA visibility, at most six four-thread
-small-model workers or the specified eight-thread vision workers. All 630 new
-scientific state files have been pulled and SHA-256 checked. The transport
-ledger records approximately 1.20 GB and all owned queues finished, including
-the two retained technical failures. Runtime model JIT is recorded as numerical
-evaluation, separately from local manuscript compilation.
+## Recovered evidence and release verification
 
-The compact source and supplement include all records, plans, historical source
-bytes, scrubbed failure logs and dataset-free verification. Raw datasets and
-trained tensors remain outside the submission archives. REVIEW_CHECKS.json
-records the final extracted-archive tests, figure reconstruction and every
-page's text/pixel comparison. The previous release is preserved.
+The manuscript has 9 main pages and 91 total pages.
+The release contains 26 independently regenerated vector figures and 117 passing
+focused structural checks. The extracted source is rebuilt and compared page
+by page in both text and rendered pixels; the final result is in REVIEW_CHECKS.json.
+The known SciPy SLSQP intermediate clipping warning is retained separately from
+LaTeX diagnostics and does not invalidate its checked solution.
+
+This round recovered and SHA-256 checked 380 tensor files;
+all 10618 floating tensors are finite. Accuracy, decisions
+and certificates are recalculated locally from recovered actual output arrays.
+This output replay is not a second execution
+of the pretrained backbone; the numerical driver reconstructs and hashes its
+weights separately. One stopped screen's immutable cache was removed from the
+CPU host only after verified local recovery; the local copy remains complete.
+The ledger distinguishes cumulative recovered bytes from live remote storage.
+Two full-corpus ViT jobs hit an author-set 8 GiB guard, rather than exhausting
+the host. The user clarified the memory policy; missing endpoints resume under
+a 256 GiB host-available reserve, up to four 12-thread workers and unchanged
+numerical code/choices. All completed original records remain. This operational
+change does not modify the already finished isolated timings or decision gates.
+All this round's numerical queues are stopped, including explicitly retained
+technical failures/reissues. All writing, statistics, figures, LaTeX compilation
+and packaging take place locally. Raw datasets, official weights and trained
+tensors remain outside the compact archives, with locations in the local guide.
+Previous release folders and their evidence are preserved.

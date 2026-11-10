@@ -60,6 +60,12 @@ def main():
         q=r['differences'][key]
         for suffix,value in [('',q['mean']),('Low',q['ci95'][0]),('High',q['ci95'][1])]:macros['SuffixRNGain'+label+suffix]=f'{100*value:.2f}'
     macros.update(SuffixRNAcc=f"{100*r['absolute']['U']['mean']:.2f}",SuffixRNBound=f"{r['maximum_remaining_bound']:.4f}")
+    if 'two_block' in summary:
+        v=summary['two_block']['vit_b32']
+        for key,label in [('healthy','Healthy'),('F','Head'),('N','NonlinearHead'),('H','RichHead'),('M','FinalMLP')]:
+            q=v['differences'][key]
+            for suffix,value in [('',q['mean']),('Low',q['ci95'][0]),('High',q['ci95'][1])]:macros['SuffixViTGain'+label+suffix]=f'{100*value:.2f}'
+        macros.update(SuffixViTAcc=f"{100*v['absolute']['U']['mean']:.2f}",SuffixViTBound=f"{v['maximum_remaining_bound']:.4f}")
     (ROOT/'paper/frontier_numbers.tex').write_text('% Generated locally from recorded endpoint metrics.\n'+''.join('\\newcommand{\\'+k+'}{'+v+'}\n' for k,v in macros.items()),encoding='utf-8',newline='\n')
     lines=['\\begin{table}[t]','\\centering','\\caption{Matched SNR support/rank factorial, three development seeds. Both first-map families have rank ceiling 16; dense updates also have more parameters and a larger bias support. Accuracy is in percent; the gain is paired J--D, in points. These are validation outcomes, not fresh confirmation.}','\\label{tab:support_factorial}','\\begin{tabular}{lrrrr}','\\toprule','First map / second rank & Update params & D & J & J--D \\\\','\\midrule']
     for key,c in cells.items():lines.append(f"{key} & {c['update_parameters']:,} & {100*c['detach']['mean']:.2f} & {100*c['joint']['mean']:.2f} & {100*c['paired_gain']['mean']:+.2f} \\\\")
@@ -74,6 +80,17 @@ def main():
         lines.append(f"{labels[mode]} & {100*q['mean']:.2f} & {difference} \\\\")
     lines+=['\\bottomrule','\\end{tabular}','\\end{table}']
     (ROOT/'paper/suffix_confirmation_table.tex').write_text('\n'.join(lines)+'\n',encoding='utf-8',newline='\n')
-    print(json.dumps(dict(factorial=contrasts,resnet18=r['differences'],primary_gate=r['primary_gate']),indent=2))
+    if 'two_block' in summary:
+        v=summary['two_block']['vit_b32']
+        lines=['\\begin{table}[t]','\\centering','\\caption{ViT-B/32/CIFAR-100 test utility after the public two-block choice. Ten fresh continuation seeds share one reference and split. Accuracy is in percent; U--control intervals are paired 95\\% intervals in points.}','\\label{tab:two_block_confirmation}','\\begin{tabular}{lrr}','\\toprule','Arm & Test accuracy & U--control [95\\% interval] \\\\','\\midrule']
+        labels=dict(F='Head only (F)',N='Residual head (N)',H='Richer frozen probe (H)',M='Final MLP (M)',U='Two complete blocks (U)')
+        for mode,q in v['absolute'].items():
+            difference='--'
+            if mode!='U':
+                d=v['differences'][mode];difference=f"{100*d['mean']:+.2f} [{100*d['ci95'][0]:+.2f}, {100*d['ci95'][1]:+.2f}]"
+            lines.append(f"{labels[mode]} & {100*q['mean']:.2f} & {difference} \\\\")
+        lines+=['\\bottomrule','\\end{tabular}','\\end{table}']
+        (ROOT/'paper/two_block_confirmation_table.tex').write_text('\n'.join(lines)+'\n',encoding='utf-8',newline='\n')
+    print(json.dumps(dict(factorial=contrasts,resnet18=r['differences'],primary_gate=r['primary_gate'],two_block=summary.get('two_block')),indent=2))
 
 if __name__=='__main__':main()

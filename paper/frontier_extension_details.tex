@@ -116,6 +116,18 @@ loading. The scope comparison tests nonlinear learning capacity under one
 recipe. Prefix sharing, late fine-tuning and low-rank updates are established
 operations, rather than new learning algorithms.
 
+Ten fresh continuations $3810$--$3819$ reach $\SuffixViTAcc\%$ test accuracy.
+The paired gain over F is $\SuffixViTGainHead$ points
+$[\SuffixViTGainHeadLow,\SuffixViTGainHeadHigh]$; over H it is
+$\SuffixViTGainRichHead$ $[\SuffixViTGainRichHeadLow,\SuffixViTGainRichHeadHigh]$.
+U also exceeds the final-MLP M control by $\SuffixViTGainFinalMLP$ points.
+All $30$ class/selective contracts in this cached-prefix FP32 comparison
+certify, with zero observed changes and maximum remainder bound
+$\SuffixViTBound$. These are the same fixed-reference continuation intervals
+as the ResNet-18 study, not a full-backbone fine-tuning or population comparison.
+
+\input{two_block_confirmation_table.tex}
+
 \subsection{Matched CPU Implementations}\label{app:frontier_native}
 
 For the small MLPs, a fused float32 C++ kernel uses the same transposed
@@ -127,6 +139,10 @@ frozen before independent full-corpus serving checks on the ten saved HAR
 and dense SNR states. The original TorchScript and slower native large-batch
 paths remain in the evidence. A better ratio against a slower baseline is
 not treated as a deployment improvement.
+Both selected implementations retain every old class/selective decision on
+the full small-model corpora. Independent current merging differs on two
+near-tied predictions in the optimized audit; real-arithmetic equality does
+not imply bitwise identity. Every primary metric uses its stated arithmetic.
 
 For vision, monolithic, modular-prefix and grouped dense suffix programs
 compete against equivalently optimized one-version current programs.
@@ -141,6 +157,10 @@ Timings use an isolated twelve-thread CPU process, twelve warmups and
 $31$ alternating repetitions. Current-only, protected and independent
 function evaluations receive the same preprocessing and pruning. Input
 decoding/preprocessing, compilation and warmup are outside forward latency.
+The host is an Intel Xeon Platinum 8570, using PyTorch $2.7.1$ and
+torchvision $0.22.1$ with CPU tensors and empty CUDA visibility. AVX-512,
+BF16 and AMX capability are recorded; individual kernel dispatch is not
+profiled. These measurements do not predict another processor's latency.
 The chosen ABI is fixed on development, not selected on test timing. Full
 chosen-code replay is separated from isolated timing; identical H functions
 are counted once, with each seed's monitor certificate recomputed from its
@@ -152,6 +172,17 @@ registered the same readout tensor twice. A subsequent completed ResNet-18
 record is retained despite a queue-envelope bookkeeping error; only the
 pending ViT job is reissued. These technical events, exact executed source
 versions and logs are retained. They do not change training or selection.
+
+During the separate full-corpus replay, two ViT jobs exceed an author-set
+$8$\,GiB RSS ceiling; the queue then interrupts another job. The host is
+not exhausted: approximately $2.7$\,TB remains available at inspection.
+After the resource clarification, all completed ResNet-18 records are retained
+and the missing ViT endpoints run with the unchanged numerical programs,
+at up to four twelve-thread workers. Fixed RSS ceilings are replaced by a
+$256$\,GiB host-available reserve. This verifier holds full-corpus features
+and several programs; its RSS is distinct from single-program deployment
+storage or activation memory. Models, input counts, decisions, monitors
+and the already completed isolated timings do not change.
 
 \subsection{Precision Belongs to the Consumer Contract}\label{app:reference_precision}
 
@@ -171,7 +202,7 @@ the class and selective decisions are checked directly.
 
 Standard whole-encoder CPU AMP, retaining the FP32 affine consumer, is a
 stronger numerical control. It changes ResNet-18 class/80/50 decisions on
-$1.28/1.72/0.98\%$ of inputs, missing the screen even though accuracy rises
+$1.28/1.72/0.98\%$ of inputs, missing the screen even though legacy coarse accuracy rises
 from $54.00\%$ to $54.10\%$ and aggregate coverage remains close. ViT's
 $0.20/0.50/0.26\%$ passes the decision screen and proceeds to the fixed
 three-state utility control. Its matched lower-precision current-only
@@ -182,3 +213,133 @@ show decision-dependent margin changes~\citep{wu2026decisions}. Here the
 precision choice tests a named legacy interface alongside retained current
 utility and measured CPU cost. A small aggregate metric change supplies no
 replacement for the class and fixed-threshold audits.
+
+\subsection{Does an Unlabeled Affine Repair Suffice?}\label{app:suffix_repairs}
+
+Before ViT test loading, we evaluate the existing nine-arm repair hierarchy
+on all three fixed U development states for each selected backbone. The
+original $2048$ anchors are disjoint from model fitting and validation.
+Healthy and current features of these same images fit the maps, without
+labels. All estimators retain the original variance convention, ridge
+$10^{-3}$ and covariance eigenvalue floor. A raw-coordinate affine map is
+composed into the old readout, leaving the current fine-label function
+unchanged. This offers the cheaper one-encoder/two-head control, with
+paired-feature access distinguished from marginal statistics.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/fig_suffix_repairs.pdf}
+\caption{Complete development-only affine repair screen. Each cell is the
+largest disagreement across the three fixed continuation seeds, on all
+$5000$ validation inputs. Class and the two original fixed confidence
+thresholds are distinct consumers; 80/50 denote their healthy fitting
+coverage targets. Every arm misses the one-percent acceptance gate. No
+official test outcome selects a repair, and no failed arm proceeds to test.}
+\label{fig:suffix_repairs}
+\end{figure}
+
+No arm passes all three consumers in every seed (Figure~\ref{fig:suffix_repairs}).
+The best worst-consumer arm is Procrustes on ResNet-18, with $24.0\%$
+disagreement; paired ridge reaches $9.16\%$ on ViT. The direct old readout
+on new features reaches $25.86/15.44\%$ worst-consumer disagreement.
+These are failures under this anchor count, fixed estimator family and
+recipe. They show why a retained healthy suffix is useful here; the
+successful HAR scale repair supplies no general affine-repair guarantee.
+
+\input{suffix_direct_flows_table.tex}
+
+Direct coarse accuracy need not fall when that interface changes. Across
+these three development seeds it rises from $54.00\%$ to $55.79\%$ on
+ResNet-18; ViT remains close at $82.89\%$ versus $82.66\%$ healthy. Yet
+$4.75\%$ and $3.40\%$ of inputs, respectively, move from correct to wrong.
+The corresponding beneficial corrections are $6.54\%$ and $3.63\%$.
+Preservation therefore concerns a specified regression/decision contract;
+it does not assert that every old prediction is preferable to an update.
+
+\subsection{A Cheaper Learned Legacy Head}\label{app:vision_head_control}
+
+A subsequent control asks whether a learned affine coarse head can avoid
+the retained reference suffix. This follow-up is registered after opening
+the unconstrained test results and uses development only. The original
+models and serving choices remain fixed. Initialize the added head to the
+healthy coarse function, then train it and the same current suffix with
+fine-label CE/L2 plus $\lambda\,\mathrm{KL}(p_0\|p_\theta)$, temperature one.
+Targets are healthy coarse predictions on the same $8705$ labeled fitting
+inputs and two views; coarse labels are not used. The current head/suffix
+rates, ten epochs, explicit L2, AdamW decay and final fine-head refit are
+unchanged. The added head uses rate $10^{-4}$ without decay or explicit L2.
+It adds $10{,}260$ parameters on ResNet-18 and $15{,}380$ on ViT.
+
+\input{vision_protected_head_table.tex}
+
+The fixed weights $\lambda\in\{1,10,100\}$ all fail the joint gate on
+pilot seed $3800$ (Table~\ref{tab:vision_protected_head}). There is no
+development-grid extension or test confirmation. A read-only initialization
+audit reconstructs both initial functions on all $17{,}410$ fitting views
+and $5000$ validation inputs: initial KL is below $10^{-5}$, and every
+validation class/selective decision agrees with the original reference.
+The teacher and cached features are consistent before the learned updates.
+This fixed-recipe loss control leaves its complete outcomes available;
+different schedules, data budgets or nonlinear legacy heads are untested.
+
+\subsection{Actual Serving Outputs and Isolated Cost}\label{app:served_frontier}
+
+After the final precision screen, the fastest passing implementation is
+fixed separately at batches $1$ and $128$, with an unchanged FP32 current
+function. ResNet-18 selects its monolithic FP32 path at batch $1$ and old-
+suffix autocast at $128$. ViT selects manual BF16 reference products at
+$1$ and old-suffix autocast at $128$. The fastest full-precision reference
+implementation is also fixed as a separate control. No implementation,
+threshold, precision or training hyperparameter is selected on test results.
+
+The final standard whole-AMP control remains important: at ViT batch $128$
+it takes $647$\,ms against its own $580$\,ms current-only baseline, a
+$1.115$ ratio, versus approximately $1003/941$\,ms for selected reference-
+only autocast at fixed-current FP32. Whole AMP is faster in absolute time
+but misses its matched $1.10$ gate in the final development run. Its earlier
+timing run passed. Both records are retained, and it stops at development.
+Thus the selected mixed implementation describes a fixed-current-fidelity
+frontier on this CPU, not the fastest possible reduced-precision system.
+
+Every selected endpoint is reconstructed from its saved state, then run
+from image tensors through the actual frozen TorchScript prefix and chosen
+suffix code at both registered batch sizes. F/N/H/L or M controls use the
+same physically evaluated FP32 prefix. The original healthy coarse logits
+remain the reference. Full-precision replay and the approximate reference
+receive separate class, selective, NLL/ECE and logit-error checks. The fresh
+monitor uses RNG $14700001+\mathrm{seed}$, $1024$ inputs and tail allocation
+$0.05/2000$; the one-percent empirical and five-percent remainder gates are
+unchanged. Full-corpus output arrays are recovered for local recalculation
+of accuracy, disagreements, decision flows and certificates. This output
+replay is distinct from a second execution of the pretrained backbone.
+Serialized program sizes are collected after latency sampling, counting a
+modular prefix once. They measure exported code/constants, separately from
+runtime activation memory and process RSS; no size measurement selects an ABI.
+
+\input{served_frontier_table.tex}
+
+ResNet-18's selected actual serving has maximum class/selective disagreement $0.39\%$, with $60/60$ checks certified and largest remainder bound $0.0233$. Its full-precision control has maximum disagreement $0.00\%$ and largest logit error $8.68e-05$. The check count is three rules, two batch implementations and ten current endpoints, not independently trained old tasks.
+
+At batch $1$, current/selected/full-reference serialized programs occupy $42.8/60.9/60.9$ MiB. At batch $128$, current/selected/full-reference serialized programs occupy $42.8/51.9/60.9$ MiB. These export sizes exclude activations and runtime libraries.
+
+ViT-B/32's selected actual serving has maximum class/selective disagreement $0.14\%$, with $60/60$ checks certified and largest remainder bound $0.0178$. Its full-precision control has maximum disagreement $0.00\%$ and largest logit error $7.25e-05$. The check count is three rules, two batch implementations and ten current endpoints, not independently trained old tasks.
+
+At batch $1$, current/selected/full-reference serialized programs occupy $334.0/361.1/388.1$ MiB. At batch $128$, current/selected/full-reference serialized programs occupy $334.0/361.0/388.1$ MiB. These export sizes exclude activations and runtime libraries.
+
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/fig_serving_frontier.pdf}
+\caption{Matched actual serving cost on the same CPU. Points show ten
+endpoint medians per implementation; diamonds and bars show means and paired
+$95\%$ intervals. Top panels resolve vision overhead at batches $1/128$;
+bottom panels show the larger MLP overhead at $1/1024$, on separate scales.
+Dashed lines mark the unchanged $1.20/1.10$ budgets. Identical selected and
+full-precision programs appear once. Each denominator is the
+development-selected current-only implementation with the same FP32 current
+function. MLP batch-$1$ uses a fused single-thread C++ kernel, large-batch
+MLP uses four-thread TorchScript, and vision uses twelve-thread TorchScript.
+The exact-function construction and approximate-reference decision contract
+remain separate claims.}
+\label{fig:serving_frontier}
+\end{figure}
