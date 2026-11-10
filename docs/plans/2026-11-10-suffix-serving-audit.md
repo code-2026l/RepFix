@@ -1,7 +1,16 @@
 # Matched Suffix Serving Audit
 
+Before any cost outcome, add a packed dense comparator. Concatenate the
+two first convolutions on their common input and group later convolutions;
+for transformer suffixes concatenate the common first QKV projection, then
+batch the version-specific projections and attention. Include its one-version
+current-only form in the same fastest-baseline search. Packing changes
+floating-point association, so it receives the same full served-output audit.
+It is established grouped/concatenated evaluation, not a learning novelty.
+
 After development utility selection, compare a monolithic frozen TorchScript
-network and a modular frozen prefix plus frozen suffix TorchScript network.
+network, a modular frozen prefix plus frozen suffix TorchScript network,
+and the packed suffix with a monolithic prefix.
 Both current-only and protected implementations use identical float32 input,
 pruning, prefix, folding, threads and preallocated/preprocessed inputs. Include
 two independently called whole functions as a cost control. No duplicated

@@ -10,6 +10,7 @@ import late_vision_cpu as late
 import nonlinear_suffix_cpu as study
 from consumer_contracts import evaluate_contracts
 from suffix_serving import SuffixReadout,WholeNetwork
+from paired_suffix import pack_suffix
 
 def trace(module,sample):
     with warnings.catch_warnings():
@@ -49,7 +50,7 @@ def main(a):
     for j in range(0,len(images),128):physical.append(ts_prefix(late.preprocess(images[j:j+128],ref['metadata']['image_size'])))
     physical=torch.cat(physical);old=late.linear(part['h'],ref['heads']['coarse'])
     monitor=None if phase=='development' else np.random.default_rng(13700001+seed).choice(len(images),1024,replace=False)
-    names=['benchmark_suffix_cpu.py','suffix_serving.py',*study.NAMES]
+    names=['benchmark_suffix_cpu.py','suffix_serving.py','paired_suffix.py',*study.NAMES]
     out=dict(complete=False,device='cpu',phase=phase,arch=arch,seed=seed,threads=12,plan_sha256=a.plan_sha256,
         training_record_sha256=hashlib.sha256(a.record.read_bytes()).hexdigest(),reference_state_sha256=paired.state_hash(ref),
         source_sha256={n:hashlib.sha256(Path(__file__).with_name(n).read_bytes()).hexdigest() for n in names},
@@ -69,6 +70,11 @@ def main(a):
         out['audits'][mode]=audit
         if mode not in ['U','H']:continue
         mono0=trace(WholeNetwork(prefix,s0),sample[:1]);mono1=trace(WholeNetwork(prefix,s1),sample[:1])
+        packed0=packed1=None
+        if mode=='U':
+            reader=dict(weight=s0.weight,bias=s0.bias)
+            packed0=trace(WholeNetwork(prefix,pack_suffix(healthy,s0.current,reader,ref['heads']['coarse'],False)),sample[:1])
+            packed1=trace(WholeNetwork(prefix,pack_suffix(healthy,s0.current,reader,ref['heads']['coarse'],True)),sample[:1])
         old_only=trace(WholeNetwork(prefix,SuffixReadout(healthy,None,ref['heads']['coarse'],ref['heads']['coarse'],'F',False)),sample[:1])
         timing={}
         for batch in [1,128]:
@@ -76,6 +82,8 @@ def main(a):
             operations=dict(mono_current=lambda:mono0(x),mono_protected=lambda:mono1(x),
                 modular_current=lambda:ts0(ts_prefix(x)),modular_protected=lambda:ts1(ts_prefix(x)),
                 independent=lambda:(mono0(x),old_only(x)))
+            operations['modular_independent']=lambda:(ts0(ts_prefix(x)),old_only(x))
+            if packed0 is not None:operations.update(packed_current=lambda:packed0(x),packed_protected=lambda:packed1(x),packed_independent=lambda:(packed0(x),old_only(x)))
             for op in operations.values():
                 for _ in range(12):op()
             times={n:[] for n in operations}
@@ -91,8 +99,10 @@ def main(a):
                 backend=choice['backbones'][arch]['modes'][mode]['batches'][str(batch)]['protected']
                 result=[]
                 for j in range(0,len(images),batch):
-                    if backend=='mono_protected':result.append(mono1(late.preprocess(images[j:j+batch],ref['metadata']['image_size'])))
-                    else:result.append(ts1(ts_prefix(late.preprocess(images[j:j+batch],ref['metadata']['image_size']))))
+                    inputs=late.preprocess(images[j:j+batch],ref['metadata']['image_size'])
+                    if backend=='mono_protected':result.append(mono1(inputs))
+                    elif backend=='packed_protected':result.append(packed1(inputs))
+                    else:result.append(ts1(ts_prefix(inputs)))
                 own,legacy=[torch.cat([v[i] for v in result]) for i in [0,1]]
                 chosen[str(batch)]=dict(backend=backend,own=paired.metrics(own,y),contracts=evaluate_contracts(legacy.double(),old.double(),coarse,ref['thresholds'],monitor,.05/2000),
                     maximum_legacy_logit_error=float((legacy-old).abs().max()),

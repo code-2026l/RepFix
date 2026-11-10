@@ -39,3 +39,7 @@ def test_last_attention_pruning_matches_the_full_transformer_and_input_gradient(
     ga=torch.autograd.grad(actual.square().sum(),x,retain_graph=True)[0]
     gb=torch.autograd.grad(expected.square().sum(),x)[0]
     assert torch.allclose(ga,gb,atol=2e-13,rtol=2e-11)
+    network=nn.Sequential(prefix,suffix).eval().requires_grad_(False)
+    with torch.no_grad():
+        traced=torch.jit.freeze(torch.jit.trace(network,x.detach()[:1],check_trace=False))
+        assert torch.allclose(traced(x.detach()),expected.detach(),atol=2e-13,rtol=2e-12)
