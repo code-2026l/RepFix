@@ -42,7 +42,8 @@ appendices. `STORY_INTEGRITY_20261110.json` compares it with scientific release
 `569632c`: all 39 numbered equations, 28 mathematical statements, 22 proof bodies,
 68 table bodies, generated numerical inputs, 2,564 empirical files, citations and
 27 figure exports are unchanged. Some material moves between the main text and
-appendices. No numerical experiment is run in this editorial pass.
+appendices. Float boundaries also keep tables from the intervention controls
+from interrupting the adjacent financial-study text. No numerical experiment is run in this editorial pass.
 
 The remaining research limits are unchanged: the real visual auxiliary screens
 fail, broader pretraining generalization is untested, and novelty must be assessed
