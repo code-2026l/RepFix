@@ -47,11 +47,18 @@ def reader_logits(features,reader):
     return z
 
 
-def current_and_legacy(features,current,reader):
-    """One shared first readout product; no second encoder or reference model."""
-    h=features.float();weights=[current.weight,reader['weight']];biases=[current.bias,reader['bias']]
+@torch.no_grad()
+def pack_outputs(current,reader):
+    """Pack fixed deployment weights once, outside the timed serving closure."""
+    weights=[current.weight.detach(),reader['weight']];biases=[current.bias.detach(),reader['bias']]
     if reader['kind']=='residual32':weights.append(reader['hidden_weight']);biases.append(reader['hidden_bias'])
-    joined=F.linear(h,torch.cat(weights),torch.cat(biases));c=current.out_features;d=len(reader['bias'])
+    return dict(reader=reader,weight=torch.cat(weights),bias=torch.cat(biases),current_classes=current.out_features)
+
+
+def serve_outputs(features,packed):
+    """One shared first readout product; no second encoder or reference model."""
+    h=features.float();reader=packed['reader'];c=packed['current_classes'];d=len(reader['bias'])
+    joined=F.linear(h,packed['weight'],packed['bias'])
     now,old=joined[:,:c],joined[:,c:c+d]
     if reader['kind']=='residual32':old=old+F.linear(F.relu(joined[:,c+d:]),reader['output_weight'])
     if reader['kind']=='quadratic':old=old+F.linear(h.square(),reader['quadratic_weight'])
