@@ -20,8 +20,8 @@ def pack(p,sparse=False):
     merged=(supported if sparse else dense).merged_serving(p);m=64
     def transpose(t):return t.detach().float().T.contiguous().numpy()
     if sparse:
-        s=len(p['support']);first=torch.cat([p['first_weight'],p['first_weight'][p['support']]+p['delta1']])
-        bias=torch.cat([p['first_bias'],p['first_bias'][p['support']]+p['delta1_bias']]);left=np.zeros((1,),np.float32);bias1=np.zeros(m,np.float32);support=p['support'].float().numpy()
+        s=len(p['support']);first=p['delta1'];bias=p['delta1_bias']
+        left=np.zeros((1,),np.float32);bias1=np.zeros(m,np.float32);support=p['support'].float().numpy()
     else:
         s=p['q'].shape[0];first=torch.cat([p['first_weight'],p['q']]);bias=torch.cat([p['first_bias'],torch.zeros(s)])
         left=transpose(p['p']);bias1=p['delta1_bias'].numpy();support=np.zeros(1,np.float32)

@@ -2,6 +2,7 @@
 // C++ compilation is numerical runtime setup, not manuscript compilation.
 #include <algorithm>
 #include <cstddef>
+#include <immintrin.h>
 #ifndef DIM
 #define DIM 256
 #endif
@@ -20,6 +21,23 @@
 constexpr int M=64,D=DIM,C=CLASSES,S=FIRST_RANK,R=SECOND_RANK;
 
 static inline void mv(const float* x,const float* w,const float* b,float* y,int k,int n){
+    if(n==64 || n==80){
+        __m512 a0=b?_mm512_loadu_ps(b):_mm512_setzero_ps(),a1=b?_mm512_loadu_ps(b+16):_mm512_setzero_ps();
+        __m512 a2=b?_mm512_loadu_ps(b+32):_mm512_setzero_ps(),a3=b?_mm512_loadu_ps(b+48):_mm512_setzero_ps();
+        __m512 a4=(n==80&&b)?_mm512_loadu_ps(b+64):_mm512_setzero_ps();
+        for(int i=0;i<k;++i){__m512 z=_mm512_set1_ps(x[i]);const float* row=w+i*n;
+            a0=_mm512_fmadd_ps(z,_mm512_loadu_ps(row),a0);a1=_mm512_fmadd_ps(z,_mm512_loadu_ps(row+16),a1);
+            a2=_mm512_fmadd_ps(z,_mm512_loadu_ps(row+32),a2);a3=_mm512_fmadd_ps(z,_mm512_loadu_ps(row+48),a3);
+            if(n==80)a4=_mm512_fmadd_ps(z,_mm512_loadu_ps(row+64),a4);
+        }
+        _mm512_storeu_ps(y,a0);_mm512_storeu_ps(y+16,a1);_mm512_storeu_ps(y+32,a2);_mm512_storeu_ps(y+48,a3);
+        if(n==80)_mm512_storeu_ps(y+64,a4);return;
+    }
+    if(n<=16){
+        __mmask16 mask=static_cast<__mmask16>((1u<<n)-1u);__m512 sum=b?_mm512_maskz_loadu_ps(mask,b):_mm512_setzero_ps();
+        for(int i=0;i<k;++i)sum=_mm512_fmadd_ps(_mm512_set1_ps(x[i]),_mm512_maskz_loadu_ps(mask,w+i*n),sum);
+        _mm512_mask_storeu_ps(y,mask,sum);return;
+    }
     for(int j=0;j<n;++j)y[j]=b?b[j]:0.f;
     for(int i=0;i<k;++i){const float z=x[i];
         #pragma GCC ivdep
@@ -45,10 +63,14 @@ extern "C" void rf_empty(const float*x,const float*const*,float*y,int){y[0]=x[0]
 extern "C" void rf_replay(const float*x,const float*const*p,float*y,int batch){
     for(int n=0;n<batch;++n){
         alignas(64) float pre[M+S],old1[M],cur1[M],old2[M],cur2[M],small[R],change[M];
+        #if SPARSE
+        mv(x+n*D,p[6],p[7],pre,D,M);mv(x+n*D,p[12],p[13],pre+M,D,S);
+        #else
         mv(x+n*D,p[12],p[13],pre,D,M+S);
+        #endif
         for(int i=0;i<M;++i)old1[i]=cur1[i]=std::max(pre[i],0.f);
         #if SPARSE
-        for(int j=0;j<S;++j)cur1[static_cast<int>(p[19][j])]=std::max(pre[M+j],0.f);
+        for(int j=0;j<S;++j){int index=static_cast<int>(p[19][j]);cur1[index]=std::max(pre[index]+pre[M+j],0.f);}
         mv(old1,p[8],p[9],old2,M,M);
         for(int j=0;j<M;++j)cur2[j]=old2[j]+p[18][j];
         for(int i=0;i<S;++i){int index=static_cast<int>(p[19][i]);float delta=cur1[index]-old1[index];
