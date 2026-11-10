@@ -28,6 +28,7 @@ def first_pilot(row):
         accuracies={k:b['validation']['own']['acc'] for k,b in branches.items()},
         candidates=candidates,extend_doses=[v['alpha'] for v in candidates if v['extend']],
         detached_minus_rich_pp=100*(correct(detached)-correct(branches['H']))/n,
+        ce_transfer_meets_pilot_gate=(correct(detached)-correct(branches['H']))*500>=n,
         confirm_ce_only_if_no_auxiliary=not any(v['extend'] for v in candidates)
             and (correct(detached)-correct(branches['H']))*500>=n)
 
