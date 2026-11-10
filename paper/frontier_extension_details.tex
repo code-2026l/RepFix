@@ -1,0 +1,184 @@
+\section{Support, Learned Scope and Serving Precision}\label{app:frontier_extension}
+
+\subsection{Separating Support from Rank}\label{app:frontier_factorial}
+
+The dense SNR result changes the first-map family as well as the second-map
+rank. We therefore cross sparse versus dense first-map updates, both with
+rank ceiling $16$, with second-map ranks $8$ and $12$. The original SNR
+development references, seeds $800$--$802$, retain their data splits, Adam
+moments, $25$ continuation epochs, dose $1$, and future masked fitting
+orders. Both calibrations use the same $1024$ fitting inputs and the same
+second-map right factors. Detached and joint arms are paired within every
+cell. No test metrics are computed.
+
+\input{support_factorial_table.tex}
+
+At second-map rank $8$, dense minus sparse joint accuracy is $+0.37$ points
+with a paired three-seed $95\%$ interval $[-0.63,1.37]$. Raising the second
+rank from $8$ to $12$ changes sparse accuracy by $+0.18$ points and dense
+accuracy by $-0.05$. The dense first map also has $1072$ more update
+parameters and a bias on all $64$ channels rather than $16$. These small
+development comparisons separate the changed factors; they do not identify
+a rank-only cause or an orientation-only effect. The retrospective SVD
+projection and fresh dense SNR confirmation retain their original scope.
+
+\subsection{Opening a Complete Nonlinear Suffix}\label{app:nonlinear_suffix}
+
+All three pretrained backbones use a fixed healthy reference and split:
+$42{,}952$ CIFAR-100 fitting inputs, $5000$ validation inputs and $2048$
+isolated anchors. A fixed Bernoulli mask provides $8705$ fine-labeled
+fitting inputs. Healthy fine-$100$ and coarse-$20$ affine heads are fitted
+on that same subset. Coarse labels are derivable from fine labels; they
+are not an inaccessible-annotation assumption. Continuation does not use
+coarse labels or a consumer-preservation loss.
+
+The ImageNet-V1 ResNet-18 and ImageNet-V2 ResNet-50 use $64\times64$
+bilinear input resizing; ImageNet-V1 ViT-B/32 uses $224\times224$. The
+ImageNet input normalizer is fixed. Official torchvision weight URLs and
+SHA-256 fingerprints are retained. The pretrained parameter count describes
+the source backbone, separately from the subset updated during transfer.
+
+The final-map screen tests unrestricted and rank-$16/64/128$ updates,
+head-only continuation F, a width-$128$ residual GELU head N, and a linear
+probe H on healthy features concatenated with pooled pre-projection
+features. None of its three-epoch pilots reaches the two-point gain over F.
+Refitting primary readers with the original standardized LBFGS/L2 recipe
+recovers much of the online-head decline, without clearing that gate on
+any backbone. These negative screens remain separate from the following
+ten-epoch recipe.
+
+The complete-suffix study opens both convolutions of ResNet-18's final
+identity block, all three maps of ResNet-50's final identity block, or both
+maps of ViT's final CLS MLP. Normalization parameters stay fixed. For CNNs,
+the suffix BN transforms are folded before defining its two versions;
+their deviation is measured against the pre-existing reference arithmetic.
+Earlier computation is frozen and may be cached during training. Inference
+evaluates the actual prefix.
+
+Training uses ten AdamW epochs, weight decay $10^{-4}$, current-head rate
+$10^{-4}$ and suffix/factor rate $3\times10^{-5}$. CE includes $10^{-4}$
+times squared primary-head weights and bias; N includes its trainable
+linear layers in that penalty. This explicit head regularization differs
+from AdamW decay. Conditioning uses the two-view healthy fitting mean and
+SD, floored at $0.1$ times median positive SD. The initial affine head is
+rebased to retain its function in real arithmetic. The old readout is unchanged.
+
+Views are clean input and one fixed CIFAR training augmentation per labeled
+image: reflection padding $4$, a uniform $32\times32$ crop, and horizontal
+flip with probability $1/2$, using RNG $3901$ in fitting order. All learned
+arms use the same original fitting-index orders (seed$+20000$) and view
+choices (seed$+71000$). Final primary readers refit the same two views and
+labels, with no encoder changes. Online heads and final refits are retained
+as distinct objects. The final-map-only L control uses the same recipe;
+R64 permits rank-$64$ changes to every suffix map.
+
+Development requires at least two accuracy points over healthy and F,
+within half a point of U, N and H, and at most $1\%$ disagreement for each
+old class/selective consumer. ResNet-18 U passes all three seeds
+$3800$--$3802$; the choice is publicly frozen before test loading. Ten
+fresh continuation seeds $3810$--$3819$ then gain
+$\SuffixRNGainHead$ points $[\SuffixRNGainHeadLow,\SuffixRNGainHeadHigh]$
+over F and $\SuffixRNGainRichHead$ $[\SuffixRNGainRichHeadLow,\SuffixRNGainRichHeadHigh]$
+over H (Table~\ref{tab:suffix_confirmation}). U exceeds L by
+$\SuffixRNGainLastMap$ points. These intervals concern continuation on
+one fixed healthy reference, label mask and data split, not variation across
+independently pretrained models or populations.
+
+\input{suffix_confirmation_table.tex}
+
+H reaches $46.96\%$ test accuracy without changing the encoder; U reaches
+$\SuffixRNAcc\%$. The two improvements have different interpretations.
+H is an established frozen-feature readout control, while U learns the
+nonlinear suffix. Its smaller additional gain over H is reported alongside
+the larger gain over F. The cached-prefix FP32 U path changes none of the
+three old decisions on any test input; all $30$ specified U contracts certify
+the five-point remainder budget, with largest upper bound $\SuffixRNBound$.
+Full-prefix implementation checks are reported separately from this
+numerical representation comparison.
+
+\subsection{How Much of the Transformer Must Learn?}\label{app:attention_scope}
+
+The complete final-MLP pilot does not reach the utility gate on ViT-B/32.
+Opening its complete final attention block raises validation accuracy to
+$75.64\%$, against $73.64\%$ healthy, $74.70\%$ F and $75.06\%$ H. The
+$0.94$-point gain over F still fails. Neither screen evaluates official
+test data. A final fixed scope check opens the last two blocks, freezing
+the first ten and retaining every LayerNorm parameter. The first suffix
+block processes all tokens; the last needs only its CLS query and MLP.
+Independent full-transformer output and input-gradient checks verify this
+pruning, including dynamic-batch TorchScript evaluation.
+
+Under the same views, rates, loss and final-refit recipe, U reaches
+$77.04\%$, $77.00\%$ and $76.96\%$ on development seeds $3800$--$3802$.
+All three clear the fixed gate; M, which opens only the final MLP maps,
+remains near $75\%$. This choice is publicly fixed before official test
+loading. The scope comparison tests nonlinear learning capacity under one
+recipe. Prefix sharing, late fine-tuning and low-rank updates are established
+operations, rather than new learning algorithms.
+
+\subsection{Matched CPU Implementations}\label{app:frontier_native}
+
+For the small MLPs, a fused float32 C++ kernel uses the same transposed
+weight layout, SIMD/compiler flags and preallocated buffers for protected
+and current-only execution. Empty binding cost and C-internal repetition
+timing are retained separately. Development chooses the fastest absolute
+implementation: native at batch $1$, TorchScript at $1024$. This choice is
+frozen before independent full-corpus serving checks on the ten saved HAR
+and dense SNR states. The original TorchScript and slower native large-batch
+paths remain in the evidence. A better ratio against a slower baseline is
+not treated as a deployment improvement.
+
+For vision, monolithic, modular-prefix and grouped dense suffix programs
+compete against equivalently optimized one-version current programs.
+Grouped convolutions and batched projections apply to both one- and
+two-version implementations. The packed program does not win by assumption.
+FP32 ResNet-18 development serving is about $1.12\times$ at batch $1$ and
+$1.20\times$ at $128$; ViT is about $1.12/1.112\times$. The full-precision
+batch-$128$ results miss the $1.10$ target. H reuses a healthy trace for its
+own richer features and old head, so it has a different, cheaper frontier.
+
+Timings use an isolated twelve-thread CPU process, twelve warmups and
+$31$ alternating repetitions. Current-only, protected and independent
+function evaluations receive the same preprocessing and pruning. Input
+decoding/preprocessing, compilation and warmup are outside forward latency.
+The chosen ABI is fixed on development, not selected on test timing. Full
+chosen-code replay is separated from isolated timing; identical H functions
+are counted once, with each seed's monitor certificate recomputed from its
+actual saved output arrays. Untimed frozen-prefix reuse checks reference,
+source, corpus and state fingerprints.
+
+Two export jobs fail before timing because a reference-only comparator
+registered the same readout tensor twice. A subsequent completed ResNet-18
+record is retained despite a queue-envelope bookkeeping error; only the
+pending ViT job is reissued. These technical events, exact executed source
+versions and logs are retained. They do not change training or selection.
+
+\subsection{Precision Belongs to the Consumer Contract}\label{app:reference_precision}
+
+The protected-only precision probe keeps the current function and shared
+prefix at FP32. Reference matrix products use BF16; their results return to
+FP32 before adding the original biases. Norms, attention, activations,
+residuals and the frozen affine consumer remain FP32. This changes the
+reference implementation, so its claim is a measured decision contract,
+not the exact-function identity of the FP32 construction.
+
+On $5000$ development inputs, ResNet-18 class/80/50 disagreements are
+$0.32/0.28/0.18\%$; ViT disagreements are $0.02/0.06/0.08\%$. Both pass
+the same one-percent screen, using only paired outputs for precision
+selection. No labels, fitted temperatures or output corrections select the
+precision. Maximum logit errors are $0.104$ and $0.087$, respectively;
+the class and selective decisions are checked directly.
+
+Standard whole-encoder CPU AMP, retaining the FP32 affine consumer, is a
+stronger numerical control. It changes ResNet-18 class/80/50 decisions on
+$1.28/1.72/0.98\%$ of inputs, missing the screen even though accuracy rises
+from $54.00\%$ to $54.10\%$ and aggregate coverage remains close. ViT's
+$0.20/0.50/0.26\%$ passes the decision screen and proceeds to the fixed
+three-state utility control. Its matched lower-precision current-only
+baseline is reported separately from a fixed-current-FP32 ratio.
+
+These numerical operations are standard. Low-bit language-model studies also
+show decision-dependent margin changes~\citep{wu2026decisions}. Here the
+precision choice tests a named legacy interface alongside retained current
+utility and measured CPU cost. A small aggregate metric change supplies no
+replacement for the class and fixed-threshold audits.
