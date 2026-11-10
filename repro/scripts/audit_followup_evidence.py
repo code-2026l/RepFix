@@ -55,14 +55,16 @@ def auxiliary(root):
         changes=(outputs(raw['old_logits'],thresholds)!=outputs(raw['cached_old_logits'],thresholds)).sum(0).tolist()
         assert row['all_old_decisions_unchanged']==(sum(changes)==0)
         for b in row['branches']:
-            value=raw['branches'][b['mode']];correct=int((value['own_logits'].argmax(1)==raw['labels']).sum())
+            value=raw['branches'][b['mode']]
+            predictions=value['own_logits'].argmax(1) if 'own_logits' in value else value['own_predictions']
+            correct=int((predictions==raw['labels']).sum())
             assert correct==b['correct'] and abs(correct/len(raw['labels'])-b['accuracy'])<1e-12
             for dose,errors in value.get('squared_errors',{}).items():
                 assert abs(float(errors.mean())-b['mse_by_dose'][dose])<2e-7
         audited.append(dict(record=path.name,arch=row['arch'],reference_seed=row['reference_seed'],seed=row['seed'],
             state_sha256=sha(state),finite_tensors=tensors,replayed_branches=len(row['branches']),
             old_decision_change_counts=changes,source_model_execution='separate CPU saved-state process',
-            local_verification='all returned logits and per-image reconstruction errors'))
+            local_verification='all returned decisions, legacy logits and per-image reconstruction errors'))
     assert audited
     return audited
 

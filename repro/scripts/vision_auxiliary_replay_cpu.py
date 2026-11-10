@@ -57,7 +57,10 @@ def main(a):
         assert abs(acc-branch['validation']['own']['acc'])<1e-12
         entry=dict(mode=mode,accuracy=acc,correct=int((z.argmax(1)==labels).sum()),
             state_sha256=sha(path),finite_saved_tensors=checked_tensors,own_logit_max_error=None,mse_by_dose={})
-        saved=dict(own_logits=z)
+        # The independent forward checks full logits against the checkpoint.
+        # Return compact decisions for local accuracy replay; retain both full
+        # legacy arrays because their confidence thresholds are also audited.
+        saved=dict(own_predictions=z.argmax(1))
         if mode not in ['F','N','H']:
             assert entry['state_sha256']==branch['state_sha256']
             entry['own_logit_max_error']=float((z-state['own_logits']).abs().max())
