@@ -50,6 +50,7 @@
 \input{dense_replay_numbers.tex}
 \input{frontier_numbers.tex}
 \input{served_frontier_numbers.tex}
+\input{reference_replication_numbers.tex}
 
 % ─── Compact table style (tighter spacing/format) ───
 \setlength{\tabcolsep}{4pt}          % default 6pt -> tighter column padding
@@ -64,14 +65,14 @@
 \maketitle
 
 \begin{abstract}
-An updated encoder can remain accurate while breaking the readout already in use. We study this separation between task information and readout compatibility. Across ten matched HAR seeds, unlabeled scale correction restores frozen-readout accuracy from $\CpuHarJointMid$ to $\MechHarScalarMid$ without changing the learned encoder. A reconstruction auxiliary shows the same failure while its own objective improves. Exact affine boundaries explain the scale component; a signed update audit identifies contraction that task-gradient conflict leaves unresolved. To retain an existing consumer during further learning, we derive a construction that shares healthy computation with a trainable nonlinear path. Matched HAR/SNR studies preserve useful auxiliary learning and existing class and confidence-threshold decisions. On CIFAR-100, complete-suffix transfer exceeds stronger frozen-feature probes by $\ServedRNGainRichHead$ points on ResNet-18 and $\ServedViTGainRichHead$ on ViT-B/32 across ten fresh continuation seeds per backbone. With FP32 current outputs and an approximate reference branch, the selected ViT implementation meets both CPU latency and old-decision budgets.
+An updated encoder can remain accurate while breaking the readout already in use. We study this separation between retained decodability and readout compatibility. Across ten matched HAR seeds, unlabeled scale correction restores frozen-readout accuracy from $\CpuHarJointMid$ to $\MechHarScalarMid$ without changing the learned encoder. A reconstruction auxiliary shows the same failure while its own objective improves. Exact affine boundaries explain the scale component; a signed update audit identifies contraction that task-gradient conflict leaves unresolved. To retain an existing consumer during further learning, we derive a construction that shares healthy computation with a trainable nonlinear path. Matched HAR/SNR studies preserve useful auxiliary learning and existing class and confidence-threshold decisions. On CIFAR-100, complete-suffix transfer improves over stronger frozen-feature probes on ResNet-18 and ViT-B/32. Across four independently fitted ViT reference groups, the gain is $\ReferenceViTGainH$ points $[\ReferenceViTGainHLow,\ReferenceViTGainHHigh]$, with intervals over reference means. With FP32 current outputs and an approximate reference branch, the selected ViT implementation meets both CPU latency and old-decision budgets.
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
 
-Further training changes an encoder's features. Its current head adapts, but a deployed readout may retain the weights and input statistics it was shipped with. Frozen-monitor staleness and label-free realignment are already documented~\citep{duan2026staleness}. We isolate the scale mechanism and ask what useful learning costs when specified old decisions must survive.
+Further training changes an encoder's features. Its current head adapts, but a deployed readout may retain the weights and input statistics it was shipped with. Frozen-monitor staleness and label-free realignment connect this problem to model maintenance~\citep{duan2026staleness}. We isolate the scale mechanism and ask what useful learning costs when specified old decisions must survive.
 
-We isolate the failure by cloning a healthy HAR model with its Adam state, retaining the fitted readout, and continuing matched branches on identical minibatches. Across ten seeds at variance-auxiliary dose $3$, frozen-readout accuracy falls from $\CpuHarHealthy$ to $\CpuHarJointMid$ while the jointly trained head reaches $\CpuHarOwnMid$. One global input-scale correction, fitted without new labels, restores $\MechHarScalarMid$ (Figure~\ref{fig:overview}b). We call this component \emph{silent scale shift}: the task information survives, and the existing readout no longer fits its input.
+We isolate the failure by cloning a healthy HAR model with its Adam state, retaining the fitted readout, and continuing matched branches on identical minibatches. Across ten seeds at variance-auxiliary dose $3$, frozen-readout accuracy falls from $\CpuHarHealthy$ to $\CpuHarJointMid$ while the jointly trained head reaches $\CpuHarOwnMid$. One global input-scale correction, fitted without new labels, restores $\MechHarScalarMid$ (Figure~\ref{fig:overview}b). We call this component \emph{silent scale shift}: the task remains decodable, and the existing readout no longer fits its input.
 
 The failure does not need a synthetic auxiliary. HAR reconstruction lowers held-out MSE to $\ReconHarMseRatioHigh$ of the dose-matched detached decoder while frozen-readout accuracy falls to $\ReconHarFrozenHigh$; a linear map fitted to paired old and new training features restores $\ReconHarPairedLinearHigh$, with the encoder and reconstruction head unchanged (Figure~\ref{fig:overview}c). The auxiliary improves as the old readout fails, yet the scatter criterion used to detect collapse never fires.
 
@@ -323,9 +324,14 @@ blocks then gains $\ServedViTGainHead$ points
 $[\ServedViTGainHeadLow,\ServedViTGainHeadHigh]$ over F and
 $\ServedViTGainRichHead$ $[\ServedViTGainRichHeadLow,\ServedViTGainRichHeadHigh]$
 over H on ten fresh continuations. The L/M controls isolate the smaller
-learned scopes. Each study conditions on one healthy reference and split;
-these are supervised-transfer gains, separate from the HAR/SNR auxiliary
-results (Appendices~\ref{app:nonlinear_suffix}--\ref{app:attention_scope}).
+learned scopes. A separate confirmation varies fitted references, masks and
+partitions: four ViT reference groups, each with three new continuations,
+gain $\ReferenceViTGainH$ points $[\ReferenceViTGainHLow,\ReferenceViTGainHHigh]$
+over H, with intervals across reference means. The ImageNet weights remain
+shared. These are supervised-transfer gains; a separately fixed visual
+reconstruction screen finds no qualifying auxiliary gain
+(Appendices~\ref{app:nonlinear_suffix}--\ref{app:attention_scope},
+\ref{app:vision_auxiliary_new}--\ref{app:reference_replication}).
 
 Cheaper repairs fail the same compatibility screen. None of nine unlabeled
 visual repairs meets the one-percent class/selective disagreement gate on

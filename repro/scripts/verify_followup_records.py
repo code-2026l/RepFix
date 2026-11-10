@@ -41,6 +41,9 @@ def verify(root):
     assert all(sum(r['old_decision_change_counts'])==0 for r in replay['auxiliary'])
     execution=read('followup_execution_audit.json')
     assert execution['complete'] and execution['all_owned_queues_stopped'] and not execution['gpu_compute_used']
+    finite=read('followup_finite_state_audit.json')
+    assert finite['complete'] and finite['all_returned_floating_tensors_finite'] and finite['states']==29
+    assert finite['transport_audit_sha256']==hashlib.sha256((base/'followup_execution_audit.json').read_bytes()).hexdigest()
     return dict(routing_development_endpoints=6,routing_policies_replayed=480,
         real_visual_auxiliary_pilots=2,auxiliary_confirmation_runs=0,
         independent_fitted_references=4,transfer_confirmation_runs=12,

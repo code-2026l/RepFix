@@ -21,13 +21,20 @@ Full-precision and approximate reference implementations have distinct actual
 consumer/cost records. The [scientific assessment](docs/FINAL_REVIEW_20261110.md)
 reports every failed budget, negative control and remaining scope condition.
 
+A separate confirmation varies four fitted ViT references, label masks and
+train/validation partitions, with three continuation seeds per reference.
+The gain over richer frozen features is 1.39 [0.80, 1.97] points, using four
+reference means for the interval. Both real visual reconstruction pilots fail
+their fixed auxiliary-benefit gate; conditional-reference routing also stops
+at development. See the [follow-up report](docs/FOLLOWUP_REPORT_20261110.md).
+
 ![Shared computation and fresh transfer](paper/figures/fig_suffix_frontier.png)
 
 ## Paper and files
 
-- [Final paper](paper/RepFix_ICLR2027.pdf): 9 main pages, 90 total.
-- [Supplementary archive](artifacts/2026-11-10/RepFix_ICLR_Refined_20261110_supplement.zip)
-- [Editable source and evidence](artifacts/2026-11-10/RepFix_ICLR_Refined_20261110_source.zip)
+- [Final paper](paper/RepFix_ICLR2027.pdf): 9 main pages, 92 total.
+- [Supplementary archive](artifacts/2026-11-10/RepFix_ReferenceAudit_20261110_supplement.zip)
+- [Editable source and evidence](artifacts/2026-11-10/RepFix_ReferenceAudit_20261110_source.zip)
 - [Reading guide](docs/REVIEWER_GUIDE.md) · [Evidence index](docs/EVIDENCE_INDEX.md)
 - [Editorial and figure refinement](docs/EDITORIAL_FINISH_20261110.md) · [Integrity checks](docs/EDITORIAL_VISUAL_VERIFICATION_20261110.json)
 
@@ -46,8 +53,8 @@ python -m pip install -r requirements-review.txt
 python repro/scripts/verify_supplement.py --tests --figures --paper
 ```
 
-This runs in a temporary copy and preserves the extracted source. It checks 117
-focused structural tests, reconstructs 26 manuscript figures from recorded data,
+This runs in a temporary copy and preserves the extracted source. It checks 132
+focused structural tests, reconstructs 27 manuscript figures from recorded data,
 and compares the rebuilt paper's page text and pixels. LaTeX requires `pdflatex`,
 `bibtex` and `pdftotext`. See the [reproduction guide](docs/REPRODUCIBILITY.md).
 

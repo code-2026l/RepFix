@@ -48,7 +48,7 @@ thread. The hardware timings reported in the paper retain their original setup.
 python repro/scripts/verify_supplement.py --tests
 ```
 
-The 117 tests cover finite-corpus disagreement bounds, repair availability, affine
+The 132 tests cover finite-corpus disagreement bounds, repair availability, affine
 scale boundaries, normalized-head nullspaces, constrained affine folding,
 nonlinear fusion, exact-count selection at a zero-benefit tie, invertible chart folding,
 vision access/split controls, and teacher-head fitting on affine and nonlinear
@@ -63,7 +63,7 @@ python repro/scripts/verify_supplement.py --figures
 ```
 
 The helper runs `repro/scripts/render_paper_figures.py` in a temporary copy. The
-coordinated generators reconstruct all 26 included figures from shipped
+coordinated generators reconstruct all 27 included figures from shipped
 records. It compares plotted numerical artists and dimensions with the release
 manifest. Files are exported as PDF, PNG, and SVG at a 5.5-inch width.
 
@@ -300,3 +300,22 @@ queue. Both sets use the same numerical program hashes and frozen choices.
 The isolated latency measurements were already complete and are not repeated
 under this concurrent replay load. See `frontier_memory_policy.json` and the
 resource plan for the exact operational change.
+
+
+## Reference and auxiliary follow-up
+
+`docs/plans/2026-11-10-independent-vision-auxiliary.md` fixes the data, gate,
+seed hierarchy and conditional confirmation before outcomes. The corrected
+`vision_auxiliary_cpu.py` isolates decoder optimizer moments. The first ResNet
+attempt is technically invalid and excluded; source snapshots and its exclusion
+are retained. The two valid pilots fail the real-auxiliary gate. Only ViT's
+predeclared CE-only fallback advances to four new fitted references.
+
+`analyze_reference_replication.py` computes intervals over reference means;
+`audit_followup_evidence.py` checks returned arrays locally. Full suffix and
+healthy-consumer forwards are separately executed by
+`vision_auxiliary_replay_cpu.py` on CPU. This avoids treating the training
+record's cached-reference-versus-itself comparison as an independent replay.
+`followup_execution_audit.json` records all nine stopped numerical queues,
+including failures, file fingerprints, recovered outputs and unbundled caches.
+The review verifier checks these records without fetching excluded weights.

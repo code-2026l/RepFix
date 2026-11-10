@@ -174,3 +174,23 @@ The original and current studies have separate names, plans and monitors. Raw
 cached-prefix metrics, actual chosen-code metrics, exact-function algebra and
 approximate-reference contracts are separate records. The source package also
 preserves byte-level result provenance across Git checkout line-ending policies.
+
+
+## Fixed-protocol follow-up, 2026-11-10
+
+- `conditional_reference_development/`: six endpoints, all 480 routing policies;
+  `conditional_reference_choice.json`: neither backbone advances.
+- `vision_auxiliary_preparation/`, `vision_auxiliary_development/`: canonical
+  training-only population and both valid real-reconstruction pilots.
+- `vision_auxiliary_first_pilot_choice.json`, `vision_auxiliary_development_choice.json`:
+  fixed stopping rules and CE-only ViT fallback, no auxiliary confirmation.
+- `vision_reference_confirmation/`, `vision_reference_summary.json`: four new
+  fitted references, three continuations each, reference-level inference.
+- `vision_auxiliary_replay/`, `vision_reference_replay/`: separate saved-model
+  execution; `followup_output_replay.json`: local output recalculation.
+- `followup_execution_audit.json`, `followup_finite_state_audit.json`: stopped
+  queues, preserved technical exclusions and returned-tensor checks.
+
+Paths above are relative to `repro/results/CPUCONT/`. Raw datasets, large prefix
+caches and trained weights are not bundled. Executed historical source bytes
+remain under `repro/source_versions/`.

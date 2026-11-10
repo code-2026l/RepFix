@@ -60,8 +60,7 @@ Backbone & Auxiliary weight & Primary gain (points) & MSE ratio & Extend \\
 train/validation partitions. Each entry averages three continuation seeds.
 F is an affine frozen-feature reader, N a learned nonlinear reader, H the
 richer frozen-feature reader, and D the CE-only learned suffix. All use the
-same fitting labels and final reader procedure. Accuracies and differences
-are in percentage points. The ImageNet pretrained weights remain shared.}
+same fitting labels and final reader procedure. Accuracies are percentages; D$-$H is in percentage points. The ImageNet pretrained weights remain shared.}
 \label{tab:reference_replication}
 \begin{tabular}{lrrrrrr}\toprule
 Reference & Labels & F & N & H & D & D$-$H \\

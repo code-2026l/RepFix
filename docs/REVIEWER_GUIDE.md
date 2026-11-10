@@ -14,12 +14,14 @@ and matched CPU overhead rather than inferring deployment cost from MACs.
 | Why retain a reference rather than simply repair or distill? | Scope/repair/control appendix | Nine affine repairs and fixed one-forward distilled-head controls, all outcomes |
 | Which actual programs meet the cost and consumer gates? | Deployment table and serving appendix | Full FP32 and selected reference programs, actual outputs, isolated latency and export sizes |
 | Does saved matrix rank identify a scientific law? | Rank/factorial appendix | Same-rank support comparison, SVD scope and gauge counterexample |
-| What remains open? | FINAL_REVIEW_20261110.md | Independent references/splits, full-backbone auxiliary learning, online policy |
+| Does transfer survive new reference fits and partitions? | Reference-replication appendix | Four fitted ViT references, twelve nested continuations; reference-level intervals |
+| What remains open? | FINAL_REVIEW_20261110.md | Real visual auxiliary benefit, broader backbones/pretraining and online policy |
 | Can the compact artifact be checked? | REPRODUCIBILITY.md | Manifest, structural tests, reconstructed figures and all-page comparison |
 
 Class decisions, confidence-threshold decisions and complete logits are different
 interfaces. Repairing new terminal features and retaining a healthy output path
-also require different access. Visual gains here concern supervised transfer on
-one fixed reference/split; the HAR/SNR studies provide separate real auxiliary-
+also require different access. The original visual test gains condition on one reference/split per backbone;
+a new ViT validation confirmation varies four fitted references and partitions.
+These concern supervised transfer; the HAR/SNR studies provide separate real auxiliary-
 learning evidence. The raw-state transport and local output checks say precisely
 which computations are repeated and which inputs remain outside the ZIP.

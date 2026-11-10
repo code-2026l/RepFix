@@ -120,17 +120,23 @@ count mixed heads/bias operations and an encoder-only denominator.
 
 ## Remaining scientific scope
 
-The strongest remaining gaps are independent reference/split replication,
-full-backbone or foundation-scale auxiliary learning, and a validated adaptive
-online intervention. There is no broad dominance over existing backward-
+A new four-reference ViT confirmation supports transfer beyond the original
+fitted reference, partition and label mask: D-H is +1.39 [0.80, 1.97] points;
+against each reference's strongest mean F/N/H control it is +1.35 [0.88, 1.81].
+The interval uses four reference means (df=3), with three continuations each.
+Shared ImageNet weights and the training population remain fixed.
+
+Real visual auxiliary benefit remains open: neither fixed reconstruction pilot
+passes its joint gain/MSE gate. Full-backbone or foundation-scale auxiliary
+learning and a validated adaptive online intervention also remain open. There is no broad dominance over existing backward-
 compatibility methods under every data, training or hardware budget. The evidence
 supports the specific interface and computation distinctions above. The main
 text keeps that scope while presenting positive results directly.
 
 ## Recovered evidence and release verification
 
-The manuscript has 9 main pages and 90 total pages.
-The release contains 26 independently regenerated vector figures and 117 passing
+The manuscript has 9 main pages and 92 total pages.
+The release contains 27 independently regenerated vector figures and 132 passing
 focused structural checks. The extracted source is rebuilt and compared page
 by page in both text and rendered pixels; the final result is in REVIEW_CHECKS.json.
 The known SciPy SLSQP intermediate clipping warning is retained separately from
@@ -154,3 +160,23 @@ technical failures/reissues. All writing, statistics, figures, LaTeX compilation
 and packaging take place locally. Raw datasets, official weights and trained
 tensors remain outside the compact archives, with locations in the local guide.
 Previous release folders and their evidence are preserved.
+
+
+## New research follow-up
+
+The complete fixed-protocol follow-up is recorded in FOLLOWUP_REPORT_20261110.md.
+It adds 480 replayed routing policies, two valid real-auxiliary pilots and twelve
+transfer confirmations across four fitted references. Separate CPU saved-model
+replays cover fourteen study records and sixty-two branch outputs. All legacy
+class and threshold decisions agree; maximum old-logit rounding error is
+1.05e-5. Local checks verify returned decisions, legacy logits and reconstruction
+errors. Twenty-nine returned tensor files are SHA-256 checked; all 365 floating
+tensors are finite. Large canonical caches and other regenerable model states
+remain outside the compact archives.
+
+Duan (2026), arXiv:2606.15980, directly studies activation-monitor staleness and
+unlabeled realignment. The paper now cites it in the introduction and related
+work. The contribution cannot be the generic observation of staleness or the
+invention of label-free repair. Scale interventions, specified decision rules
+and the measured preservation/utility/cost comparison carry the narrower case.
+The new screen failures are conditional evidence, not impossibility results.

@@ -25,7 +25,7 @@ def main():
         for r in rows:
             a.annotate(f"{r['alpha']:g}",(r['dose_matched_mse_ratio'],r['gain_pp']),
                 xytext=(4,5),textcoords='offset points',fontsize=7.2,color=color)
-    a.text(.842,.265,'Joint gate',fontsize=7.2,color=C['repair'])
+    a.text(.842,.265,'Advance',fontsize=7.2,color=C['repair'])
     a.set(xlim=(.83,1.035),ylim=(-.64,.33),xlabel='Dose-matched MSE ratio',ylabel='Primary gain over D (points)')
     a.set_xticks([.85,.95,1.]);a.set_yticks([-.6,-.4,-.2,0,.2])
     a.legend(loc='upper center',bbox_to_anchor=(.5,-.31),ncol=2,fontsize=7.1,
