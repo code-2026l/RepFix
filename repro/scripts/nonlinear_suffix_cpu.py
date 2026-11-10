@@ -101,6 +101,7 @@ def branch(a):
         time.sleep(2)
     assert json.loads(prepared.read_text())['complete']
     ref=torch.load(a.reference,map_location='cpu',weights_only=True);cached=torch.load(a.reference.with_name('cache.pt'),map_location='cpu',weights_only=True)
+    assert ref['plan_sha256']==a.plan_sha256
     _,healthy=build_full(ref['arch']);healthy.load_state_dict(ref['healthy']);healthy.requires_grad_(False);train=cached['train'];part=cached['validation']
     modes=['F','N','H','L','U','R64'];phase='development';monitor=None
     if a.choice is not None:
@@ -135,10 +136,14 @@ def branch(a):
                     if any(p.grad is not None and not torch.isfinite(p.grad).all() for g in groups for p in g['params']):raise FloatingPointError('Nonfinite full-suffix gradient')
                     optimizer.step()
                 trace.append(dict(epoch=epoch+1,loss=float(loss.detach())));print(json.dumps(dict(arch=ref['arch'],seed=a.seed,mode=mode,epoch=epoch+1)),flush=True)
+            with torch.no_grad():
+                online_features=embed(healthy if update is None else update,part['x'])
+                online_own=paired.metrics(head(online_features),part['y'])
             all_x=train['x'].flatten(0,1);all_h=train['h'].flatten(0,1)
             fit_features=current_features(update,head,mode,all_x,all_h);reader=fit_reader(fit_features,train['y'].repeat(2))
             row=dict(mode=mode,trace=trace,minibatch_order_sha256=order_sha.hexdigest(),view_order_sha256=view_sha.hexdigest(),
-                validation=score(update,head,mode,part,healthy,ref,reader,monitor),trainable_parameters=sum(p.numel() for g in groups for p in g['params']))
+                validation=score(update,head,mode,part,healthy,ref,reader,monitor),online_own=online_own,
+                trainable_parameters=sum(p.numel() for g in groups for p in g['params']))
             state=dict(mode=mode,head=head.state_dict(),reader=reader)
             if update is not None:
                 if mode=='R64':state['update']={k:v for k,v in update.state_dict().items() if k.endswith(('.u','.v','.delta_bias'))}
@@ -152,7 +157,28 @@ def branch(a):
     assert len({b['view_order_sha256'] for b in out['branches'] if 'view_order_sha256' in b})==1
     out.update(complete=True,elapsed_s=time.time()-start);paired.save_json(a.out,out)
 
+@torch.no_grad()
+def prepare_test(a):
+    ref=torch.load(a.reference,map_location='cpu',weights_only=True);choice=json.loads(a.choice.read_text())
+    assert ref['plan_sha256']==a.plan_sha256 and choice['backbones'][ref['arch']]['selected'] in ['U','R64']
+    original=torch.load(a.original_reference,map_location='cpu',weights_only=True)
+    assert paired.state_hash(original)==ref['source_reference_sha256']
+    images,y,coarse,sha=late.images(False)
+    # Keep the pre-existing reference arithmetic as the comparison, rather than
+    # comparing the folded suffix with itself.
+    prefix,tail,norm,_=late.build_backbone(ref['arch'],True)
+    tail.load_state_dict(original['tail']);norm.load_state_dict(original['norm'])
+    values=late.collect(prefix,tail,norm,images,torch.arange(len(images)),ref['metadata']['image_size'],torch.ones(len(images),dtype=torch.bool))
+    part=dict(x=values['residual'],h=values['h'],y=y,coarse=coarse)
+    folder=a.out.parent/(a.out.stem+'_states');folder.mkdir(exist_ok=True,parents=True)
+    cache=dict(test=part,reference_state_sha256=paired.state_hash(ref),data_sha256=sha)
+    torch.save(cache,folder/'test_cache.pt')
+    paired.save_json(a.out,dict(complete=True,device='cpu',phase='nonlinear_test_after_selection',arch=ref['arch'],
+        plan_sha256=a.plan_sha256,selection_sha256=hashlib.sha256(a.choice.read_bytes()).hexdigest(),source_sha256=sources(),
+        reference_state_sha256=paired.state_hash(ref),cache_state_sha256=paired.state_hash(cache),data_sha256=sha,branches=[]))
+
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--stage',choices=['prepare','branch'],required=True);p.add_argument('--reference',type=Path,required=True)
+    p=argparse.ArgumentParser();p.add_argument('--stage',choices=['prepare','branch','test'],required=True);p.add_argument('--reference',type=Path,required=True)
+    p.add_argument('--original-reference',type=Path)
     p.add_argument('--seed',type=int);p.add_argument('--choice',type=Path);p.add_argument('--test-cache',type=Path);p.add_argument('--plan-sha256',required=True);p.add_argument('--out',type=Path,required=True);a=p.parse_args()
-    torch.set_num_threads(12);torch.set_num_interop_threads(1);{'prepare':prepare,'branch':branch}[a.stage](a)
+    torch.set_num_threads(12);torch.set_num_interop_threads(1);{'prepare':prepare,'branch':branch,'test':prepare_test}[a.stage](a)

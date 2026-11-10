@@ -71,19 +71,22 @@ def main(a):
                             internal[name]=duration
                     row['timings'][str(batch)]=dict(samples_seconds=values,medians_seconds={name:float(np.median(v)) for name,v in values.items()},kernel_samples_seconds=internal)
                 # Audit the selected post-development serving path on the entire corpus.
-                actual=[];comparison=[]
-                backend='native_replay' if selected is None else selected['domains'][domain]['batches']['1']['protected']
-                for j in range(0,len(x),1024):
-                    block=x[j:j+1024]
-                    if backend.startswith('native'):
-                        z=torch.from_numpy(native.call(block.numpy(),'independent' if backend=='native_independent' else 'replay').copy());actual.append((z[:,:c],z[:,c:]))
-                    else:actual.append(ts_replay(block))
-                    comparison.append(ts_current(block))
-                own,legacy=[torch.cat([v[i] for v in actual]) for i in [0,1]];target=torch.cat(comparison)
                 monitor=None if a.phase=='development' else np.random.default_rng(12700001+seed+(100000 if supported else 0)).choice(len(x),1024,replace=False)
-                row['audit']=dict(backend=backend,own=paired.metrics(own,y),contracts=evaluate_contracts(legacy.double(),old,y,reference['thresholds'],monitor,.05/2000),
-                    maximum_legacy_logit_error=float((legacy.double()-old).abs().max()),maximum_current_merge_logit_error=float((own-target).abs().max()),
-                    current_merge_prediction_changes=int((own.argmax(1)!=target.argmax(1)).sum()))
+                backends=['native_replay'] if selected is None else list(dict.fromkeys(v['protected'] for v in selected['domains'][domain]['batches'].values()))
+                row['audits']={}
+                for backend in backends:
+                    actual=[];comparison=[]
+                    for j in range(0,len(x),1024):
+                        block=x[j:j+1024]
+                        if backend.startswith('native'):
+                            z=torch.from_numpy(native.call(block.numpy(),'independent' if backend=='native_independent' else 'replay').copy());actual.append((z[:,:c],z[:,c:]))
+                        else:actual.append(ts_replay(block))
+                        comparison.append(ts_current(block))
+                    own,legacy=[torch.cat([v[i] for v in actual]) for i in [0,1]];target=torch.cat(comparison)
+                    row['audits'][backend]=dict(backend=backend,own=paired.metrics(own,y),contracts=evaluate_contracts(legacy.double(),old,y,reference['thresholds'],monitor,.05/2000),
+                        maximum_legacy_logit_error=float((legacy.double()-old).abs().max()),maximum_current_merge_logit_error=float((own-target).abs().max()),
+                        current_merge_prediction_changes=int((own.argmax(1)!=target.argmax(1)).sum()))
+                row['audit']=row['audits'][backends[0]]
                 out['branches'].append(row);paired.save_json(a.out.with_suffix('.partial.json'),out)
                 print(json.dumps(dict(domain=domain,seed=seed,mode=mode,seconds=time.time()-start)),flush=True)
     out.update(complete=True,elapsed_s=time.time()-start);paired.save_json(a.out,out)
