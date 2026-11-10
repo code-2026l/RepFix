@@ -38,10 +38,13 @@ def main(a):
     head=base.initial_head(ref);opt=torch.optim.AdamW([dict(params=[p for p in model.parameters() if p.requires_grad],lr=.00003),dict(params=head.parameters(),lr=.0001)],weight_decay=.0001)
     fit=ref['fitting'];val=ref['validation'];mask=ref['label_mask'];xx=cache['x'][:,fit];y=cache['y'][fit]
     rng=torch.Generator().manual_seed(a.seed+20000);vrng=torch.Generator().manual_seed(a.seed+71000);trace=[]
-    for epoch in range(10):
+    for epoch in range(a.epochs):
         ce_sum=aux_sum=0.;batches=0
         for idx in torch.randperm(len(fit),generator=rng).split(128):
             view=torch.randint(2,(len(idx),),generator=vrng);h=model(xx[view,idx]);ce=base.primary_loss(head,h,y[idx],mask[idx])
+            if a.primary_two_view:
+                assert a.alpha==0
+                other=model(xx[1-view,idx]);ce=(ce+base.primary_loss(head,other,y[idx],mask[idx]))/2
             aux=ce*0
             if a.alpha:
                 other=model(xx[1-view,idx]);aux=contrastive(h,other,head.mean,head.sd)
@@ -67,7 +70,7 @@ def main(a):
             accuracy=info['validation']['own']['acc'],contrastive_loss=evaluate_aux(detached,cache['x'][:,val],dhead))
     value=dict(complete=True,device='cpu',phase='contrastive_'+a.phase,alpha=a.alpha,reference_seed=a.reference_seed,seed=a.seed,
         plan_sha256=a.plan_sha256,source_sha256={Path(__file__).name:base.digest(Path(__file__)),**base.sources()},official_test_loaded=False,
-        validation=own,contrastive_loss=aux,baseline=baseline,healthy_path='retained frozen prefix/suffix; cached output pending independent replay',trace=trace,
+        validation=own,contrastive_loss=aux,baseline=baseline,epochs=a.epochs,primary_two_view=a.primary_two_view,healthy_path='retained frozen prefix/suffix; cached output pending independent replay',trace=trace,
         state_sha256=base.digest(state),elapsed_s=time.time()-start,branches=[])
     base.save(a.out,value);print(json.dumps(dict(complete=True,alpha=a.alpha,accuracy=own['acc'],auxiliary_loss=aux)),flush=True)
 
@@ -75,5 +78,6 @@ def main(a):
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--population',type=Path,required=True);p.add_argument('--alpha',type=float,required=True)
     p.add_argument('--reference-seed',type=int,default=6200);p.add_argument('--seed',type=int,default=6300);p.add_argument('--plan-sha256',required=True);p.add_argument('--out',type=Path,required=True)
-    p.add_argument('--phase',choices=['development','confirmation'],default='development');p.add_argument('--baseline-record',type=Path)
+    p.add_argument('--phase',choices=['development','confirmation','compute_control'],default='development');p.add_argument('--baseline-record',type=Path)
+    p.add_argument('--epochs',type=int,default=10);p.add_argument('--primary-two-view',action='store_true')
     a=p.parse_args();torch.set_num_threads(12);torch.set_num_interop_threads(1);main(a)
