@@ -217,3 +217,15 @@ The candidate-specific alignment and release experiment is in
 Each directory retains run-level results and any sealed receipts.
 See [Subject transfer](SUBJECT_TRANSFER_RESULT_20261111.md) for the
 fixed protocols, comparisons and numerical archive.
+
+
+## Exact one-pass RadioML tests, 2026-11-11
+
+Development, confirmation and timing for the joint-initialized and
+anchored candidates are under
+`contrastive_contrastivermlonepass{development,confirmation,timing}_export/`
+and `contrastive_contrastivermlanchored{development,confirmation,timing}_export/`.
+The equal-work control is in `contrastive_contrastivermlmatched_export/`.
+See [Exact compatibility](RML_ONE_PASS_RESULT_20261111.md) for protocols and
+held-out results. The numerical archive includes replay tensors and
+the folded programs.

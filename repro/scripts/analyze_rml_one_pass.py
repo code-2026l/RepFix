@@ -16,6 +16,19 @@ CHOICE = RESULTS / 'rml_one_pass_choice_20261111.json'
 STAGES = dict(development=('d', 8900, 8), confirmation=('c', 9000, 16), timing=('t', 9000, 16))
 
 
+
+def verify_shared_legacy(program):
+    chosen, reference = (program[name] for name in ('chosen', 'reference'))
+    old_width = reference['2.weight'].shape[0]
+    old_classes = reference['4.weight'].shape[0]
+    for suffix in ('weight', 'bias'):
+        assert torch.equal(chosen['0.' + suffix], reference['0.' + suffix])
+        assert torch.equal(chosen['2.' + suffix][:old_width], reference['2.' + suffix])
+    assert torch.equal(chosen['4.weight'][-old_classes:, :old_width], reference['4.weight'])
+    assert torch.equal(chosen['4.bias'][-old_classes:], reference['4.bias'])
+    assert not torch.count_nonzero(chosen['4.weight'][-old_classes:, old_width:])
+
+
 def load(stage, records, arrays, confirmation, plan, choice, anchored):
     prefix, start, count = STAGES[stage]
     start += 200 * anchored
@@ -36,8 +49,13 @@ def load(stage, records, arrays, confirmation, plan, choice, anchored):
         folder = arrays / f'{name}_states'
         path = folder / 'replay.pt'
         assert digest(path) == row['replay_sha256']
+        exact_selected = False
         if stage == 'confirmation':
-            assert digest(folder / 'program.pt') == row['program_sha256']
+            program_file = folder / 'program.pt'
+            assert digest(program_file) == row['program_sha256']
+            exact_selected = json.loads(choice.read_text())['selected'].startswith('exact/')
+            if exact_selected:
+                verify_shared_legacy(torch.load(program_file, map_location='cpu', weights_only=True))
         value = torch.load(path, map_location='cpu', weights_only=True)
         assert len(value['labels']) == (4400 if stage == 'confirmation' else 1600)
         thresholds = value['thresholds']
@@ -52,8 +70,14 @@ def load(stage, records, arrays, confirmation, plan, choice, anchored):
                    for name, z in value['current'].items()}
         residual = {name: (value['current'][name] - value['current']['joint']).abs().max().item()
                     for name in value['current']}
-        yield dict(seed=row['seed'], accuracy_pp=accuracy, disagreement=risk, changed=changed,
-                   max_current_logit_difference=residual, labeled=row['labeled'])
+        result = dict(seed=row['seed'], accuracy_pp=accuracy, disagreement=risk, changed=changed,
+                      max_current_logit_difference=residual, labeled=row['labeled'])
+        if stage == 'confirmation':
+            result['legacy_subgraph_verified'] = exact_selected
+            result['max_legacy_logit_difference'] = {
+                name: (z - value['old']).abs().max().item() for name, z in value['legacy'].items()
+            }
+        yield result
 
 
 def added_macs(name):

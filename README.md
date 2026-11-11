@@ -76,7 +76,7 @@ python repro/scripts/verify_supplement.py --tests --figures --paper
 ```
 
 This runs in a temporary copy and preserves the extracted source. It checks 142
-focused structural tests, reconstructs 32 manuscript figures from recorded data,
+focused structural tests, reconstructs 33 manuscript figures from recorded data,
 and compares the rebuilt paper's page text and pixels. LaTeX requires `pdflatex`,
 `bibtex` and `pdftotext`. See the [reproduction guide](docs/REPRODUCIBILITY.md).
 

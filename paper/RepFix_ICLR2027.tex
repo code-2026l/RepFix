@@ -67,26 +67,22 @@
 
 \begin{abstract}
 An encoder update can improve its current task while breaking a deployed
-readout. In matched HAR continuations across ten seeds, frozen accuracy falls
-from $\CpuHarHealthy$ to $\CpuHarJointMid$ while the current head reaches
-$\CpuHarOwnMid$. An unlabeled input-scale correction restores
-$\MechHarScalarMid$. Exact affine crossings locate the decisions affected by
-this mechanism, and a signed update audit distinguishes contraction from
-gradient conflict. Class agreement can hold even when every fixed-threshold
-decision changes. We derive an exact replay construction that shares
-computation with a trainable nonlinear path, and observe unchanged class and
-threshold decisions on HAR and SNR. On CIFAR-100 validation splits, a
-cross-view auxiliary improves ViT-B/32 accuracy by $0.73$ points
-($95\%$ CI $[0.29,1.16]$) over two-view supervised continuation and
-$0.53$ points ($[0.20,0.86]$) over doubled-epoch continuation, at the same
-suffix-forward budget. With AugReg weights, the fixed recipe gains $0.60$
-points ($[0.15,1.05]$) over matched one-view continuation. The retained
-FP32 reference preserves every audited old class and threshold decision.
-Early logits forecast later readout disagreement on RadioML with
-$2.25$ points of error, compared with $2.87$ for a schedule-aware
-baseline and $8.27$ for persistence. On CIFAR-10, a policy set before
-the terminal update keeps all $24$ evaluated continuations within the
-old-decision budget.
+readout. In matched HAR continuations, frozen accuracy falls from
+$\CpuHarHealthy$ to $\CpuHarJointMid$ while the current head reaches
+$\CpuHarOwnMid$. Unlabeled input rescaling restores $\MechHarScalarMid$.
+We derive the affine crossings and audit which component of the applied
+update contracts the representation. Class agreement can conceal failures
+of fixed confidence rules. On RadioML, a single forward shares the healthy
+hidden units and adds capacity for the current output. It preserves all
+audited old decisions and gains $0.33$ points ($95\%$ CI $[0.15,0.51]$)
+over detachment, at $1.070\times$ current-only CPU latency at batch 128.
+With equal distillation work, the gain is $0.28$ points ($[0.11,0.45]$).
+On CIFAR-100, a cross-view auxiliary improves ViT-B/32 accuracy by
+$0.73$ points over two-view supervision and $0.53$ over doubled-epoch
+supervision at matched suffix-forward budgets. The retained reference
+preserves all audited old decisions. Early logits also forecast terminal
+disagreement on RadioML, with $2.25$ points of error versus $2.87$ for
+a schedule-aware baseline and $8.27$ for persistence.
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
@@ -358,17 +354,18 @@ budget, and both nonlinear layers change. Small-network latency misses the
 $1.20/1.10$ limits, and the initial ResNet-18 screens miss their net-gain gate
 (Appendices~\ref{app:shared_replay_protocol}--\ref{app:shared_replay_vision}).
 
-Row support is sufficient, not necessary. A dense rank-$s$ first map replays
-the old function through the same identity with one dense $m\times m$
-correction. Trained on ten fresh SNR seeds at $(16,12)$, it gains
-$\DenseSnrGain$ points over detachment
-$[\DenseSnrGainLow,\DenseSnrGainHigh]$ and matches unrestricted joint training
-to $\DenseSnrFull$ points $[\DenseSnrFullLow,\DenseSnrFullHigh]$, with zero
-disagreement on all $\DenseSnrContractChecks$ consumer checks, for $11{,}456$
-extra MACs ($54.1\%$ above the folded current-only graph). The same arm misses
-the HAR primary gate on development ($\DenseHarDevLow$ to $\DenseHarDevHigh$
-points). Capacity, not support, sets the price of compatibility
-(Appendices~\ref{app:shared_replay_rank} and~\ref{app:frontier_factorial}).
+Dense low-rank updates also admit exact replay. The $(16,12)$ SNR
+update gains $\DenseSnrGain$ points over detachment and matches joint
+within $0.23$ points across the paired interval, with $54.1\%$ extra
+MACs. It misses the HAR primary gate (Appendix~\ref{app:shared_replay_rank}).
+At rate $10^{-4}$, we keep the healthy units and distill the joint
+output into a head with 16 added nonlinear units. On 16 fresh
+RadioML references it gains $0.33$ points ($[0.15,0.51]$) over detachment
+with zero old-decision changes. The folded CPU graph costs $1.016\times$
+at batch 1 and $1.070\times$ at batch 128. A fresh comparison gives
+both teachers the same student and distillation work, and retains a
+$0.28$-point auxiliary gain ($[0.11,0.45]$)
+(Appendices~\ref{app:rml_one_pass}--\ref{app:rml_matched_distillation}).
 
 A frozen prefix offers a different tradeoff: evaluate healthy and current
 nonlinear suffixes on the same input (Figure~\ref{fig:shared_replay}). A fixed
@@ -2424,5 +2421,6 @@ Additional ten-seed sweeps use $\lambda\in\{2,5,20,50,200,500\}$ on HAR and $\la
 
 \input{legacy_precision_study.tex}
 \input{subject_transfer_study.tex}
+\input{rml_one_pass_study.tex}
 
 \end{document}

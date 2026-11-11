@@ -1,0 +1,98 @@
+\subsection{Exact one-pass serving at a useful SNR update rate}
+\label{app:rml_one_pass}
+
+We returned to the RadioML rate $10^{-4}$, where joint SNR training
+improved modulation accuracy in two independent experiments. Each
+reference used $12{,}000$ fitting signals, $3\%$ primary labels,
+a width-64 encoder and a healthy warm start. We trained joint and
+detached teachers with the same 24 continuation epochs, data and
+optimizer state. In confirmation we evaluated $4{,}400$ test signals
+per reference after freezing every serving program.
+
+We first compared post-hoc repair with training a shared student.
+A fixed-feature affine repair used all fitting windows, alongside
+the 512-anchor ridge control. Nonlinear repairs added 8, 16 or 32
+units to the second hidden layer while keeping the current encoder
+fixed. They still exceeded the four-point development budget.
+A width-64 student learned both outputs from the two teachers.
+The best student started at the joint endpoint. In 16 fresh
+references it gained $0.32$ points ($95\%$ CI $[0.21,0.42]$) over
+detachment, but class disagreement reached $5.68\%$ and exceeded the
+budget on four references (Figure~\ref{fig:rml_one_pass}).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/fig_rml_one_pass.pdf}
+\caption{Useful RadioML continuations with a single serving graph.
+(a) The largest old-rule disagreement across eight development
+references and the mean accuracy change from unrestricted joint.
+The shaded band and horizontal line mark the $4\%$ and $-0.15$-point
+development limits. Rings mark the two frozen choices. (b) Each point
+is one of 16 fresh references for its method. The band marks the $5\%$
+decision budget. The accuracy baseline is matched detached continuation.}
+\label{fig:rml_one_pass}
+\end{figure}
+
+We then kept the old nonlinear activations inside the student. Write
+$a=\sigma(W_1^0x+b_1^0)$ for the healthy first layer and
+$b=\sigma(W_2^0a+b_2^0)$ for the healthy second layer. Add
+$u=\sigma(Ua+c)$ and fit the current head on $[b;u]$ to the joint
+teacher. If the folded old head is $C_0b+d_0$, the two outputs are
+\begin{equation}
+\begin{pmatrix}z_{\rm current}\\ z_{\rm old}\end{pmatrix}
+=
+\begin{pmatrix}C_b&C_u\\ C_0&0\end{pmatrix}
+\begin{pmatrix}b\\u\end{pmatrix}
++
+\begin{pmatrix}d_{\rm current}\\d_0\end{pmatrix}.
+\end{equation}
+The second layer stacks $W_2^0$ and $U$. The output layer stacks
+both heads. The old rows have zero weights on the added units, so the
+old function is exact in real arithmetic for any current weights.
+The first affine layer, the old rows of the second layer, and the old
+readout coefficients match the folded reference in every saved
+program. This construction shares the original hidden units and uses
+one additional set of logits. Its ability to retain the auxiliary
+gain depends on how well the current student fits the teacher.
+
+On fresh development references we compared 0, 4, 8 and 16 added
+units with a same-width student initialized at the healthy checkpoint
+and trained with a preservation-margin loss. The width-16 expansion
+was the cheapest candidate meeting both limits. It used 36 offline
+distillation epochs on unlabeled fitting signals. On 16 fresh
+confirmation references its accuracy gain over detachment was $0.33$
+points ($[0.15,0.51]$) and its change from unrestricted joint was
+$-0.05$ ($[-0.19,0.09]$). All old class and confidence decisions agreed.
+The largest FP32 old-logit difference after folding was
+$1.72\times10^{-5}$. The corresponding worst class disagreements were
+$17.61\%$ for the 512-anchor ridge control and $16.32\%$ for full-fit
+affine repair.
+
+We timed the folded programs in isolation on the same CPU with one
+thread. The current-only baseline used the same affine folding and
+the same input shape. Exact reuse cost $1.016\times$ ($[1.014,1.017]$)
+at batch 1 and $1.070\times$ ($[1.068,1.072]$) at batch 128. The ratios
+to two separately executed encoders were $0.557\times$ ($[0.554,0.559]$)
+and $0.545\times$ ($[0.544,0.546]$). No serving input calls a separate
+healthy encoder. These timings cover model forward on standardized
+signals.
+
+\subsection{Equal distillation work}
+\label{app:rml_matched_distillation}
+
+To isolate the auxiliary contribution, we repeated exact reuse on
+16 new references with both teachers. Both students used the same
+healthy hidden units, 16 added ReLU units, initialization, minibatches
+and 36 distillation epochs. Their teachers differed only in whether
+the SNR gradient reached the encoder. Both students were frozen before
+test evaluation.
+
+The joint student's accuracy exceeded the detached student's by
+$0.28$ points ($95\%$ CI $[0.11,0.45]$). It differed from the
+unrestricted joint teacher by $-0.12$ points ($[-0.24,0.002]$),
+within the prespecified $-0.25$ noninferiority margin. Descriptive
+gain intervals were $0.30$ points ($[0.11,0.49]$) below $0$ dB
+and $0.27$ ($[0.06,0.48]$) at or above $0$ dB. Every class and
+confidence decision agreed across all 32 student programs.
+All saved programs contained the healthy subgraph; maximum FP32
+old-logit difference was $1.91\times10^{-5}$.
