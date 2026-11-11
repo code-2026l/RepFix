@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import time
+import warnings
 
 import torch
 from torch import nn
@@ -30,6 +31,15 @@ class ScriptedCurrentTail(nn.Module):
             replacement=self.teacher(tokens.index_select(0,indices))
             z=z.index_copy(0,indices,replacement)
         return z,old
+
+
+def compile_current_tail(student,teacher,cutoff,sample):
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore',torch.jit.TracerWarning)
+        student_jit=torch.jit.trace(student.eval(),sample[:1],check_trace=False)
+        teacher_jit=torch.jit.trace(teacher.eval(),sample[:1],check_trace=False)
+    module=ScriptedCurrentTail(student_jit,teacher_jit,cutoff).eval()
+    return torch.jit.freeze(torch.jit.script(module))
 
 
 class PrimaryOutput(nn.Module):
@@ -93,10 +103,8 @@ def run(args):
     cutoff=torch.quantile(top[:,0]-top[:,1],rescue['percentile']).item()
     assert cutoff==previous['cutoffs']['joint']
     sample_tokens=population['tokens'][:128]
-    student_jit=trace(student,sample_tokens[:1])
     teacher_tail=TeacherSuffix(teacher,teacher_state['reader']).eval()
-    teacher_jit=trace(teacher_tail,sample_tokens[:1])
-    program=torch.jit.freeze(torch.jit.script(ScriptedCurrentTail(student_jit,teacher_jit,cutoff).eval()))
+    program=compile_current_tail(student,teacher_tail,cutoff,sample_tokens)
     assert 'prim::If' in str(program.inlined_graph)
     indices=torch.arange(0,128,4)
     output={}
