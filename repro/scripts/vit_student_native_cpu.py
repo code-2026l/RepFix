@@ -145,10 +145,12 @@ def run(args):
             joint_reader = endpoint['reader']
             joint_suffix = teacher
             selected = params
+    legacy = dict(weight=torch.cat((ref['heads']['coarse']['weight'],ref['heads']['fine']['weight'])),
+                  bias=torch.cat((ref['heads']['coarse']['bias'],ref['heads']['fine']['bias'])))
     if args.nonlinear:
-        student = NonlinearVisualStudent(healthy, selected, ref['heads']['coarse'])
+        student = NonlinearVisualStudent(healthy, selected, legacy)
     else:
-        student = ExactVisualStudent(healthy, selected['weight'], selected['bias'], ref['heads']['coarse'])
+        student = ExactVisualStudent(healthy, selected['weight'], selected['bias'], legacy)
     teacher_tail=TeacherSuffix(joint_suffix,joint_reader).eval()
     current = WholeNetwork(prefix, teacher_tail).eval()
     program=CurrentTailRescue(student,teacher_tail,cutoffs['joint']) if rescue else student
@@ -163,9 +165,9 @@ def run(args):
     assert data_sha == population['data_sha256']
     sample = base.late.preprocess(images[:128], cache['metadata']['image_size'])
     output = {}
+    fine_thresholds = list(base.confidence_thresholds(
+        base.late.linear(cache['h'][0,ref['fitting'][ref['label_mask']]], ref['heads']['fine'])).values())
     if args.stage == 'audit':
-        fine_thresholds = list(base.confidence_thresholds(
-            base.late.linear(cache['h'][0,ref['fitting'][ref['label_mask']]], ref['heads']['fine'])).values())
         raw_current, raw_old = both(sample)
         compiled = trace(program, population['tokens'][:1])
         served_old, served_current = [], []
@@ -186,6 +188,8 @@ def run(args):
             served_old.append(old_compiled)
             served_current.append(z_compiled.argmax(1))
         served_old, served_current = torch.cat(served_old), torch.cat(served_current)
+        compiled_fine=served_old[:,20:]
+        served_old=served_old[:,:20]
         native_old, native_current, native_fine = (torch.cat(parts) for parts in (native_old,native_current,native_fine))
         thresholds = list(ref['thresholds'].values())
         expected_current=rescue_predictions['joint'] if rescue else student_predictions['joint']
@@ -194,13 +198,16 @@ def run(args):
                       native_current=native_current.argmax(1), coarse=population['coarse'],
                       old=old, native_old=native_old, fine_old=fine_old, native_fine=native_fine,
                       coarse_thresholds=thresholds, fine_thresholds=fine_thresholds,
-                      compiled_old=served_old, compiled_current=served_current,
+                      compiled_old=served_old, compiled_current=served_current,compiled_fine_old=compiled_fine,
+                      compiled_fine_changed=(decisions(fine_old,fine_thresholds)!=decisions(compiled_fine,fine_thresholds)).sum(0).tolist(),
                       compiled_old_changed=(decisions(old, thresholds) != decisions(served_old, thresholds)).sum(0).tolist(),
                       coarse_changed=(decisions(old, thresholds) != decisions(native_old, thresholds)).sum(0).tolist(),
                       fine_changed=(decisions(fine_old, fine_thresholds) != decisions(native_fine, fine_thresholds)).sum(0).tolist(),
                       current_changes=int((native_current.argmax(1) != expected_current).sum()),
                       raw_sample_current_changes=int((raw_current.argmax(1) != native_current[:128].argmax(1)).sum()),
-                      raw_sample_old_changes=(decisions(raw_old, thresholds) != decisions(old[:128], thresholds)).sum(0).tolist())
+                      raw_sample_fine_changes=(decisions(raw_old[:,20:],fine_thresholds)!=
+                                               decisions(fine_old[:128],fine_thresholds)).sum(0).tolist(),
+                      raw_sample_old_changes=(decisions(raw_old[:,:20], thresholds) != decisions(old[:128], thresholds)).sum(0).tolist())
     else:
         fast = dict(teacher=current, student=only_student, protected=both)
         if rescue:
@@ -227,7 +234,9 @@ def run(args):
         thresholds = list(ref['thresholds'].values())
         output = dict(timings=timings,
                       current_changes=int((protected_current.argmax(1) != values['rescue_current' if rescue else 'student'].argmax(1)).sum()),
-                      old_changed=(decisions(protected_old,thresholds) != decisions(old[:128],thresholds)).sum(0).tolist())
+                      old_changed=(decisions(protected_old[:,:20],thresholds) != decisions(old[:128],thresholds)).sum(0).tolist(),
+                      fine_old_changed=(decisions(protected_old[:,20:],fine_thresholds) !=
+                                        decisions(fine_old[:128],fine_thresholds)).sum(0).tolist())
     folder = args.out.parent / (args.out.stem + '_states')
     folder.mkdir(exist_ok=True,parents=True)
     replay = folder / 'replay.pt'
