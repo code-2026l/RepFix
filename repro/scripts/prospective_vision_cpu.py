@@ -27,6 +27,7 @@ ARCHIVE_MD5 = 'c32a1d4ab5d03f1284b67883e8d87530'
 ARCHIVE_SHA256 = 'c4a38c50a1bc5f3a1c5537f2155ab9d68f9f25eb1ed8d9ddda3db29a59bca1dd'
 MULTIPLIERS = (1., 1.5, 2., 3., 4.)
 RATES = {'mild': 3e-6, 'nominal': 3e-5, 'strong': 3e-4}
+STABLE_RATE = 3e-7
 FAMILIES = ('direct', 'moments', 'ridge', 'reference')
 EVALUATION_BUDGET = .05
 ACTION_BUDGET = .04
@@ -160,6 +161,7 @@ def current_output(model, fitting_views, labels, mask, evaluation):
 def run(args):
     assert args.alpha in (0., .1) and (args.alpha or args.rate == 'nominal')
     assert (args.stage == 'development') == (args.reference_seed in (7410, 7411))
+    assert (args.stage == 'stability') == (args.rate == 'stable')
     choice = json.loads(args.choice.read_text()) if args.choice else None
     if args.stage == 'confirmation':
         assert choice and choice['plan_sha256'] == args.plan_sha256
@@ -181,7 +183,8 @@ def run(args):
     sd = sd.clamp_min(.1 * sd[sd > 0].median())
     head = NormalizedHead(legacy['weight'] * sd, legacy['bias'] + legacy['weight'] @ mean, mean, sd)
     model = copy.deepcopy(healthy).requires_grad_(True)
-    optimizer = torch.optim.AdamW([dict(params=model.parameters(), lr=RATES[args.rate]),
+    rate = STABLE_RATE if args.rate == 'stable' else RATES[args.rate]
+    optimizer = torch.optim.AdamW([dict(params=model.parameters(), lr=rate),
                                   dict(params=head.parameters(), lr=1e-4)], weight_decay=1e-4)
     seed = args.reference_seed + 1000
     rng = torch.Generator().manual_seed(seed + 20000)
@@ -241,13 +244,13 @@ def run(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--stage', choices=('prepare', 'development', 'confirmation'), required=True)
+    parser.add_argument('--stage', choices=('prepare', 'development', 'confirmation', 'stability'), required=True)
     parser.add_argument('--plan-sha256', required=True)
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--archive', type=Path)
     parser.add_argument('--population', type=Path)
     parser.add_argument('--reference-seed', type=int)
-    parser.add_argument('--rate', choices=RATES)
+    parser.add_argument('--rate', choices=(*RATES, 'stable'))
     parser.add_argument('--alpha', type=float, default=.1)
     parser.add_argument('--choice', type=Path)
     args = parser.parse_args()

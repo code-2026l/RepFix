@@ -62,6 +62,8 @@ def load(args):
     expected = {(ref, rate, .1) for ref in refs for rate in RATES}
     if args.stage == 'confirmation':
         expected |= {(ref, 'nominal', 0.) for ref in refs}
+    if args.stage == 'stability':
+        expected = {(ref, 'stable', .1) for ref in refs}
     assert keys == expected and len(rows) == len(keys)
     return rows
 
