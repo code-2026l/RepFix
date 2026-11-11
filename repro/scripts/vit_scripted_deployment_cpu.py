@@ -33,13 +33,14 @@ class ScriptedCurrentTail(nn.Module):
         return z,old
 
 
-def compile_current_tail(student,teacher,cutoff,sample):
+def compile_current_tail(student,teacher,cutoff,sample,freeze=True):
     with warnings.catch_warnings():
         warnings.simplefilter('ignore',torch.jit.TracerWarning)
         student_jit=torch.jit.trace(student.eval(),sample[:1],check_trace=False)
         teacher_jit=torch.jit.trace(teacher.eval(),sample[:1],check_trace=False)
     module=ScriptedCurrentTail(student_jit,teacher_jit,cutoff).eval()
-    return torch.jit.freeze(torch.jit.script(module))
+    scripted=torch.jit.script(module)
+    return torch.jit.freeze(scripted) if freeze else scripted
 
 
 class PrimaryOutput(nn.Module):
@@ -104,7 +105,7 @@ def run(args):
     assert cutoff==previous['cutoffs']['joint']
     sample_tokens=population['tokens'][:128]
     teacher_tail=TeacherSuffix(teacher,teacher_state['reader']).eval()
-    program=compile_current_tail(student,teacher_tail,cutoff,sample_tokens)
+    program=compile_current_tail(student,teacher_tail,cutoff,sample_tokens,freeze=args.stage=='audit')
     assert 'prim::If' in str(program.inlined_graph)
     indices=torch.arange(0,128,4)
     output={}

@@ -4,6 +4,8 @@ import torch
 from torch import nn
 
 from vit_scripted_deployment_cpu import compile_current_tail
+from vit_student_native_cpu import trace
+from suffix_serving import WholeNetwork
 
 
 class Student(nn.Module):
@@ -23,7 +25,8 @@ class Teacher(nn.Module):
 @pytest.mark.parametrize('indices',[(0,),(1,),(0,1)])
 def test_scripted_route_preserves_current_and_old_outputs(indices):
     sample=torch.tensor([[1.,.95,0.,0.],[3.,0.,0.,0.]])
-    program=compile_current_tail(Student(),Teacher(),.1,sample)
+    program=compile_current_tail(Student(),Teacher(),.1,sample,freeze=False)
+    program=trace(WholeNetwork(nn.Identity(),program).eval(),sample[:1])
     assert 'prim::If' in str(program.inlined_graph)
     x=sample[list(indices)]
     current,old=program(x)
