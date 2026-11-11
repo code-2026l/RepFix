@@ -21,7 +21,8 @@ and matched CPU overhead rather than inferring deployment cost from MACs.
 | Does the auxiliary help against stronger training-work controls? | Cross-view appendix and COMPUTE_CONTROL_RESULT_20261111.md | Both supervised controls across the full four-reference, three-continuation grid |
 | Does the fixed recipe transfer to another pretrained checkpoint? | CHECKPOINT_REPLICATION_20261111.md | Four AugReg pairs with the same images, mask, views and continuation seed |
 | Can existing anchors estimate disagreement? | Reusing the Fitting Anchors | Fixed-design ridge leave-one-out and transfer to contrastive updates |
-| What remains open? | Current result reports | Further datasets, backbone families and prospectively selected online interventions |
+| Can early predictions guide a fresh encoder update? | Early Decisions for a Planned Encoder Update, Figure 30 | Sealed epoch-two decisions on CIFAR-10, held-out outcomes, stability controls and limited-reference replay |
+| What remains open? | Current result reports | Accuracy gains from the auxiliary on further tasks and live evaluation of limited referral |
 | Can the compact artifact be checked? | REPRODUCIBILITY.md | Manifest, structural tests, reconstructed figures and all-page comparison |
 
 Class decisions, confidence-threshold decisions and complete logits are different

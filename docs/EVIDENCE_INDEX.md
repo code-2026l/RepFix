@@ -14,6 +14,7 @@ Paths are relative to the artifact root. `C` below abbreviates
 | Does the failure occur while a real auxiliary improves? | `C/frontier/`, `C/task_validation/`, `C/recon_repairs/` | `reconstruction_task_audit.py`; Table `tab:reconstruction_full` |
 | Does the fixed visual auxiliary transfer to a second checkpoint? | `C/augreg_replication_20261111.json`, `C/contrastive_contrastiveaugreg_export/` | `augreg_replication_cpu.py`; fixed protocol `docs/plans/2026-11-11-augreg-replication.md` |
 | Does the gain survive stronger supervised training-work controls? | `C/compute_control_confirmation_20261111.json`, `C/contrastive_contrastiveworkconfirm_export/` | `analyze_compute_confirmation.py`; four reference groups and three continuations each |
+| Can an early monitor guide a planned update and budget reference queries? | `C/early_update_confirmation_20261111.json`, `C/early_referral_confirmation_20261111.json` | `prospective_vision_cpu.py`, `analyze_early_update.py`, `analyze_early_referral.py` |
 | What is the marginal cost of the retained visual reference? | `C/matched_batch_latency_20261111.json`, `C/contrastive_contrastivematchedbatch_export/` | `matched_batch_cpu.py`; fixed protocol `docs/plans/2026-11-11-matched-batch-latency.md` |
 | What does the CNN change? | `C/frontier/`, `C/cnn_consumer/` | `cnn_reconstruction_continuation.py`; Table `tab:cnn_continuation` |
 | Does auxiliary-head state explain the historical SNR gap? | `C/head_state/`, `C/head_state_first/`, `C/head_state_summary.json` | `auxiliary_state_factorial.py`; Table `tab:head_state` |
@@ -66,6 +67,7 @@ the included manuscript figures in source order.
 | 27 | `fig_reference_replication.pdf` | `plot_reference_replication.py` | `C/vision_reference_summary.json` |
 | 28 | `fig_contrastive_benefit.pdf` | `plot_contrastive_benefit.py` | `C/augreg_replication_20261111.json`, `C/matched_batch_latency_20261111.json` |
 | 29 | `fig_risk_queries.pdf` | `plot_risk_query_result.py` | `C/cached_risk_transfer_20261111.json`, `C/small_budget_risk_confirmation.json` |
+| 30 | `fig_early_update.pdf` | `plot_early_update.py` | `C/early_referral_confirmation_20261111.json` |
 
 Generator basenames are under `repro/scripts/`. Figure manifests retain source
 and numerical-artist hashes; diagrams are marked as schematics in their captions.

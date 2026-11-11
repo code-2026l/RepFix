@@ -374,3 +374,26 @@ the earlier native joint outputs, and recomputes all 24 accuracy
 comparisons. Intervals average three continuation differences within
 each reference and use the four reference means. The separate numerical
 archive includes the compact outputs and the exact analysis command.
+
+## Early decisions on CIFAR-10
+
+Download the [binary CIFAR-10 archive](https://www.cs.toronto.edu/~kriz/cifar.html).
+The driver checks its published MD5 and the TensorFlow Datasets SHA-256
+before decoding the training batches. Use the SHA-256 of
+`docs/plans/2026-11-11-early-update-diagnosis.md` for preparation and the
+development and confirmation runs.
+
+```text
+python repro/scripts/prospective_vision_cpu.py --stage prepare --archive cifar-10-binary.tar.gz --plan-sha256 PLAN_SHA256 --out v000.json
+python repro/scripts/prospective_vision_cpu.py --stage development --population v000_states/population.pt --reference-seed 7410 --rate mild --plan-sha256 PLAN_SHA256 --out d000.json
+```
+
+Run the three rates for each development reference. Derive the fixed
+choice with `analyze_early_update.py` and provide it with `--choice`
+for the six confirmation references. The nominal supervised control uses
+`--alpha 0`. Stability runs use `--stage stability --rate stable` and
+the separate stability protocol's digest. Each run writes a
+`forecast.json` at epoch two and a `replay.pt` after evaluation. The
+numerical archive supplies the full analysis commands, sealed receipts,
+terminal outputs and epoch logs. The archives exclude the image data and
+the prepared feature population.

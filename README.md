@@ -29,6 +29,12 @@ On the TorchVision endpoints, a BF16 reference with the same FP32 current
 graph costs 1.078× [1.069, 1.088] at batch 128.
 [Checkpoint replication](docs/CHECKPOINT_REPLICATION_20261111.md)
 
+On CIFAR-10 with ResNet-18, an epoch-two monitor flags 15 of 17 later
+budget exceedances and clears all seven safe updates. A fixed
+limited-reference replay stays within 5% disagreement on all 24 cases
+and sends a median 25% of examples to the old suffix on unsafe updates.
+[Early-update study](docs/EARLY_UPDATE_RESULT_20261111.md)
+
 The earlier supervised-transfer studies and the failed visual reconstruction
 and routing screens document how the result depends on the task and access
 conditions. [Earlier experiments](docs/FOLLOWUP_REPORT_20261110.md)
@@ -42,8 +48,8 @@ monitor. [Risk estimation and audit results](docs/CACHED_RISK_RESULT_20261111.md
 ## Paper and files
 
 - [Paper](paper/RepFix_ICLR2027.pdf)
-- [Supplementary archive](artifacts/2026-11-11/RepFix_ComputeControls_20261111_supplement.zip)
-- [Editable source](artifacts/2026-11-11/RepFix_ComputeControls_20261111_source.zip)
+- [Supplementary archive](artifacts/2026-11-11/RepFix_ProspectiveUpdate_20261111_supplement.zip)
+- [Editable source](artifacts/2026-11-11/RepFix_ProspectiveUpdate_20261111_source.zip)
 - [Reading guide](docs/REVIEWER_GUIDE.md) · [Evidence index](docs/EVIDENCE_INDEX.md)
 - [Final argument and English](docs/STORY_FINAL_20261110.md) · [Scientific integrity](docs/STORY_INTEGRITY_20261110.json)
 - [Editorial and figure refinement](docs/EDITORIAL_FINISH_20261110.md) · [Integrity checks](docs/EDITORIAL_VISUAL_VERIFICATION_20261110.json)
@@ -64,7 +70,7 @@ python repro/scripts/verify_supplement.py --tests --figures --paper
 ```
 
 This runs in a temporary copy and preserves the extracted source. It checks 142
-focused structural tests, reconstructs 29 manuscript figures from recorded data,
+focused structural tests, reconstructs 30 manuscript figures from recorded data,
 and compares the rebuilt paper's page text and pixels. LaTeX requires `pdflatex`,
 `bibtex` and `pdftotext`. See the [reproduction guide](docs/REPRODUCIBILITY.md).
 

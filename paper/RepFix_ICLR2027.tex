@@ -82,6 +82,9 @@ $0.53$ points ($[0.20,0.86]$) over doubled-epoch continuation, at the same
 suffix-forward budget. With AugReg weights, the fixed recipe gains $0.60$
 points ($[0.15,1.05]$) over matched one-view continuation. The retained
 FP32 reference preserves every audited old class and threshold decision.
+On CIFAR-10 with ResNet-18, a warning at epoch two flags $15$ of $17$
+later budget exceedances. A replay of a fixed limited-reference policy
+keeps all $24$ updates within the old-decision budget.
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
@@ -454,58 +457,49 @@ $\ConsumerScatterFalseSafeTen$ false-safe declarations
 flips~\citep{yan2021positive}, separating old-correct errors from useful
 corrections.
 
-Fidelity and cost are measured on the served program. The denominator is the
-current-only implementation, the current function stays at FP32, and each
-reference implementation receives its own decision audit, so a saving cannot
-come from a different current model. The monitor covers this candidate family
-and corpus remainder; new populations need a new check.
+Each reference program is audited and timed against the same FP32
+current-only function. Cached ridge residuals estimate clean disagreement
+with $0.47$ points of MAE using the $1{,}024$ fitting pairs, compared with
+$0.49$ using $32$ additional queries. Certification uses a separate
+monitor (Appendix~\ref{app:cached_anchor_risk}).
 
-Cached fitting anchors can also estimate disagreement. On the cross-view
-continuations, isotropic propagation of ridge leave-one-out residuals gives
-$0.47$ points of clean-corpus MAE with no additional reference queries,
-compared with $0.49$ using $32$ queries. The initial $1{,}024$ pairs are
-shared, and errors rise under augmentation. The certificate uses an
-independent monitor (Appendix~\ref{app:cached_anchor_risk}).
+We test an earlier decision on CIFAR-10 with ResNet-18. At epoch two, an
+unlabeled monitor predicts whether the old consumer will exceed $5\%$
+disagreement at epoch eight. Across three planned update rates and a
+separate stability control, it flags $15/17$ exceedances and clears $7/7$
+safe cases. A fixed policy replay uses these early logs to choose a
+repair and a reference-call budget. Every selected program stays within
+$5\%$ on the held-out examples. Among unsafe updates, it sends a median
+$25\%$ of examples to the old suffix, compared with $75\%$ under uniform
+referral. The current path is shared across all interventions
+(Appendix~\ref{app:early_update}).
 
 \section{Related Work}\label{sec:related}
 
-Backward-compatible learning treats the consumer as an
-interface~\citep{shen2020backward,hu2022backward}, and positive-congruent
+Backward-compatible learning treats the readout as an
+interface~\citep{shen2020backward,hu2022backward}. Positive-congruent
 training targets negative flips~\citep{yan2021positive}. Weight interpolation
-reduces regressions without extra inference cost~\citep{schumann2023bcwi}, at
-the price of changing the current function. BC-Aligner trains an encoder and a
-linear backward map jointly; our matched control adapts its single-update
-objective. Duan~\citep{duan2026staleness} repairs frozen language-model monitors
-with paired unlabeled realignment. We vary the scale of the update, keep class
-and confidence-threshold decisions fixed, and measure current-task utility and
-serving cost. Successful stitching~\citep{bansal2021stitching,mai2026stitching}
-does not by itself establish informational similarity~\citep{smith2025functional}.
-Our moment and ridge repairs act at the readout interface, alongside
-AdaBN~\citep{li2016adabn}, LDC~\citep{gomezvilla2024ldc}, CORAL~\citep{sun2016coral}
-and Tent~\citep{wang2021tent}. Calibration~\citep{guo2017calibration,ovadia2019trust}
-and unlabeled performance estimation~\citep{garg2022unlabeled} complement the
-audit, with access and selection assumptions kept explicit~\citep{zhao2023pitfalls}.
+changes the current function~\citep{schumann2023bcwi}, while BC-Aligner
+fits an encoder and backward map jointly. Unlabeled alignment also repairs
+stale language-model monitors~\citep{duan2026staleness}. We test repairs
+against class and confidence contracts. Related tools include model
+stitching~\citep{bansal2021stitching,mai2026stitching,smith2025functional},
+moment adaptation~\citep{li2016adabn,gomezvilla2024ldc,sun2016coral,wang2021tent},
+calibration and unlabeled risk estimation~\citep{guo2017calibration,ovadia2019trust,garg2022unlabeled,zhao2023pitfalls}.
 
-Multi-task learning~\citep{caruana1997multitask} and task
-grouping~\citep{standley2020tasks} ask when shared training helps. PCGrad and
-CAGrad address gradient conflict~\citep{yu2020pcgrad,liu2021cagrad}; MGDA,
-Nash-MTL and FAMO optimize Pareto, bargaining or progress-balancing
-criteria~\citep{sener2018multi,navon2022multi,liu2023famo}; other methods reshape
-task-gradient geometry or loss
-weights~\citep{senushkin2023aligned,liu2021imtl,chen2018gradnorm,kendall2018multi,wang2021gradient,limarenko2026gcond,zhou2025imgrad}.
-We add the variance gradient: task-gradient relations alone leave the sign of
-variance change unidentified.
+Multi-task learning and task grouping ask when shared training
+helps~\citep{caruana1997multitask,standley2020tasks}. PCGrad and CAGrad address
+gradient conflict~\citep{yu2020pcgrad,liu2021cagrad}. Pareto, bargaining and
+progress-balancing methods choose different update
+directions~\citep{sener2018multi,navon2022multi,liu2023famo}. The applied
+step's projection onto the variance gradient determines local contraction.
 
-Self-supervised learning studies collapse through stop-gradient
+Self-supervised work studies collapse through stop-gradient
 mechanisms~\citep{grill2020bootstrap,chen2021simsiam,caron2021emerging},
-variance and covariance
-regularization~\citep{zbontar2021barlow,bardes2022vicreg,ermolov2021whitening}
-and spectral dynamics~\citep{jing2022understanding,dong2021attention,kim2025taxonomy};
-RankMe scores representations by effective rank~\citep{garrido2023rankme}. Our
-observable is variation across examples, not the terminal classifier geometry
-of neural collapse~\citep{papyan2020prevalence,wang2026neuralcollapse}. Input
-repair shows how reduced variation can coexist with retained decodability and a
-lost readout.
+variance regularization~\citep{zbontar2021barlow,bardes2022vicreg,ermolov2021whitening}
+and spectral measures~\citep{jing2022understanding,dong2021attention,kim2025taxonomy,garrido2023rankme}.
+We measure variation across examples and use input repair to test
+decodability after contraction.
 
 Auxiliary-gradient projection~\citep{dery2021attittud,zhu2025gradops},
 auxiliary selection~\citep{navon2021auxiliary,jiang2023forkmerge,shin2024dgr},
@@ -517,18 +511,13 @@ modulation recognition~\citep{radioml} and battery
 health~\citep{nasa_battery,severson2019data,attia2020closed,pradhan2022soh}
 supply the test domains.
 
-Incremental activation computation and parameter-efficient updates are
-established: DeltaCNN reuses sparse frame differences~\citep{parger2022deltacnn},
-LoRA takes low-rank parameter steps~\citep{hu2022lora}, and Punica and S-LoRA
-share base parameters across served
-adapters~\citep{chen2024punica,sheng2024slora}. Our construction is a same-input,
-two-version computation under channel-supported changes, with independent and
-prefix-sharing controls. Progressive networks and side-tuning retain a
-frozen path while training new capacity~\citep{rusu2016progressive,zhang2020sidetuning,sung2022lst}.
-Our frozen-feature controls use residual decoders and probes over final and
-intermediate features. Feature distortion under fine-tuning also motivates
-LP--FT~\citep{kumar2022finetuning}. We measure serving cost on the same
-current function and separately audit each reference implementation.
+DeltaCNN reuses sparse activation differences~\citep{parger2022deltacnn}.
+LoRA and adapter serving share base parameters~\citep{hu2022lora,chen2024punica,sheng2024slora}.
+Progressive networks and side-tuning retain frozen paths
+while training new capacity~\citep{rusu2016progressive,zhang2020sidetuning,sung2022lst}.
+Our replay shares computations across two versions on the same input.
+The frozen-feature controls also address distortion from
+fine-tuning~\citep{kumar2022finetuning}.
 
 \section{Conclusion}\label{sec:conclusion}
 
@@ -546,7 +535,7 @@ program costs.
 Generative AI tools assisted with drafting, language editing, code, literature retrieval, proof development, and figure design. The new diagnostic identities were checked with executable numerical examples; assumptions are stated explicitly with each claim and in Appendix~\ref{app:proofs}. Figures are drawn from recorded experimental results. The authors remain responsible for verifying the final text, claims, code, and artifacts.
 
 \section*{Ethics Statement}
-We use existing datasets: UCI-HAR, RadioML2016.10A, the NASA PCoE and MATR battery archives, public A-share market data, NYUv2, CelebA, and CIFAR-100, with ImageNet-pretrained vision weights. We collected no new human-subject data. The HAR identity auxiliary is evaluated as a training-head probe, not a held-out privacy attack. Battery prediction is safety-relevant; Appendix~\ref{sec:negatives} describes the observed limitations, and deployment requires task-specific validation.
+We use existing datasets: UCI-HAR, RadioML2016.10A, the NASA PCoE and MATR battery archives, public A-share market data, NYUv2, CelebA, CIFAR-10 and CIFAR-100, with ImageNet-pretrained vision weights. We collected no new human-subject data. The HAR identity auxiliary is evaluated as a training-head probe, not a held-out privacy attack. Battery prediction is safety-relevant; Appendix~\ref{sec:negatives} describes the observed limitations, and deployment requires task-specific validation.
 
 
 \section*{Reproducibility Statement}
@@ -2420,5 +2409,7 @@ Additional ten-seed sweeps use $\lambda\in\{2,5,20,50,200,500\}$ on HAR and $\la
 \input{contrastive_visual_study.tex}
 
 \input{query_risk_study.tex}
+
+\input{early_update_study.tex}
 
 \end{document}
