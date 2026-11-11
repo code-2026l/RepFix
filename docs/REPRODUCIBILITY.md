@@ -397,3 +397,21 @@ the separate stability protocol's digest. Each run writes a
 numerical archive supplies the full analysis commands, sealed receipts,
 terminal outputs and epoch logs. The archives exclude the image data and
 the prepared feature population.
+
+## Legacy precision on the official CIFAR-10 test partition
+
+Use `stable_prefix_cpu.py --stage fit` at widths 64, 128 and 256 for
+the development screen, with the prepared population and width protocol
+digest. The screen closes before official test access. Use
+`legacy_precision_cpu.py --stage fit` with the same population and the
+legacy precision protocol digest to calibrate the three precision
+candidates. The fixed order selects a zero-exact-call candidate from
+development monitor outputs.
+
+For each confirmation reference (7420–7425), the precision driver
+reconstructs the strong continuation and records both serving actions
+before loading its test partition. The timing stage uses that run's
+saved serving state, the same old-block weights, and the original
+population. The numerical archive provides the exact commands to
+replay selection, decisions and timing summaries. The timing runs use
+the x86 quantized CPU backend.

@@ -1,6 +1,6 @@
 # Reproduction scripts and archived results
 
-The current manuscript has **30 included figures**, rebuilt by coordinated
+The current manuscript has **31 included figures**, rebuilt by coordinated
 generators through one entry point. Start with the artifact-wide
 [reproduction guide](../docs/REPRODUCIBILITY.md) and
 [evidence index](../docs/EVIDENCE_INDEX.md).
@@ -21,7 +21,7 @@ dependencies, and keep the extracted release intact. They run on CPU.
 | Purpose | Script |
 |---|---|
 | Verify files, recorded protocol/source hashes, and optional review checks | `scripts/verify_supplement.py` |
-| Rebuild all 30 manuscript figures from shipped records | `scripts/render_paper_figures.py` |
+| Rebuild all 31 manuscript figures from shipped records | `scripts/render_paper_figures.py` |
 | Compile the supplied manuscript and check its page boundary | `scripts/build_cpu_paper.py` |
 | Paired checkpoint training | `scripts/paired_readout_continuation.py` |
 | Fixed readout repairs | `scripts/checkpoint_repair_audit.py`, `scripts/readout_alignment.py` |
@@ -37,6 +37,7 @@ dependencies, and keep the extracted release intact. They run on CPU.
 | Replicate the fixed recipe on AugReg weights | `scripts/augreg_replication_cpu.py` |
 | Hold the current FP32 graph fixed in batch-128 timing | `scripts/matched_batch_cpu.py` |
 | Seal early update decisions and replay referral | `scripts/prospective_vision_cpu.py`, `scripts/analyze_early_update.py`, `scripts/analyze_early_referral.py` |
+| Compare narrowed and low-precision legacy blocks | `scripts/stable_prefix_cpu.py`, `scripts/legacy_precision_cpu.py`, `scripts/analyze_legacy_precision.py` |
 | Local recovered tensor/output checks (additional raw inputs required) | `scripts/check_frontier_states.py`, `scripts/replay_frontier_outputs.py` |
 
 Training and saved-state replay additionally need the specified datasets or tensor

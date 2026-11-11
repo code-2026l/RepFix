@@ -109,7 +109,7 @@ def timing(args):
         rows.append(dict(reference_seed=row['reference_seed'], seconds=medians))
     assert [r['reference_seed'] for r in rows] == list(range(7420, 7426))
     ratios = {f'{num}_over_{den}': interval([r['seconds'][num] / r['seconds'][den] for r in rows])
-              for num, den in [('prefix', 'previous'), ('prefix', 'current'),
+              for num, den in [('prefix', 'previous'), ('prefix', 'current'), ('prefix', 'exact'),
                                ('previous', 'current'), ('exact', 'current')]}
     return dict(complete=True, rows=rows, ratios=ratios,
                 latency_gate_passed=ratios['prefix_over_previous']['ci95'][1] < 1.)

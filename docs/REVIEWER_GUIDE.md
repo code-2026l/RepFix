@@ -22,6 +22,7 @@ and matched CPU overhead rather than inferring deployment cost from MACs.
 | Does the fixed recipe transfer to another pretrained checkpoint? | CHECKPOINT_REPLICATION_20261111.md | Four AugReg pairs with the same images, mask, views and continuation seed |
 | Can existing anchors estimate disagreement? | Reusing the Fitting Anchors | Fixed-design ridge leave-one-out and transfer to contrastive updates |
 | Can early predictions guide a fresh encoder update? | Early Decisions for a Planned Encoder Update, Figure 30 | Sealed epoch-two decisions on CIFAR-10, held-out outcomes, stability controls and limited-reference replay |
+| Can strong updates use a cheaper old branch? | Legacy Precision Under Strong Updates, Figure 31 | Six official-test partitions, zero exact calls and paired physical CPU timing |
 | What remains open? | Current result reports | Accuracy gains from the auxiliary on further tasks and live evaluation of limited referral |
 | Can the compact artifact be checked? | REPRODUCIBILITY.md | Manifest, structural tests, reconstructed figures and all-page comparison |
 

@@ -15,6 +15,7 @@ Paths are relative to the artifact root. `C` below abbreviates
 | Does the fixed visual auxiliary transfer to a second checkpoint? | `C/augreg_replication_20261111.json`, `C/contrastive_contrastiveaugreg_export/` | `augreg_replication_cpu.py`; fixed protocol `docs/plans/2026-11-11-augreg-replication.md` |
 | Does the gain survive stronger supervised training-work controls? | `C/compute_control_confirmation_20261111.json`, `C/contrastive_contrastiveworkconfirm_export/` | `analyze_compute_confirmation.py`; four reference groups and three continuations each |
 | Can an early monitor guide a planned update and budget reference queries? | `C/early_update_confirmation_20261111.json`, `C/early_referral_confirmation_20261111.json` | `prospective_vision_cpu.py`, `analyze_early_update.py`, `analyze_early_referral.py` |
+| Does legacy-only quantization reduce the cost of strong updates? | `C/legacy_precision_audit_20261111.json`, `C/legacy_precision_timing_20261111.json` | `legacy_precision_cpu.py`, `analyze_legacy_precision.py` |
 | What is the marginal cost of the retained visual reference? | `C/matched_batch_latency_20261111.json`, `C/contrastive_contrastivematchedbatch_export/` | `matched_batch_cpu.py`; fixed protocol `docs/plans/2026-11-11-matched-batch-latency.md` |
 | What does the CNN change? | `C/frontier/`, `C/cnn_consumer/` | `cnn_reconstruction_continuation.py`; Table `tab:cnn_continuation` |
 | Does auxiliary-head state explain the historical SNR gap? | `C/head_state/`, `C/head_state_first/`, `C/head_state_summary.json` | `auxiliary_state_factorial.py`; Table `tab:head_state` |
@@ -68,6 +69,7 @@ the included manuscript figures in source order.
 | 28 | `fig_contrastive_benefit.pdf` | `plot_contrastive_benefit.py` | `C/augreg_replication_20261111.json`, `C/matched_batch_latency_20261111.json` |
 | 29 | `fig_risk_queries.pdf` | `plot_risk_query_result.py` | `C/cached_risk_transfer_20261111.json`, `C/small_budget_risk_confirmation.json` |
 | 30 | `fig_early_update.pdf` | `plot_early_update.py` | `C/early_referral_confirmation_20261111.json` |
+| 31 | `fig_legacy_precision.pdf` | `plot_legacy_precision.py` | `C/legacy_precision_audit_20261111.json`, `C/legacy_precision_timing_20261111.json` |
 
 Generator basenames are under `repro/scripts/`. Figure manifests retain source
 and numerical-artist hashes; diagrams are marked as schematics in their captions.

@@ -474,6 +474,14 @@ $25\%$ of examples to the old suffix, compared with $75\%$ under uniform
 referral. The current path is shared across all interventions
 (Appendix~\ref{app:early_update}).
 
+On the strong updates, an INT8 legacy block reads the frozen prefix
+and keeps its residual addition and output gate at FP32. On $9{,}000$
+official CIFAR-10 test images, it uses zero exact old-block calls.
+The largest disagreement is $1.73\%$, with the same FP32 current
+predictions. At batch $128$, the program costs $1.043\times$ the
+current-only graph and $0.878\times$ the prior referral program
+(Appendix~\ref{app:legacy_precision}).
+
 \section{Related Work}\label{sec:related}
 
 Backward-compatible learning treats the readout as an
@@ -2411,5 +2419,7 @@ Additional ten-seed sweeps use $\lambda\in\{2,5,20,50,200,500\}$ on HAR and $\la
 \input{query_risk_study.tex}
 
 \input{early_update_study.tex}
+
+\input{legacy_precision_study.tex}
 
 \end{document}
