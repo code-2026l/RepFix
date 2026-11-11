@@ -23,6 +23,19 @@ ratio is $0.805$ $[0.794,0.816]$. Intervals use the four reference means.
 The references share one ImageNet-pretrained checkpoint. All comparisons
 use the held-out training-population splits.
 
+Two supervised controls match the training suffix-forward budget.
+D2 averages cross-entropy on both views for ten epochs. D20 continues the
+original one-view objective for twenty epochs. Each arm processes
+$200{,}000$ image views through the trainable suffix in $1{,}580$ minibatch
+forwards. D2 and joint take $790$ optimizer steps, and D20 takes $1{,}580$.
+The contrastive objective additionally computes paired-feature similarities.
+Across the full four-reference, three-continuation grid, joint gains
+$0.73$ points $[0.29,1.16]$ over D2 and $0.53$ points $[0.20,0.86]$
+over D20. Their auxiliary loss ratios are $0.791$ $[0.781,0.800]$ and
+$0.785$ $[0.777,0.793]$. All $24$ control accuracies are independently
+recomputed from the saved validation outputs. Elapsed times are recorded
+for their separate numerical executions.
+
 We repeat the two arms with AugReg ViT-B/32 weights pretrained on
 ImageNet-21k and fine-tuned on ImageNet-1k~\citep{steiner2022augreg}.
 The four pairs reuse the fitting examples, label masks, views, input
@@ -70,16 +83,16 @@ reference costs $1.105\times$ $[1.092,1.119]$ and preserves every audited
 decision. The BF16 interval fits the $1.10$ budget on this CPU
 (Figure~\ref{fig:contrastive_benefit}).
 
-\begin{figure}[t]
+\begin{figure}[H]
 \centering
 \includegraphics[width=\linewidth]{figures/fig_contrastive_benefit.pdf}
-\caption{Cross-view continuation across ViT-B/32 checkpoints. (a,b) Each
-point is a fitted-reference pair at continuation seed $6310$. Diamonds
-show means and paired $95\%$ intervals. (c) Old decisions on AugReg with
-the unchanged head and with the retained FP32 reference. The thresholds
-target $80\%$ and $50\%$ coverage on the reference fitting data. (d) Native
-forward latency on TorchVision endpoints. Batch one uses the original
-selected program. Batch $128$ holds the current graph fixed and varies
-reference precision. Dashed segments mark the latency limits.}
+\caption{Cross-view utility and compatibility. (a,b) Accuracy gains and
+loss ratios against one-view (D), two-view (D2) and twenty-epoch (D20)
+supervision. Points average three seeds per TorchVision reference (TV)
+and use seed $6310$ for AugReg. Diamonds show means and paired $95\%$
+intervals. (c) Old decisions on AugReg. Gates target $80\%$ and $50\%$
+coverage on fitting data. (d) Native latency on TorchVision endpoints.
+Batch $128$ holds the FP32 current graph fixed. Dashed segments mark
+the latency limits.}
 \label{fig:contrastive_benefit}
 \end{figure}

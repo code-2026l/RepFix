@@ -354,3 +354,23 @@ endpoint states. Run each separately with `matched_batch_cpu.py` on the
 same CPU and thread count. Use `summarize_checkpoint_replication.py` to
 recompute paired intervals and the decision audits from the numerical
 archive. Its README lists the commands and expected JSON files.
+
+## Training-work controls
+
+The full control grid uses references 6201–6204 and continuation seeds
+6310–6312. Both arms start from each reference's healthy suffix. The
+protocol is `docs/plans/2026-11-11-compute-control-confirmation.md`.
+Run both commands for each pair, with unique output paths and the
+protocol's SHA-256.
+
+```text
+python repro/scripts/contrastive_benefit_cpu.py --population population.pt --alpha 0 --reference-seed 6201 --seed 6310 --epochs 10 --primary-two-view --phase compute_control --plan-sha256 PLAN_SHA256 --out k000.json
+python repro/scripts/contrastive_benefit_cpu.py --population population.pt --alpha 0 --reference-seed 6201 --seed 6310 --epochs 20 --phase compute_control --plan-sha256 PLAN_SHA256 --out k001.json
+```
+
+Each endpoint saves validation logits and labels in its `replay.pt`.
+`analyze_compute_confirmation.py` checks their hashes, pairs them with
+the earlier native joint outputs, and recomputes all 24 accuracy
+comparisons. Intervals average three continuation differences within
+each reference and use the four reference means. The separate numerical
+archive includes the compact outputs and the exact analysis command.

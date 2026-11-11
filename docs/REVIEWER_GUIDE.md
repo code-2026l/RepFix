@@ -18,8 +18,10 @@ and matched CPU overhead rather than inferring deployment cost from MACs.
 | Does transfer survive new reference fits and partitions? | Reference-replication appendix | Four fitted ViT references, twelve nested continuations; reference-level intervals |
 | Can few reference queries estimate repair risk? | Small-budget query appendix | Four fitted references; direct-count and isotropic controls; point estimates separate from certification |
 | Does a visual auxiliary help at matched update steps? | Cross-view appendix and deployment table | Four fitted ViT references and twelve matched continuations |
+| Does the auxiliary help against stronger training-work controls? | Cross-view appendix and COMPUTE_CONTROL_RESULT_20261111.md | Both supervised controls across the full four-reference, three-continuation grid |
+| Does the fixed recipe transfer to another pretrained checkpoint? | CHECKPOINT_REPLICATION_20261111.md | Four AugReg pairs with the same images, mask, views and continuation seed |
 | Can existing anchors estimate disagreement? | Reusing the Fitting Anchors | Fixed-design ridge leave-one-out and transfer to contrastive updates |
-| What remains open? | CONTRASTIVE_RESULT_20261111.md | Broader pretraining, stronger matched baselines and online policy |
+| What remains open? | Current result reports | Further datasets, backbone families and prospectively selected online interventions |
 | Can the compact artifact be checked? | REPRODUCIBILITY.md | Manifest, structural tests, reconstructed figures and all-page comparison |
 
 Class decisions, confidence-threshold decisions and complete logits are different

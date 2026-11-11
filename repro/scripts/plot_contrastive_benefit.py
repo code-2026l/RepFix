@@ -14,17 +14,22 @@ RESULTS = ROOT / 'repro/results/CPUCONT'
 
 
 def horizontal_interval(ax, y, statistic, color):
-    values = statistic['values']
+    if 'ci95' in statistic:
+        lower, upper = statistic['ci95']
+        values = statistic['reference_values']
+    else:
+        lower, upper = statistic['lower'], statistic['upper']
+        values = statistic['values']
     ax.scatter(values, y + np.linspace(.10, .21, len(values)), s=14,
                color=color, alpha=.52, zorder=3, linewidths=0)
     mean = statistic['mean']
-    ax.errorbar(mean, y, xerr=[[mean - statistic['lower']], [statistic['upper'] - mean]],
+    ax.errorbar(mean, y, xerr=[[mean - lower], [upper - mean]],
                 color=color, fmt='D', ms=4.2, lw=1.25, capsize=2.4, zorder=4)
 
 
-def plot(replication, timing, native, output):
+def plot(replication, timing, native, controls, confirmation, output):
     apply_style()
-    fig, axs = plt.subplots(2, 2, figsize=(5.5, 3.95))
+    fig, axs = plt.subplots(2, 2, figsize=(5.5, 4.45))
     fig.subplots_adjust(left=.157, right=.976, top=.922, bottom=.18,
                         wspace=.39, hspace=.66)
     for ax, letter, title, key, baseline, unit in [
@@ -32,9 +37,14 @@ def plot(replication, timing, native, output):
         (axs[0, 1], 'b', 'Auxiliary progress', 'loss_ratio', 1, 'Contrastive loss / supervised'),
     ]:
         ax.axvline(baseline, color=C['reference'], ls='--', lw=.75)
-        for i, (prefix, color) in enumerate([('original_matched_', C['current']), ('', C['purple'])]):
-            horizontal_interval(ax, i, replication[prefix + key], color)
-        ax.set(yticks=[0, 1], yticklabels=['TorchVision', 'AugReg'], ylim=(1.49, -.36), xlabel=unit)
+        original = native['native_gain_pp'] if key == 'gain_pp' else confirmation['auxiliary_ratio']
+        control_key = key if key == 'gain_pp' else 'auxiliary_loss_ratio'
+        rows = [original, controls['contrasts']['two_view'][control_key],
+                controls['contrasts']['twenty_epochs'][control_key], replication[key]]
+        for i, statistic in enumerate(rows):
+            horizontal_interval(ax, i, statistic, C['purple'] if i == 3 else C['current'])
+        ax.set(yticks=range(4), yticklabels=['TV / D', 'TV / D2', 'TV / D20', 'AugReg / D'],
+               ylim=(3.49, -.36), xlabel=unit)
         if letter == 'b':
             ax.tick_params(labelleft=False, left=False)
         ax.grid(axis='x')
@@ -81,10 +91,12 @@ def plot(replication, timing, native, output):
 
 
 def main():
-    replication, timing, native = [json.loads((RESULTS / name).read_text()) for name in (
+    replication, timing, native, controls, confirmation = [json.loads((RESULTS / name).read_text()) for name in (
         'augreg_replication_20261111.json', 'matched_batch_latency_20261111.json',
-        'contrastive_native_summary_20261111.json')]
-    plot(replication, timing, native, ROOT / 'paper/figures/fig_contrastive_benefit')
+        'contrastive_native_summary_20261111.json', 'compute_control_confirmation_20261111.json',
+        'contrastive_confirmation_20261111.json')]
+    plot(replication, timing, native, controls, confirmation,
+         ROOT / 'paper/figures/fig_contrastive_benefit')
 
 
 if __name__ == '__main__':

@@ -13,6 +13,7 @@ Paths are relative to the artifact root. `C` below abbreviates
 | How much can unlabeled scale repair recover? | `C/mechanism/`, `C/mechanism_summary.json` | `checkpoint_repair_audit.py`, `readout_alignment.py`; Table `tab:repair_hierarchy` |
 | Does the failure occur while a real auxiliary improves? | `C/frontier/`, `C/task_validation/`, `C/recon_repairs/` | `reconstruction_task_audit.py`; Table `tab:reconstruction_full` |
 | Does the fixed visual auxiliary transfer to a second checkpoint? | `C/augreg_replication_20261111.json`, `C/contrastive_contrastiveaugreg_export/` | `augreg_replication_cpu.py`; fixed protocol `docs/plans/2026-11-11-augreg-replication.md` |
+| Does the gain survive stronger supervised training-work controls? | `C/compute_control_confirmation_20261111.json`, `C/contrastive_contrastiveworkconfirm_export/` | `analyze_compute_confirmation.py`; four reference groups and three continuations each |
 | What is the marginal cost of the retained visual reference? | `C/matched_batch_latency_20261111.json`, `C/contrastive_contrastivematchedbatch_export/` | `matched_batch_cpu.py`; fixed protocol `docs/plans/2026-11-11-matched-batch-latency.md` |
 | What does the CNN change? | `C/frontier/`, `C/cnn_consumer/` | `cnn_reconstruction_continuation.py`; Table `tab:cnn_continuation` |
 | Does auxiliary-head state explain the historical SNR gap? | `C/head_state/`, `C/head_state_first/`, `C/head_state_summary.json` | `auxiliary_state_factorial.py`; Table `tab:head_state` |

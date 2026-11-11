@@ -34,6 +34,7 @@ def analyze(args):
         assert record['plan_sha256'] == plan_sha
         role = 'two_view' if record['primary_two_view'] else 'twenty_epochs'
         assert record['epochs'] == (10 if role == 'two_view' else 20)
+        assert len(record['trace']) == record['epochs']
         ref, seed = record['reference_seed'], record['seed']
         key = (ref, seed, role)
         assert key in expected and key not in found
@@ -85,7 +86,8 @@ def analyze(args):
                 control_endpoints=len(rows), matched_joint_endpoints=12,
                 all_accuracy_counts_recomputed=True, contrasts=contrasts,
                 matched_work_gate_passed=all(c['positive_lower_accuracy_bound'] for c in contrasts.values()),
-                suffix_forwards_per_arm=1580, optimizer_steps=dict(joint=790, two_view=790, twenty_epochs=1580),
+                suffix_forwards_per_arm=1580, training_image_suffix_evaluations=200000,
+                optimizer_steps=dict(joint=790, two_view=790, twenty_epochs=1580),
                 elapsed_time_scope='separate numerical executions with different host loads',
                 rows=rows)
 

@@ -76,11 +76,12 @@ gradient conflict. Class agreement can hold even when every fixed-threshold
 decision changes. We derive an exact replay construction that shares
 computation with a trainable nonlinear path, and observe unchanged class and
 threshold decisions on HAR and SNR. On CIFAR-100 validation splits, a
-cross-view auxiliary improves ViT-B/32 accuracy over matched supervised
-continuation by $0.84$ points ($95\%$ CI $[0.66,1.03]$) with TorchVision
-weights and $0.60$ points ($[0.15,1.05]$) with AugReg weights. The auxiliary
-loss falls on both checkpoints, and the retained FP32 reference preserves
-every audited old class and threshold decision.
+cross-view auxiliary improves ViT-B/32 accuracy by $0.73$ points
+($95\%$ CI $[0.29,1.16]$) over two-view supervised continuation and
+$0.53$ points ($[0.20,0.86]$) over doubled-epoch continuation, at the same
+suffix-forward budget. With AugReg weights, the fixed recipe gains $0.60$
+points ($[0.15,1.05]$) over matched one-view continuation. The retained
+FP32 reference preserves every audited old class and threshold decision.
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
@@ -388,7 +389,11 @@ A cross-view contrastive auxiliary~\citep{chen2020simclr} improves fine-label
 accuracy by $0.84$ points $[0.66,1.03]$ at the same ten-epoch schedule and
 reduces held-out contrastive loss by $19.5\%$. The fixed weight is selected on
 three development seeds and evaluated on twelve paired continuations across
-four fitted references (Appendix~\ref{app:contrastive_visual}). Applying the
+four fitted references (Appendix~\ref{app:contrastive_visual}). Across the
+same twelve pairs, the gain is $0.73$ points $[0.29,1.16]$ over two-view
+supervised continuation and $0.53$ points $[0.20,0.86]$ over twenty-epoch
+one-view continuation. Each arm uses $200{,}000$ training-image suffix
+evaluations. Applying the
 old coarse head directly to the updated features changes $7.35\%$ of class
 decisions on average. The retained FP32 reference preserves all audited
 class and threshold decisions. Holding the recipe fixed, a replication with
