@@ -212,16 +212,18 @@ def fit_current(args, cache, teacher):
                 current=current, optimizer=optimizer, rng=rng, views=views, previous_fraction=fraction)
 
 
-def audit(args):
+def audit(args, load_model=load_student, force_zero=False):
     choice = json.loads(args.choice.read_text())
     assert choice['passed'] and choice['plan_sha256'] == args.plan_sha256
     cache = torch.load(args.population, map_location='cpu', weights_only=True, mmap=True)
     prefix, teacher = teacher_block(cache)
-    student = load_student(args, choice)
+    student = load_model(args, choice)
     state = fit_current(args, cache, teacher)
     legacy, thresholds, current = state['legacy'], state['thresholds'], state['current']
     cheap_monitor = vision.linear(base.embeds(student, state['monitor']), legacy)
     fraction, rates = select_fraction(cheap_monitor, state['exact_monitor'], thresholds)
+    if force_zero:
+        fraction = 0.
     previous = state['previous_fraction']
     seal = args.out.with_suffix('.forecast.json')
     base.save(seal, dict(early_epoch=2, test_loaded=False, plan_sha256=args.plan_sha256,
@@ -271,14 +273,14 @@ def audit(args):
 
 
 @torch.no_grad()
-def timing(args):
+def timing(args, load_model=load_student):
     choice = json.loads(args.choice.read_text())
     previous = json.loads(args.audit_record.read_text())
     assert base.digest(args.serving) == previous['serving_sha256']
     state = torch.load(args.serving, map_location='cpu', weights_only=True)
     cache = torch.load(args.population, map_location='cpu', weights_only=True, mmap=True)
     prefix, teacher = teacher_block(cache)
-    student = load_student(args, choice)
+    student = load_model(args, choice)
     current = copy.deepcopy(teacher)
     current.load_state_dict(state['current'])
     legacy, reader, correction = state['legacy'], state['reader'], state['correction']

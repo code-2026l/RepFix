@@ -51,7 +51,7 @@ def development(args):
     return dict(complete=True, plan_sha256=digest(args.plan), candidates=candidates, **selected)
 
 
-def audit(args):
+def audit(args, force_zero=False):
     choice = json.loads(args.choice.read_text())
     assert choice['passed'] and choice['plan_sha256'] == digest(args.plan)
     rows = []
@@ -69,7 +69,8 @@ def audit(args):
         start = (row['reference_seed'] - 7420) * 1500
         assert torch.equal(data['test_indices'], permutation[start:start + 1500])
         fraction, rates = select_fraction(data['monitor_cheap'], data['monitor_exact'], data['thresholds'])
-        assert fraction == receipt['prefix_fraction'] and rates == receipt['monitor_rates']
+        assert (0. if force_zero else fraction) == receipt['prefix_fraction']
+        assert rates == receipt['monitor_rates']
         for name in ('prefix', 'previous'):
             q = receipt[name + '_fraction']
             expected = sum(math.ceil(q * len(b)) for b in data['labels'].split(128))
@@ -86,7 +87,7 @@ def audit(args):
             current_accuracy=float((logits['current'].argmax(1) == data['labels']).double().mean())))
     assert [r['reference_seed'] for r in rows] == list(range(7420, 7426))
     passed = all(r['maximum_disagreement']['prefix'] <= .05 and
-                 r['physical_fraction']['prefix'] <= .50 for r in rows)
+                 r['physical_fraction']['prefix'] <= (0. if force_zero else .50) for r in rows)
     query = {name: interval([r['physical_fraction'][name] for r in rows]) for name in ('prefix', 'previous')}
     return dict(complete=True, width=choice['width'], access_gate_passed=passed, official_test_examples=9000,
         current_predictions_shared=True, rows=rows, exact_referral=query,
