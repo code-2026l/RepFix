@@ -79,8 +79,9 @@ without semantic labels on the audited inputs.
 Small points are the four fitted-reference means, each averaging
 three continuations; diamonds and bars show means and paired $95\%$
 intervals. (a) Routed joint-student gains over three supervised controls.
-(b) Accuracy change from the unrestricted joint teacher, before and
-after routing. The dashed line is the $-0.25$-point margin.
+(b) Accuracy change from the unrestricted joint teacher for the student,
+the exact expectation of uniform random routing with equal calls, and
+the fixed confidence route. The dashed line is the $-0.25$-point margin.
 (c) Full-image CPU cost against the original teacher and the same
 routed current function. Row-specific marks show the $1.20/1.10$
 cost limits.}
@@ -105,6 +106,21 @@ $2.23 [1.93, 2.54]$ points. The twelve programs use four historical fitted
 references and the same TorchVision pretrained weights. The official
 test images were reserved from every fit and model-selection phase;
 intervals describe variation across the four reference means.
+
+To separate routing quality from extra computation, we performed a
+retrospective equal-call control on the saved predictions. For a uniform
+subset of exactly $k$ of $n$ inputs, each teacher prediction is used with
+probability $p=k/n$. Its expected accuracy is therefore
+$(1-p)\operatorname{acc}(S)+p\operatorname{acc}(T)$, and its expected
+teacher disagreement is $(1-p)D(S,T)$. We set $k$ to each fixed program's
+actual call count. The confidence route exceeds this exact random
+expectation by $0.63$ points $[0.51,0.75]$. It captures $99.33\%$
+$[99.06,99.59]$ of student--teacher class differences. Remaining teacher
+disagreement is $0.041\%$ $[0.023,0.058]$, versus $4.095\%$
+$[3.848,4.343]$ under random routing. Thus the chosen inputs matter,
+even at the same additional suffix-evaluation count. This comparison
+uses already inspected test outputs; it introduces no new fitted policy
+or independent confirmation. Call counts do not equate measured latency.
 
 The old fine and coarse consumers each have a class rule and two fixed
 confidence rules. Every audited rule agrees. The largest current-class

@@ -29,6 +29,7 @@ def main():
     audit=read('vit_native_audit')
     cost=read('vit_scripted_timing')
     control=read('vit_supervised_control')
+    specificity=read('vit_routing_specificity')['metrics']
     apply_style()
     fig=plt.figure(figsize=(5.5,4.45))
     grid=fig.add_gridspec(2,2,height_ratios=(1,.9))
@@ -47,10 +48,11 @@ def main():
 
     b=fig.add_subplot(grid[0,1])
     points(b,audit['pure_versus_teacher_pp'],0,C['reference'])
-    points(b,audit['versus_teacher_pp'],1,C['repair'])
+    points(b,specificity['random_accuracy_vs_teacher_pp'],1,C['purple'])
+    points(b,audit['versus_teacher_pp'],2,C['repair'])
     b.axvline(-.25,color=C['reference'],ls='--',lw=.8)
     b.axvline(0,color=C['grid'],lw=.8)
-    b.set(yticks=(0,1),yticklabels=('Student','Routed'),ylim=(1.5,-.5),
+    b.set(yticks=(0,1,2),yticklabels=('Student','Random','Routed'),ylim=(2.5,-.5),
           xlim=(-1.25,.16),xticks=(-1,-.5,0),xlabel='Accuracy vs. teacher (pp)')
     b.grid(axis='x')
     panel(b,'b','Teacher retention')

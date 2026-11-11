@@ -444,7 +444,10 @@ the largest decision difference from the full joint teacher is
 $\VisualTeacherDifference\%$. Complete CPU forwards cost
 $\VisualCostOne/\VisualCostBatch\times$ at batches $1/128$.
 The pure student loses $0.97$ points from its teacher; selective
-computation closes that gap (Appendix~\ref{app:vit_deployment}).
+computation closes that gap. In a retrospective equal-call comparison,
+fixed routing gains $0.63$ points $[0.51,0.75]$ over the exact random-routing
+expectation: the fixed gate captures $99.33\%$ of student--teacher
+decision differences (Appendix~\ref{app:vit_deployment}).
 
 \input{deployment_frontier_table.tex}
 
@@ -566,7 +569,11 @@ LoRA and adapter serving share base parameters~\citep{hu2022lora,chen2024punica,
 Progressive networks and side-tuning retain frozen paths
 while training new capacity~\citep{rusu2016progressive,zhang2020sidetuning,sung2022lst}.
 Confidence cascades allocate computation adaptively~\citep{bolukbasi2017adaptive}.
-Our replay shares computations across two versions on the same input.
+We use these tools to separate two requirements: retaining the complete
+old consumer function and recovering the benefit of an updated model.
+The old path supplies the first; paired learning controls and measured
+serving costs test the second. Our replay shares computations across
+two versions on the same input.
 The frozen-feature controls also address distortion from
 fine-tuning~\citep{kumar2022finetuning}.
 

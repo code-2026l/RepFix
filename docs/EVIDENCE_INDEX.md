@@ -240,3 +240,5 @@ output checks and isolated physical CPU timing. The numerical archive
 contains fitted students and prediction tensors for twelve independently
 recomputed summaries. Earlier padded and overlapping timing outcomes are
 retained with their execution exclusions.
+
+[Equal-call routing control](ROUTING_SPECIFICITY_20261111.md): fixed routing gains 0.63 points [0.51, 0.75] over the exact random expectation and captures 99.33% of student/teacher decision differences. This is a retrospective fixed-prediction analysis.

@@ -49,3 +49,5 @@ The reproduction commands are in the numerical archive. Inputs,
 frozen base features and historical teachers can be reconstructed
 from the source and public datasets. The numerical archive contains
 the compact predictions, fitted readouts and source hashes.
+
+[Equal-call routing control](ROUTING_SPECIFICITY_20261111.md): fixed routing gains 0.63 points [0.51, 0.75] over the exact random expectation and captures 99.33% of student/teacher decision differences. This is a retrospective fixed-prediction analysis.

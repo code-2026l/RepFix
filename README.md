@@ -63,8 +63,8 @@ monitor. [Risk estimation and audit results](docs/CACHED_RISK_RESULT_20261111.md
 ## Paper and files
 
 - [Paper](paper/RepFix_ICLR2027.pdf)
-- [Supplementary archive](artifacts/2026-11-11/RepFix_VisualDeployment_20261111_supplement.zip)
-- [Editable source](artifacts/2026-11-11/RepFix_VisualDeployment_20261111_source.zip)
+- [Supplementary archive](artifacts/2026-11-11/RepFix_RoutingControl_20261111_supplement.zip)
+- [Editable source](artifacts/2026-11-11/RepFix_RoutingControl_20261111_source.zip)
 - [Reading guide](docs/REVIEWER_GUIDE.md) 路 [Evidence index](docs/EVIDENCE_INDEX.md)
 - [Final argument and English](docs/STORY_FINAL_20261110.md) 路 [Scientific integrity](docs/STORY_INTEGRITY_20261110.json)
 - [Editorial and figure refinement](docs/EDITORIAL_FINISH_20261110.md) 路 [Integrity checks](docs/EDITORIAL_VISUAL_VERIFICATION_20261110.json)
@@ -104,3 +104,5 @@ caches are outside the compact archives. Recovered tensor and output checks are
 recorded explicitly; the default verifier does not silently rerun a pretrained
 backbone or claim to load those excluded inputs. The numerical CPU environment
 and hardware are separate from the lightweight local review environment.
+
+[Equal-call routing control](docs/ROUTING_SPECIFICITY_20261111.md): fixed routing gains 0.63 points [0.51, 0.75] over the exact random expectation and captures 99.33% of student/teacher decision differences. This is a retrospective fixed-prediction analysis.
