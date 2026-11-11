@@ -15,7 +15,7 @@ PERCENTILES=(.1,.25,.5)
 def run(args):
     cache=torch.load(args.population,map_location='cpu',mmap=True,weights_only=True)
     record=json.loads(args.student_record.read_text())
-    assert record['reference_seed']==6200 and record['seed']==6300 and record['stage']=='pilot'
+    assert record['stage']==('pilot' if args.stage=='pilot' else 'confirmation')
     source=args.student_record.parent/(args.student_record.stem+'_states/program.pt')
     assert base.digest(source)==record['program_sha256']
     state=torch.load(source,map_location='cpu',weights_only=True)
@@ -57,7 +57,7 @@ def run(args):
     replay=folder/'replay.pt'
     torch.save(dict(labels=labels,predictions=predictions,teachers=teachers,
                     fit_margins=fit_margins,val_margins=val_margins),replay)
-    base.save(args.out,dict(complete=True,device='cpu',stage='pilot',reference_seed=6200,seed=6300,
+    base.save(args.out,dict(complete=True,device='cpu',stage=args.stage,reference_seed=record['reference_seed'],seed=record['seed'],
         plan_sha256=args.plan_sha256,official_test_loaded=False,outcomes=results,
         replay_sha256=base.digest(replay),student_program_sha256=record['program_sha256'],
         source_sha256={Path(__file__).name:base.digest(Path(__file__))},branches=[]))
@@ -65,6 +65,7 @@ def run(args):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser()
+    parser.add_argument('--stage',choices=('pilot','calibration'),default='pilot')
     parser.add_argument('--population',type=Path,required=True)
     parser.add_argument('--student-record',type=Path,required=True)
     parser.add_argument('--joint',type=Path,required=True)
