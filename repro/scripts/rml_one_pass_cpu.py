@@ -159,11 +159,11 @@ def split_and_warm(seed):
     return healthy, optimizer.state_dict(), data, raw, order, generator, mean, scale
 
 
-def run(args):
+def run(args, candidates=CANDIDATES, build=None):
     confirm = args.stage == 'confirmation'
     choice = json.loads(args.choice.read_text()) if confirm else None
     if confirm:
-        assert choice['plan_sha256'] == args.plan_sha256 and choice['selected'] in CANDIDATES
+        assert choice['plan_sha256'] == args.plan_sha256 and choice['selected'] in candidates
     seed = args.seed
     healthy, moments, data, raw, order, generator, mean, scale = split_and_warm(seed)
     x, y, _, known = data
@@ -178,12 +178,15 @@ def run(args):
         fit_stream(state, data, seed, 0, 24)
         endpoints[objective] = state['model']
     joint, detach = (endpoints[name] for name in ('joint', 'detach'))
-    names = CANDIDATES if not confirm else list(dict.fromkeys(('side/0', choice['selected'])))
+    names = [*candidates, 'side/0'] if build and not confirm else candidates if not confirm else list(dict.fromkeys(('side/0', choice['selected'])))
     programs = {}
     for name in names:
         torch.manual_seed(seed + 2000)
-        fit = side_repair if name.startswith('side/') else dual_repair
-        programs[name] = fit(joint, x, old_teacher, name, seed)
+        if build and name != 'side/0':
+            programs[name] = build(healthy, joint, reader, thresholds, x, old_teacher, name, seed)
+        else:
+            fit = side_repair if name.startswith('side/') else dual_repair
+            programs[name] = fit(joint, x, old_teacher, name, seed)
     baseline = folded(joint)
     old_program = folded(healthy)
     old_program[-1] = affine(reader['weight'].float() @ healthy.encoder[-1].weight,
