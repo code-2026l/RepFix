@@ -4,16 +4,22 @@ import copy
 import json
 from pathlib import Path
 import time
+import warnings
 
 import torch
 from torch import nn
 from torch.nn import functional as F
 
-from contrastive_serving_cpu import trace
 from suffix_serving import WholeNetwork
 from vit_exact_student_cpu import ExactVisualStudent, base, factory
 from consumer_routing import decisions
 from vit_nonlinear_student_cpu import LogitStudent, NonlinearVisualStudent
+
+
+def trace(module,sample):
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore',torch.jit.TracerWarning)
+        return torch.jit.freeze(torch.jit.trace(module.eval(),sample,check_trace=False))
 
 
 class TeacherSuffix(nn.Module):
