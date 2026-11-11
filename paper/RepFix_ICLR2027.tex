@@ -68,24 +68,23 @@
 
 \begin{abstract}
 An encoder update can improve its current task while breaking a deployed
-readout. In matched HAR continuations, frozen accuracy falls from
+readout. We study this separation between task information and readout
+compatibility. In matched HAR continuations, frozen accuracy falls from
 $\CpuHarHealthy$ to $\CpuHarJointMid$ while the current head reaches
-$\CpuHarOwnMid$. Unlabeled input rescaling restores $\MechHarScalarMid$.
-We derive the affine crossings and audit which component of the applied
-update contracts the representation. Class agreement can conceal failures
-of fixed confidence rules. On RadioML, a single forward shares the healthy
-hidden units and adds capacity for the current output. It preserves all
-audited old decisions and gains $0.33$ points ($95\%$ CI $[0.15,0.51]$)
-over detachment, at $1.070\times$ current-only CPU latency at batch 128.
-With equal distillation work, the gain is $0.28$ points ($[0.11,0.45]$).
-On the official CIFAR-100 test set, a ViT-B/32 program retains its old
-fine and coarse decisions while gaining $\VisualGainTwo$ points over
-two-view supervision and $\VisualGainDouble$ over doubled-epoch supervision.
-A student uses the healthy features; low-margin inputs also use the current
-two-block suffix. Complete FP32 forwards cost $\VisualCostOne/\VisualCostBatch\times$
-the unrestricted current model at batches $1/128$. Early logits also forecast terminal
-disagreement on RadioML, with $2.25$ points of error versus $2.87$ for
-a schedule-aware baseline and $8.27$ for persistence.
+$\CpuHarOwnMid$; unlabeled input rescaling restores $\MechHarScalarMid$.
+Exact affine crossings explain this scale-sensitive failure, and a signed
+update audit identifies contraction that task-gradient conflict alone
+cannot determine. Compatibility also depends on the output rule: preserving
+classes can leave fixed confidence thresholds invalid. We therefore evaluate
+the old consumer's decisions alongside the benefit and cost of an update.
+Retaining healthy computations supports both outputs efficiently. On RadioML,
+equal-distillation controls retain a $0.28$-point auxiliary gain with unchanged
+old decisions. On the official CIFAR-100 test set, a ViT-B/32 student with
+selective current-tail computation gains $\VisualGainTwo$ points over two-view
+supervision and $\VisualGainDouble$ over doubled-epoch supervision while
+preserving all audited fine and coarse decisions. Complete FP32 CPU forwards
+cost $\VisualCostOne/\VisualCostBatch\times$ the unrestricted current model at
+batches $1/128$.
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
@@ -98,44 +97,29 @@ component a \emph{consumer}, including the decision rule it implements.
 The problem arises in backward-compatible learning~\citep{shen2020backward}
 and in activation monitoring~\citep{duan2026staleness}.
 
-A matched HAR continuation isolates the effect. We clone a healthy model with
-its Adam state, keep the deployed readout, and train matched branches on
-identical minibatches. Across ten seeds at variance-auxiliary dose $3$, frozen
-accuracy falls from $\CpuHarHealthy$ to $\CpuHarJointMid$ while the current
-head reaches $\CpuHarOwnMid$. One global input-scale correction, fitted
-without labels, restores $\MechHarScalarMid$ and leaves the encoder untouched
-(Figure~\ref{fig:overview}b). We call this component a \emph{silent scale
-shift}: the task is still decodable, but the readout no longer matches its
-input. A real reconstruction auxiliary produces the same separation while its
-own loss improves (Figure~\ref{fig:overview}c).
+Matched HAR continuations expose the separation. Starting from the same
+model and Adam state, joint training reduces frozen accuracy from
+$\CpuHarHealthy$ to $\CpuHarJointMid$ while the current head reaches
+$\CpuHarOwnMid$. A global scale correction fitted without labels restores
+$\MechHarScalarMid$ (Figure~\ref{fig:overview}). We call this component
+\emph{silent scale shift}: information remains decodable, but the deployed
+readout no longer matches its input. Reconstruction training produces the
+same separation while improving its own objective.
 
-The mechanism is affine. As features contract, their contribution to a frozen
-linear map shrinks relative to its bias, and exact crossing scales predict
-when a class changes. Mean, scale, and alignment repairs then measure how much
-of the observed damage this account explains. A signed audit asks which loss
-moves the representation in that direction. Gradient conflict, the target of
-PCGrad~\citep{yu2020pcgrad} and CAGrad~\citep{liu2021cagrad}, does not
-determine the sign; the projection of the update onto the variance gradient
-does, and for Adam the applied step matters.
+For an affine readout, contraction changes the balance between features
+and bias. We derive its decision crossings and use input repairs to test
+how much damage scale and alignment explain. A signed audit connects this
+geometry to the applied encoder update. Task-gradient conflict alone,
+addressed by PCGrad~\citep{yu2020pcgrad} and CAGrad~\citep{liu2021cagrad},
+does not determine whether that update contracts the representation.
 
-A repair can restore aggregate accuracy while changing individual decisions.
-A distilled readout can preserve classes while crossing fixed confidence
-thresholds. We audit the decisions specified by each consumer and compare three
-interventions: input repair, a learned replacement readout, and retention of
-the healthy function.
-
-Retaining the function need not require two complete encoders. We derive
-an exact reuse identity across nonlinear layers, then test shared serving
-programs against their learning and CPU costs. On RadioML, a single forward
-keeps the healthy hidden units and learns new capacity; an equal-distillation
-comparison retains a $0.28$-point auxiliary gain with unchanged old decisions.
-On CIFAR-100, a student uses the healthy ViT features and sends low-margin
-inputs through an updated suffix. It preserves every audited fine and coarse
-decision while gaining $\VisualGainTwo$ points over two-view supervision and
-$\VisualGainDouble$ over doubled-epoch supervision on the official test.
-Complete FP32 forwards cost $\VisualCostOne/\VisualCostBatch\times$ at
-batches $1/128$. These constructions retain the old function; their measured
-cost determines whether retaining it is practical.
+Repair quality depends on the deployed rule. Accuracy can recover while
+individual decisions change, and classes can agree while confidence gates
+fail. We compare input repair, learned readouts and retention of the healthy
+function under the decisions each consumer actually makes. Shared healthy
+computations retain auxiliary gains on RadioML and CIFAR-100 at modest
+measured CPU cost. The question is whether an upgrade can keep its learning
+benefit and its existing interface together.
 
 \begin{figure}[t]
 \centering
@@ -170,7 +154,13 @@ Each pairwise margin is affine in $c$. Increasing $c$ from zero reaches the smal
 
 The imposed-scale sweep in Figure~\ref{fig:scale_law} isolates this mechanism from the drift that training adds (Appendix~\ref{app:readout}).
 
-The matched HAR trajectory in Figure~\ref{fig:paired_dose}a starts from one healthy checkpoint and keeps calibration examples out of encoder and readout fitting. At $\alpha=3$ the current head recovers while the frozen consumer stays inaccurate. Repairs fitted to training features without labels separate mean from scale: mean correction reaches $\MechHarMeanMid$, global scale correction $\MechHarScalarMid$, and their combination $\MechHarMeanScalarMid$, close to per-feature recalibration ($\CpuHarRecalMid$). At $\alpha=100$, per-feature repair reaches $\CpuHarRecalHigh$ against $\CpuHarRetrainHigh$ for the refitted probe. Scale explains most of the moderate-dose failure; stronger or projected contraction needs richer alignment (Appendix~\ref{app:repair_hierarchy}).
+Matched HAR trajectories separate mean from scale. At $\alpha=3$, global
+scale correction reaches $\MechHarScalarMid$ and adding a mean correction
+reaches $\MechHarMeanScalarMid$, close to per-feature recalibration
+($\CpuHarRecalMid$). At $\alpha=100$, per-feature repair reaches
+$\CpuHarRecalHigh$ versus $\CpuHarRetrainHigh$ for a supervised refit.
+Stronger and projected contraction require richer alignment
+(Appendix~\ref{app:repair_hierarchy}).
 
 All repairs act upstream of the frozen weights, through a versioned encoder output or a consumer-input adapter. Mean and scale repairs need cached healthy statistics and unlabeled new features; paired alignment also needs old features at the same anchors. A supervised refit reuses labels and is the stronger-access baseline. We report NLL and $15$-bin ECE with accuracy.
 
@@ -209,16 +199,14 @@ The task-gradient Gram matrix does not determine the sign of $\dot V$. In partic
 Take $G_p=e_1$, $G_a^\pm=\pm e_2$, and $v=-e_1+\beta e_2$ for $\beta>0$. Both pairs have identity Gram matrix and zero conflict, whereas $r=1$ and $c^\pm=\pm\beta$. For $\alpha\beta>1$, $\dot V^+<0<\dot V^-$. These gradients are locally realizable by a smooth encoder and losses (Appendix~\ref{app:boundary_proof}).
 \end{proof}
 
-Task-gradient relations therefore leave the sign open. Lowering the auxiliary dose protects variance; preserving a particular auxiliary update requires its projection onto $v$.
-
-Local balance differs from eventual collapse. In the symmetric linear model $\dot z=(R-\alpha A)z$, $R\succ0$, $A\succeq0$, some mode contracts when $\alpha\lambda_{\max}(R^{-1/2}AR^{-1/2})>1$; all modes contract when $\alpha\lambda_{\min}(R^{-1/2}AR^{-1/2})>1$ (Theorem~\ref{thm:spectral}). A head can exploit the surviving modes. In HAR, a $4{,}600\times$ trace contraction leaves standardized-probe accuracy unchanged (Appendix~\ref{app:scale_audit}), so variance, effective rank, task decodability, and old-readout utility are measured separately.
-
-The obvious cheaper proxy does not work: a radial ratio in feature space agrees
-with the exact variance derivative on $51\%$ of $405$ HAR checkpoints, no better
-than chance. The signed audit retains the direction and encoder geometry that
-the ratio omits. Appendix~\ref{app:unsigned_probe} defines the proxy and its
-local validity certificate; Appendix~\ref{app:probe_controls} reports
-calibration and online-trigger controls.
+Local contraction and loss of task information are separate outcomes.
+In HAR, a $4{,}600\times$ trace contraction leaves standardized-probe
+accuracy unchanged (Appendix~\ref{app:scale_audit}). The spectral model in
+Theorem~\ref{thm:spectral} distinguishes contraction of some modes from all
+modes. We measure variation, decodability and consumer utility separately.
+The cheaper radial feature-space proxy agrees with the exact derivative on
+$51\%$ of $405$ HAR checkpoints; its geometry and calibration controls are in
+Appendices~\ref{app:unsigned_probe} and~\ref{app:probe_controls}.
 
 \section{Testing the Readout Interface}\label{sec:experiments}\label{sec:analysis}
 
@@ -265,110 +253,56 @@ Paired linear alignment restores $\ReconHarPairedLinearHigh$ and keeps the
 learned encoder with a reconstruction MSE of $\ReconHarMseRatioHigh$ relative
 to detachment (Figure~\ref{fig:overview}c).
 
-Aggregate recovery is the weaker target. A post-hoc chart raises old-reader
-accuracy by $\ChartOldGain$ points, with better NLL and ECE, yet changes
-$\ChartDisagreement\%$ of decisions and certifies none of ten readers. A
-training-time margin hinge keeps a $0.72$-point SNR gain but changes $29.2\%$
-of decisions. On a pretrained vision backbone, frozen accuracy can rise by
-$8.5$ points while $42.1\%$ of decisions change, including $7.2\%$
-correct-to-wrong flips (Appendices~\ref{app:posthoc_chart}--\ref{app:vision_boundary}).
-
-A learned legacy head relaxes the fixed weights through
-distillation~\citep{hinton2015distilling,li2016lwf}. Ten fresh low-label HAR
-runs keep reconstruction MSE at $\FreshMse$ of detachment, with a primary
-difference of $+\FreshGain$ points $[\FreshGainLow,\FreshGainHigh]$. Mean class
-disagreement is $\FreshDirectChanged\%$, all ten monitor bounds certify, and
-serving costs $\FreshDirectLatency\times$ native FP32. OLS and full-feature
-alignment give cheaper class interfaces but certify neither fixed confidence
-threshold (Appendices~\ref{app:alignment_confirmation}--\ref{app:completion_controls}).
-Accuracy recovered by a repair does not tell us which decisions it keeps.
+Recovered accuracy does not imply recovered decisions. A post-hoc chart
+improves accuracy, NLL and ECE yet changes $\ChartDisagreement\%$ of
+decisions. Distilling a legacy head~\citep{hinton2015distilling,li2016lwf}
+gives a useful HAR tradeoff: reconstruction MSE is $\FreshMse$ of
+detachment, primary accuracy changes by $+\FreshGain$ points
+$[\FreshGainLow,\FreshGainHigh]$, and all ten class-disagreement bounds
+certify. Cheaper OLS and full-feature alignment preserve the class interface
+but fail the fixed confidence rules. The matched controls and vision
+counterexamples are in Appendices~\ref{app:posthoc_chart}--\ref{app:completion_controls}
+and~\ref{app:vision_boundary}.
 
 \subsection{Retaining the healthy function}
 
-For an unchanged feature interface, let $A=W_0\operatorname{diag}(1/s_0)$ and
-let $P_\perp$ project onto $\ker A$. The reference-anchored features
-$H_0+(H_\theta-H_0)P_\perp$ preserve all healthy logits
-(Proposition~\ref{prop:consumer_nullspace}). Ten fresh SNR seeds keep an
-auxiliary gain of $\BenefitGuardGain$ points
-$[\BenefitGuardGainLow,\BenefitGuardGainHigh]$, against $\BenefitJointGain$ for
-ordinary joint training, within the half-point noninferiority margin. The price
-is two encoders at $\BenefitLatencyRatio\times$ CPU cost
-(Appendix~\ref{app:benefit_confirmation}). Freezing the nonlinear trunk allows
-single-encoder folding but loses the gain: freezing accounts for $-3.53$ points
-and the compatibility constraint for $-0.003$
-(Appendix~\ref{app:compiled_interface}).
+Retaining a healthy function gives exact outputs in real arithmetic.
+For an affine consumer $A$, the features
+$H_0+(H_\theta-H_0)P_\perp$, with $P_\perp$ projecting onto $\ker A$,
+preserve its logits. On ten fresh SNR seeds this keeps a
+$\BenefitGuardGain$-point auxiliary gain, but evaluating both encoders costs
+$\BenefitLatencyRatio\times$. Freezing the nonlinear trunk permits folding
+and loses the gain (Appendices~\ref{app:benefit_confirmation}
+and~\ref{app:compiled_interface}). Sharing healthy computations offers a
+cheaper way to keep the function while adding learning capacity.
 
-
-
-Retaining the old function need not mean running two full encoders. Let
-$a_1^0=\sigma(W_1^0x+b_1^0)$ and $t_2^0=W_2^0a_1^0+b_2^0$ denote the
-healthy trace. Change $k$ rows $S$ of the first affine map and use a rank-$r$
-second-map update $UV$. The current $a_1$ can cross nonlinear activation
-boundaries, but $\delta a_1=a_1-a_1^0$ is still supported on $S$.
-
-\begin{proposition}[Shared-reference replay]\label{prop:shared_replay}
-For any coordinatewise activation $\sigma$, the current second preactivation
-equals
+For a two-layer nonlinear trunk, let $a_1^0$ and $t_2^0$ denote the
+healthy first activation and second preactivation. If the first-map update
+changes rows $S$ and the second-map update is $UV$, then
 \begin{equation}
-t_2=t_2^0+W_2^0[:,S]\,\delta a_1[S]+UVa_1+\delta b_2.
+t_2=t_2^0+W_2^0[:,S](a_1-a_1^0)[S]+UVa_1+\delta b_2.
 \label{eq:shared_replay}
 \end{equation}
-Evaluating $\sigma(t_2)$ and $\sigma(t_2^0)$ produces the merged current and
-healthy functions in real arithmetic, including when activation gates change.
-Their extra MACs are $kd+km+2rm+Cm$, with separate affine current and old
-heads, rather than a second dense trunk.
-\end{proposition}
-\begin{proof}
-Substitute $a_1=a_1^0+\delta a_1$ into
-$(W_2^0+UV)a_1+b_2^0+\delta b_2$ and use the support of $\delta a_1$.
-\end{proof}
-
-Support is what makes the correction cheap: a rank-one first-map update can
-still produce a full-rank activation difference
-(Appendix~\ref{app:shared_replay}), while $\delta a_1$ stays on $S$ through any
-coordinatewise nonlinearity. The construction keeps reference parameters and
-separate output paths, so it preserves a function rather than reapplying old
-weights to new terminal features. Continuation uses only the original task
-losses.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/fig_suffix_frontier.pdf}
-\caption{Shared computation with enough nonlinear learning capacity.
-(a) A frozen prefix feeds healthy and current suffixes; expanded views show the
-learned residual block or two attention blocks, with ViT normalization and
-residual paths omitted. The old coarse readout keeps its class and
-fixed-threshold rules; the current task uses fine labels.
-(b,c) Serving gains at batch $128$ over head-only F and the richer
-frozen-feature probe H. Dots show all ten fresh continuation seeds; diamonds
-and bars show paired $95\%$ intervals. One pretrained reference, label mask and
-split are shared within each backbone.}
-\label{fig:shared_replay}
-\end{figure}
+The activation difference stays on $S$ through any coordinatewise
+nonlinearity, even when gates change. This permits shared evaluation of
+healthy and current functions with $kd+km+2rm+Cm$ extra MACs.
+Proposition~\ref{prop:shared_replay} gives the construction and proof;
+its saved parameters retain the healthy path, while current features learn.
 
 \subsection{Learning capacity and measured cost}
 
-Development fixes HAR $(4,4)$ and SNR $(16,8)$ before twenty fresh
-confirmation runs. HAR reconstruction MSE is $\ReplayHarMse$ of detachment
-$[\ReplayHarMseLow,\ReplayHarMseHigh]$, with primary noninferiority. SNR gains
-$\ReplaySnrGain$ points $[\ReplaySnrGainLow,\ReplaySnrGainHigh]$ but stays
-$0.792$ points below full joint training. Class and fixed-threshold decisions
-are unchanged under native serving, all $120$ bounds meet the five-point
-budget, and both nonlinear layers change. Small-network latency misses the
-$1.20/1.10$ limits, and the initial ResNet-18 screens miss their net-gain gate
-(Appendices~\ref{app:shared_replay_protocol}--\ref{app:shared_replay_vision}).
+Sparse and dense replay retain old decisions and improve learning, but
+their small-network CPU cost exceeds the $1.20/1.10$ batch limits
+(Table~\ref{tab:deployment_frontier}). Their support/rank controls and
+negative development outcomes are in
+Appendices~\ref{app:shared_replay_protocol}--\ref{app:shared_replay_rank}.
 
-Dense low-rank updates also admit exact replay. The $(16,12)$ SNR
-update gains $\DenseSnrGain$ points over detachment and matches joint
-within $0.23$ points across the paired interval, with $54.1\%$ extra
-MACs. It misses the HAR primary gate (Appendix~\ref{app:shared_replay_rank}).
-At rate $10^{-4}$, we keep the healthy units and distill the joint
-output into a head with 16 added nonlinear units. On 16 fresh
-RadioML references it gains $0.33$ points ($[0.15,0.51]$) over detachment
-with zero old-decision changes. The folded CPU graph costs $1.016\times$
-at batch 1 and $1.070\times$ at batch 128. A fresh comparison gives
-both teachers the same student and distillation work, and retains a
-$0.28$-point auxiliary gain ($[0.11,0.45]$)
+On RadioML, we instead retain the healthy hidden units and distill the
+current output into 16 added nonlinear units. With equal architecture,
+initialization and distillation work, the joint student gains $0.28$ points
+$[0.11,0.45]$ over its detached counterpart across 16 fresh references.
+Every old class and confidence decision agrees. The folded graph costs
+$1.016\times$ at batch 1 and $1.070\times$ at batch 128
 (Appendices~\ref{app:rml_one_pass}--\ref{app:rml_matched_distillation}).
 
 \begin{figure}[t]
@@ -386,46 +320,21 @@ All old class and confidence decisions are unchanged.}
 \label{fig:vit_shared_path}
 \end{figure}
 
-A frozen prefix offers a different tradeoff: evaluate healthy and current
-nonlinear suffixes on the same input (Figure~\ref{fig:shared_replay}). A fixed
-two-view transfer recipe opens the final ResNet-18 residual block. Ten fresh
-continuations gain $\ServedRNGainHead$ points
-$[\ServedRNGainHeadLow,\ServedRNGainHeadHigh]$ over head-only F and
-$\ServedRNGainRichHead$ $[\ServedRNGainRichHeadLow,\ServedRNGainRichHeadHigh]$
-over the richer frozen-feature probe H. On ViT-B/32, opening the final MLP or
-one attention block fails the development gate; opening two complete blocks
-gains $\ServedViTGainHead$ points
-$[\ServedViTGainHeadLow,\ServedViTGainHeadHigh]$ over F and
-$\ServedViTGainRichHead$ $[\ServedViTGainRichHeadLow,\ServedViTGainRichHeadHigh]$
-over H on ten fresh continuations. Smaller L/M scopes isolate what the extra
-capacity buys. A separate confirmation varies fitted references, masks and
-partitions: four ViT reference groups, three new continuations each, gain
-$\ReferenceViTGainH$ points $[\ReferenceViTGainHLow,\ReferenceViTGainHHigh]$
-over H, with intervals across reference means and shared ImageNet weights.
-The fixed reconstruction grid misses its auxiliary-benefit gate
-(Appendices~\ref{app:nonlinear_suffix}--\ref{app:attention_scope},
-\ref{app:vision_auxiliary_new}--\ref{app:reference_replication}).
+Pretrained vision models can share a frozen prefix while learning complete
+nonlinear suffixes. ResNet-18 and ViT-B/32 then improve supervised transfer
+over richer frozen-feature controls; smaller update scopes and the fixed
+reconstruction grid miss their gain targets
+(Appendices~\ref{app:nonlinear_suffix}--\ref{app:reference_replication}).
 
-A cross-view contrastive auxiliary~\citep{chen2020simclr} improves fine-label
-accuracy by $0.84$ points $[0.66,1.03]$ at the same ten-epoch schedule and
-reduces held-out contrastive loss by $19.5\%$. The fixed weight is selected on
-three development seeds and evaluated on twelve paired continuations across
-four fitted references (Appendix~\ref{app:contrastive_visual}). Across the
-same twelve pairs, the gain is $0.73$ points $[0.29,1.16]$ over two-view
-supervised continuation and $0.53$ points $[0.20,0.86]$ over twenty-epoch
-one-view continuation. Each arm uses $200{,}000$ training-image suffix
-evaluations. Applying the
-old coarse head directly to the updated features changes $7.35\%$ of class
-decisions on average. The retained FP32 reference preserves all audited
-class and threshold decisions. Holding the recipe fixed, a replication with
-AugReg weights gains $0.60$ points $[0.15,1.05]$ and lowers contrastive loss
-by $8.46\%$ across four paired references. The same FP32 reference
-construction preserves every old decision in the AugReg audit.
-
-Cheaper repairs fail the same compatibility screen: none of nine unlabeled
-visual repairs meets the one-percent class/selective gate on all development
-seeds, and a one-forward distilled-head control fails its three-weight pilot
-(Appendices~\ref{app:suffix_repairs}--\ref{app:vision_head_control}).
+On ViT-B/32, a cross-view contrastive auxiliary~\citep{chen2020simclr}
+improves training-only validation accuracy over both two-view and
+doubled-epoch supervision at matched suffix-forward budgets. A fixed-recipe
+AugReg replication also improves accuracy and contrastive loss. Directly
+applying the old coarse head to updated features changes $7.35\%$ of its
+class decisions on average. Nine unlabeled repairs and the initial
+distilled-head screen fail their compatibility targets
+(Appendices~\ref{app:suffix_repairs}--\ref{app:vision_head_control},
+\ref{app:contrastive_visual}).
 
 We can retain those visual gains with exact old decisions and FP32
 execution. A 128-unit student reads the healthy final features and last
@@ -451,23 +360,13 @@ decision differences (Appendix~\ref{app:vit_deployment}).
 
 \input{deployment_frontier_table.tex}
 
-The selected cross-view programs cost $1.139/1.078\times$ at batches
-$1/128$, with at most $0.18\%$ old decision disagreement. At batch $128$,
-both programs use the same FP32 current graph, and the BF16 reference
-meets the $1.10$ limit ($95\%$ CI $[1.069,1.088]$,
-Table~\ref{tab:deployment_frontier}).
-In supervised ViT transfer, selected reference serving costs
-$\ServedViTCostOne/\ServedViTCostBatch\times$ at batches $1/128$ against
-$1.20/1.10$ budgets; its largest class/selective disagreement is
-$\ServedViTDisagreement\%$ and all $60$ consumer checks certify the
-five-point corpus-remainder budget. Full-precision reference serving costs
-$\ServedViTFullCostOne/\ServedViTFullCostBatch\times$ with zero observed old
-decision changes, although its batch-$128$ interval crosses $1.10$.
-ResNet-18 transfer still exceeds the batch-$128$ limit. The original
-MLP replay programs exceed their limits; exact reuse meets both in the
-new SNR experiment. Whole-encoder AMP is faster but changes the
-current function; Appendix~\ref{app:reference_precision} gives its matched
-comparison, and Appendix~\ref{app:served_frontier} the full table.
+Table~\ref{tab:deployment_frontier} places the retained-function programs
+alongside their learning gains and observed decision changes. The routed
+ViT result uses one pretrained checkpoint and one official test cohort;
+intervals are across four fitted-reference means. ResNet-18 still exceeds
+the batch-128 cost limit. Reduced-precision reference serving offers a
+different accuracy--cost tradeoff, evaluated separately with the FP32
+current function fixed (Appendix~\ref{app:served_frontier}).
 
 \section{Checking Compatibility Before Serving}\label{sec:standard}
 
@@ -498,40 +397,16 @@ $\ConsumerScatterFalseSafeTen$ false-safe declarations
 flips~\citep{yan2021positive}, separating old-correct errors from useful
 corrections.
 
-Each reference program is audited and timed against the same FP32
-current-only function. Cached ridge residuals estimate clean disagreement
-with $0.47$ points of MAE using the $1{,}024$ fitting pairs, compared with
-$0.49$ using $32$ additional queries. Certification uses a separate
-monitor (Appendix~\ref{app:cached_anchor_risk}).
-
-We test an earlier decision on CIFAR-10 with ResNet-18. At epoch two, an
-unlabeled monitor predicts whether the old consumer will exceed $5\%$
-disagreement at epoch eight. Across three planned update rates and a
-separate stability control, it flags $15/17$ exceedances and clears $7/7$
-safe cases. A fixed policy replay uses these early logs to choose a
-repair and a reference-call budget. Every selected program stays within
-$5\%$ on the held-out examples. Among unsafe updates, it sends a median
-$25\%$ of examples to the old suffix, compared with $75\%$ under uniform
-referral. The current path is shared across all interventions
-(Appendix~\ref{app:early_update}).
-
-On RadioML, epoch-six margins forecast epoch-24 disagreement with
-$2.25$ points of error, compared with $2.87$ for schedule and $8.27$
-for persistence. Joint SNR training gains $0.35$ points of modulation
-accuracy ($[0.20,0.50]$) at rate $10^{-4}$ with matched labels and steps
-(Appendix~\ref{app:rml_trajectory}). On subject-disjoint HAR, the
-forecast beats persistence, with an uncertain gain over schedule.
-Reconstruction lowers its own loss and graph-derived targets help on
-development subjects but hurt on the test cohort
-(Appendix~\ref{app:subject_transfer}).
-
-On the strong CIFAR-10 updates, an INT8 legacy block reads the frozen prefix
-and keeps its residual addition and output gate at FP32. On $9{,}000$
-official CIFAR-10 test images, it uses zero exact old-block calls.
-The largest disagreement is $1.73\%$, with the same FP32 current
-predictions. At batch $128$, the program costs $1.043\times$ the
-current-only graph and $0.878\times$ the prior referral program
-(Appendix~\ref{app:legacy_precision}).
+Early logits can also guide a pending upgrade. On CIFAR-10, an epoch-two
+monitor flags $15/17$ later budget exceedances and clears all seven safe
+updates. A fixed replay policy stays within $5\%$ disagreement on all
+24 held-out cases. RadioML trajectory forecasts reduce terminal-risk error
+from $2.87$ to $2.25$ points relative to a schedule-aware baseline;
+the corresponding advantage is uncertain on subject-disjoint HAR.
+These forecast studies and cheaper legacy-path experiments are reported
+in Appendices~\ref{app:cached_anchor_risk}--\ref{app:legacy_precision}
+and~\ref{app:subject_transfer}. They extend the interface audit to release
+decisions; the main serving results above use fixed, completed updates.
 
 \section{Related Work}\label{sec:related}
 
@@ -604,6 +479,15 @@ The artifact contains theoretical assumptions, code, per-seed records, the fixed
 % ═══════════════════════════════════════════════════════════════════
 \clearpage
 \appendix
+
+The supplementary material is organized by question. Readout crossings and
+update geometry are developed in Appendices~\ref{app:boundary_proof}
+and~\ref{app:proofs}. Matched continuation, repairs and their failure cases
+are in Appendix~\ref{app:moved}. Shared computation and serving controls
+begin at Appendix~\ref{app:frontier_extension}; the matched RadioML and
+official-test vision programs are in Appendices~\ref{app:rml_one_pass}
+and~\ref{app:vit_deployment}. Complete development grids and recorded
+protocols accompany the source artifact.
 
 
 \section{Proofs and Audit Details for the Diagnostic Boundary}\label{app:boundary_proof}
@@ -1270,7 +1154,7 @@ The corrected battery protocol uses cell-disjoint train/validation/test partitio
 \label{alg:stf}
 \begin{algorithmic}[1]
 \STATE \textbf{Input:} domain data $\mathcal{D}$, encoder width $m$, toxicity schedule $\{\alpha\}$, seeds
-\STATE \textbf{Phase 1 -- health anchor:} train the single-task encoder ($\alpha=0$), record healthy scatter $\mathcal{S}_{single}=\mathcal{S}_h(\theta^*)$ and healthy spectral ratio $\rho_0$.
+\STATE Phase 1 -- health anchor: train the single-task encoder ($\alpha=0$), record healthy scatter $\mathcal{S}_{single}=\mathcal{S}_h(\theta^*)$ and healthy spectral ratio $\rho_0$.
 \STATE \textbf{Phase 2 -- calibration:} sweep $\alpha$ with mode \textsc{joint}; record $\rho$, relative scatter $\mathcal{S}_h/\mathcal{S}_{single}$, collapse flag; locate $\alpha_c$ by the threshold crossing.
 \STATE \textbf{Phase 3 -- repair:} at a selected dose, train each arm on $L_p(H)+\alpha L_a(\widetilde H)$, using its specified forward map $\widetilde H$ (or detached $H$ for \textsc{stf-0}); backpropagate this loss and monitor the gradient diagnostic and relative scatter.
 \STATE \textbf{Report:} collapse rate, recovery rate, $\rho$, $\mathcal{S}_h/\mathcal{S}_{single}$.
@@ -1935,16 +1819,31 @@ The frozen affine consumer has exactly the reference logits on every input in re
 Since $AP_\perp=0$, the logit difference is $AP_\perp(h_\theta-h_0)=0$. Rank--nullity gives the free dimension and the converse. The construction is the orthogonal projection onto the affine set $h_0(x)+\ker A$, proving the minimum-distance statement. The fixed normalizer's mean and the head's bias cancel in the difference.
 \end{proof}
 
-The row-vector implementation is $\widetilde H=H_0+(H_\theta-H_0)P_\perp$. A float64 SVD of the normalized head $A$ fixes the projector before continuation. Because the reference branch remains present, the logit identity holds for later encoder parameters and arbitrary inputs in real arithmetic. It also preserves fixed post-processing and its resulting NLL and ECE. Corpus-level float64 checks measure the numerical residual. This functional identity is stronger than the checkpoint-local flow statement and covers a different object from the sampled disagreement bound.
+We compute $P_\perp$ by float64 SVD before continuation and implement
+$\widetilde H=H_0+(H_\theta-H_0)P_\perp$. Retaining $H_0$ preserves fixed
+post-processing as well as logits; corpus checks measure floating-point error.
 
+Development seeds $200$--$202$ compare HAR reconstruction at doses
+$1,10,100$ with $10\%$ labels and RadioML SNR at $0.1,1,10$ with $20\%$.
+Validation is reserved before fitting. Each candidate shares the healthy
+state, Adam moments and minibatches. Selection maximizes the minimum
+validation gain among J--D, GJ--GD and GJ--D, where D/J denote detached/joint
+training and GD/GJ their guarded versions.
 
-The committed plan separates development from confirmation. Development seeds $200$--$202$ test HAR reconstruction with $10\%$ of fitting primary labels at doses $1,10,100$, and RadioML SNR with $20\%$ at $0.1,1,10$. A training reservation made before any model or readout fit supplies validation only. Candidates share healthy states, Adam moments, and future minibatches. Healthy readouts use labeled fitting examples; all fitting inputs and auxiliary targets remain available. HAR reconstructs the $561$-dimensional input, while SNR metadata are standardized on fitting data. The rule maximizes the minimum mean validation gain among J--D, GJ--GD, and GJ--D. The frozen choice record retains all six candidates, including null and adverse results; development computes no test metrics.
-
-Selection yields RadioML SNR dose $1$, width $64$, Adam $10^{-3}$, batch $256$, and $25$ healthy plus $25$ continuation epochs. Ten new seeds $300$--$309$ receive this unchanged recipe and all four branches: ordinary detachment/joint training (D/J), and guarded detachment/joint training (GD/GJ). Classification logits and the projector use float64 in every arm; encoder/auxiliary parameters and Adam states remain fp32. The guard and losses are fixed before continuation. Training-anchor prediction drift is logged at fixed epochs with a $0.05$ disagreement threshold; it is a diagnostic trace rather than an adaptive controller or warning-lead-time claim. Endpoints are fixed; neither checkpoint nor seed selection uses test outcomes.
+The selected SNR recipe uses dose $1$, width $64$, Adam $10^{-3}$, batch
+$256$ and $25+25$ warm-up/continuation epochs. Confirmation uses ten seeds
+$300$--$309$ and all four branches. Logits and projection are float64;
+encoder, auxiliary parameters and Adam states are fp32. The $0.05$ drift
+threshold is logged diagnostically at fixed epochs. All six development
+candidates and fixed-endpoint confirmation outcomes are archived.
 
 \input{benefit_contrasts_table.tex}
 
-Confirmation requires five predeclared conditions: positive paired lower $95\%$ limits for J--D, GJ--GD, and GJ--D; GJ--J above $-0.5$ percentage point; and logit error below $10^{-8}$ with zero prediction changes. All five pass. Intervals are paired seed-level $t$ intervals conditional on this dataset, split, and recipe. Current-head accuracy is $\BenefitOwnGuardJoint$ for GJ, $\BenefitOwnJoint$ for J, $\BenefitOwnGuardDetach$ for GD, and $\BenefitOwnDetach$ for D. The guarded comparison GJ--GD isolates the auxiliary's contribution, with SNR MSE $\BenefitMseRatio$ of matched guarded detachment.
+All five confirmation conditions pass: positive paired lower $95\%$ limits
+for J--D, GJ--GD and GJ--D; GJ--J above $-0.5$ points; and old-logit error
+below $10^{-8}$ with zero changed predictions. Table~\ref{tab:benefit_contrasts}
+reports the contrasts. SNR MSE is $\BenefitMseRatio$ of guarded detachment.
+Intervals describe seed variation on this fixed split and recipe.
 
 \begin{figure}[t]
 \centering
@@ -1955,15 +1854,20 @@ Confirmation requires five predeclared conditions: positive paired lower $95\%$ 
 
 The separate confirmation bank contains forty fixed consumers, total tail probability $0.05$, an independent $1{,}024$-input monitor per seed, and a $0.05$ relative classification-error budget. GD and GJ each certify in $10/10$ seeds with a bound near $0.0065$; D and J each certify in $0/10$. Ordinary consumers change many predictions while aggregate frozen accuracy remains nearly unchanged. J's frozen ECE rises from $\BenefitHealthyECE$ to $\BenefitJointECE$; guarded predictions, NLL, and ECE match the reference, with maximum logit error $\BenefitLogitError$. This bank is distinct from the earlier $3{,}015$-candidate family.
 
-All ten normalized heads have rank $11$, leaving $53$ free directions. Stacking normalized matrices protects several affine heads on the same reference features, at the cost of a smaller nullspace; full column rank leaves no compatible displacement. Nonlinear consumers need their own constraint. The reference encoder remains at inference. On one Xeon Platinum 8570 CPU thread, batch $1{,}024$, the mean ratio of per-seed median latencies is $\BenefitLatencyRatio\times$, using nine repetitions after three warm-ups. Reference fitting features are cached during training. Thus the confirmed low-label result includes the cost of retaining and evaluating the reference.
-
-A direct dual-routing baseline also retains both encoders, serving the old consumer from $h_0$ and the current head from J. It inherits J's primary metric and the reference legacy metrics. The guarded control enforces one shared fixed-width representation for both heads and adds a projection to this graph. Its nearest-vector property concerns Euclidean feature distance.
-
-The full study verifies $104$ development/confirmation model--Adam states, shared initial states, primary-label masks, future-order hashes, and all consumer bounds. An independent process reconstructs all forty saved consumers and replays their accuracy/NLL/ECE and bounds exactly. Numerical drivers are \texttt{benefit\_compatibility\_cpu.py} and \texttt{verify\_benefit\_consumers\_cpu.py}; local analysis is \texttt{summarize\_benefit\_compatibility.py}. The committed plan, frozen validation choice, full records, verification and all negative development cases accompany the artifact.
+All heads have rank $11$, leaving $53$ feature directions. Stacking affine
+heads reduces this nullspace; nonlinear consumers need a separate constraint.
+At batch $1{,}024$, nine post-warm-up repetitions on one Xeon Platinum 8570
+thread give mean per-seed median cost $\BenefitLatencyRatio\times$.
+The direct two-encoder baseline serves old outputs from $h_0$ and current
+outputs from J; projection additionally enforces one shared fixed-width
+representation. Training caches reference fitting features. Independent
+tensor replay checks all forty consumers; source and state hashes are in
+the artifact's verification records.
 
 \subsection{Folding Compatibility into a Single Encoder}\label{app:compiled_interface}
 
-The reference branch makes compatibility expensive. Freezing the nonlinear trunk lets us fold the constraint into its final affine map, retaining ordinary inference shapes but restricting feature learning. A new plan, committed after the earlier confirmation and before execution, tests this tradeoff as a separate study.
+Freezing the nonlinear trunk allows the compatibility constraint to fold into
+the final affine map. We test its learning cost under a separate fixed protocol.
 
 \begin{corollary}[Foldable affine compatibility]\label{cor:compiled_interface}
 Let $h_0(x)=B_0\phi_0(x)+c_0$, with a retained deterministic trunk $\phi_0$. For arbitrary trainable $B,c$, set
@@ -1978,7 +1882,8 @@ Then $\overline h(x)=\overline B\phi_0(x)+\overline c$ has the reference affine-
 Both $A(\overline B-B_0)$ and $A(\overline c-c_0)$ vanish. Folding is a substitution of one weight and bias, not a second inference operation. Each of the $d+1$ weight/bias columns can vary in $\ker A$.
 \end{proof}
 
-The construction uses constrained affine adaptation, related to nullspace updates and mergeable frozen-backbone methods~\citep{farajtabar2020ogd,pham2026ness,hu2022lora}. With a linear current head it remains a linear predictor of fixed trunk features. Folding preserves the constrained function exactly; whether that function retains auxiliary benefit is the empirical question.
+This constrained affine adaptation~\citep{farajtabar2020ogd,pham2026ness,hu2022lora}
+remains a linear predictor of fixed trunk features when its current head is linear.
 
 \begin{figure}[t]
 \centering
@@ -2009,7 +1914,9 @@ All $40$ CD/CJ consumers retain old predictions, NLL, and ECE, with maximum logi
 
 Deployed encoders retain exactly three affine evaluations and the baseline parameter shapes, with no reference or projector parameters. At batch $1$, mean ratios of per-seed median CPU latency are $\CompileRmlSingleLatency\times$ for SNR and $\CompileHarSingleLatency\times$ for HAR. At batch $1{,}024$, they are $\CompileRmlLatency\times$ and $\CompileHarLatency\times$. Measurements cover the encoder and current head, using one Xeon Platinum 8570 thread, five warm-ups and $21$ alternating timed repetitions per path; the baseline uses the same mixed precision. The corresponding two-encoder paths average $2.22\times$ and $2.16\times$ at batch $1{,}024$. These deployment measurements establish the cost reduction, not useful adaptation.
 
-Local checks cover all $180$ healthy, endpoint model--Adam, and compiled states. A separate tensor-based process reconstructs all $120$ consumers and exactly replays accuracy, NLL, ECE, and sampling bounds. Structural checks cover the normalized-head constraint, Adam steps, folding, reference and projector removal, nonzero gradients, and failure under trunk drift. The artifact includes the committed plan, drivers, complete outcomes, and verification. This control removes reference computation but loses the confirmed SNR benefit, motivating a trainable nonlinear channel.
+State checks cover all $180$ healthy, endpoint and compiled model--Adam
+states; independent replay covers $120$ consumers. The compiled control
+reduces serving cost but loses the confirmed SNR auxiliary benefit.
 
 \subsection{A Compatible Nonlinear Channel: Development Gate and Limits}\label{app:nonlinear_interface}
 
@@ -2021,7 +1928,7 @@ A narrow side network allows nonlinear learning while the base remains fixed. We
 \end{equation}
 The healthy base $f_0$ stays fixed, and a two-ReLU side MLP $g_\psi$ learns its nonlinear prefix. Both heads receive one shared $64$-vector. Projection preserves affine-consumer logits; we test whether that flexibility retains useful learning.
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth]{figures/fig_nonlinear_interface.pdf}
 \caption{A compatible nonlinear channel adds trainable capacity. (a) The base stays fixed while the side learns, with $AP_\perp g_\psi=0$. (b) Equal-depth paths fuse into a dense width-$64+k$ MLP: the middle matrix is block diagonal and the final side block is projected. The base is embedded once, all dense zero blocks count toward storage and computation, and the output stays $64$-dimensional. Planes are schematic; parameter ratios and the validation screen are reported separately.}

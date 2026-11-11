@@ -14,8 +14,7 @@ decision budget. The accuracy baseline is matched detached continuation.}
 \label{fig:rml_one_pass}
 \end{figure}
 
-We returned to the RadioML rate $10^{-4}$, where joint SNR training
-improved modulation accuracy in two independent experiments. Each
+RadioML continuation uses rate $10^{-4}$. Each
 reference used $12{,}000$ fitting signals, $3\%$ primary labels,
 a width-64 encoder and a healthy warm start. We trained joint and
 detached teachers with the same 24 continuation epochs, data and
@@ -48,14 +47,10 @@ teacher. If the folded old head is $C_0b+d_0$, the two outputs are
 +
 \begin{pmatrix}d_{\rm current}\\d_0\end{pmatrix}.
 \end{equation}
-The second layer stacks $W_2^0$ and $U$. The output layer stacks
-both heads. The old rows have zero weights on the added units, so the
-old function is exact in real arithmetic for any current weights.
-The first affine layer, the old rows of the second layer, and the old
-readout coefficients match the folded reference in every saved
-program. This construction shares the original hidden units and uses
-one additional set of logits. Its ability to retain the auxiliary
-gain depends on how well the current student fits the teacher.
+Stacking $W_2^0$ with $U$ and both heads gives one graph. Zero old-head
+weights on the added units preserve the old function in real arithmetic.
+Every saved program retains the reference affine coefficients; the current
+student determines how much teacher utility survives.
 
 On fresh development references we compared 0, 4, 8 and 16 added
 units with a same-width student initialized at the healthy checkpoint

@@ -1,5 +1,28 @@
 \subsection{Shared-Reference Replay}\label{app:shared_replay}
 
+Retaining the old function need not mean running two full encoders. Let
+$a_1^0=\sigma(W_1^0x+b_1^0)$ and $t_2^0=W_2^0a_1^0+b_2^0$ denote the
+healthy trace. Change $k$ rows $S$ of the first affine map and use a rank-$r$
+second-map update $UV$. The current $a_1$ can cross nonlinear activation
+boundaries, but $\delta a_1=a_1-a_1^0$ is still supported on $S$.
+
+\begin{proposition}[Shared-reference replay]\label{prop:shared_replay}
+For any coordinatewise activation $\sigma$, the current second preactivation
+equals
+\[
+t_2=t_2^0+W_2^0[:,S]\,\delta a_1[S]+UVa_1+\delta b_2.
+\]
+Evaluating $\sigma(t_2)$ and $\sigma(t_2^0)$ produces the merged current and
+healthy functions in real arithmetic, including when activation gates change.
+Their extra MACs are $kd+km+2rm+Cm$, with separate affine current and old
+heads, rather than a second dense trunk.
+\end{proposition}
+\begin{proof}
+Substitute $a_1=a_1^0+\delta a_1$ into
+$(W_2^0+UV)a_1+b_2^0+\delta b_2$ and use the support of $\delta a_1$.
+\end{proof}
+
+
 The earlier one-encoder controls either restrict a common feature interface
 or learn a replacement readout. Shared-reference replay retains the healthy input-to-output function
 on a separate path, freeing the current features to change. The reference parameters

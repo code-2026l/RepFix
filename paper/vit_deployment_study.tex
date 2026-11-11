@@ -10,32 +10,23 @@ $h_0$. The student learns the current output of a saved teacher, and
 a gate can send selected prefix tokens through that teacher's
 updated two-block suffix.
 
-The three teachers came from contrastive continuation, two-view
-supervised continuation and doubled-epoch supervised continuation.
-They used the same 20\% fitting-label budget. Each student received
-both fixed views of the same 10,000 fitting images, using its own
-teacher targets without further labels. We first fit an affine
-residual with ridge coefficients $0.001,0.01,0.1,1$. The pilot retained
-the contrastive-loss advantage but lost $0.76$--$1.04$ points of
-joint-teacher accuracy. A nonlinear logit residual added 128 or
-512 GELU units. We trained it for 30 epochs with normalized
-centered MSE and unit-temperature KL, batch 256 and Adam at $0.001$.
-The affine term stayed fixed after its ridge-$0.001$ fit. Width 128
-lost $0.32$ points on the pilot, slightly beyond the $0.25$-point
-retention margin; we kept this failed selection result.
+Contrastive, two-view supervised and doubled-epoch supervised teachers
+share a $20\%$ fitting-label budget. Students use both fixed views of
+10,000 fitting images and their own teacher targets, without further labels.
+An affine residual with ridge coefficients $0.001,0.01,0.1,1$ retains the
+contrastive advantage but loses $0.76$--$1.04$ teacher-accuracy points.
+We add a 128- or 512-unit GELU logit residual and train for 30 epochs
+with normalized centered MSE, unit-temperature KL, batch 256 and
+Adam at $0.001$; the ridge-$0.001$ affine term stays fixed.
+Width 128 loses $0.32$ pilot points against a $0.25$-point retention limit.
 
-For each student, the routing score is the gap between its two
-largest logits. Cutoffs are quantiles of that score on clean fitting
-images. We evaluated the fixed $10\%$, $25\%$ and $50\%$ quantiles.
-The single-reference pilot selected $10\%$. Across twelve
-training-only validation continuations, that point had an uncertain
-retention interval. Final calibration averaged three continuations
-within each of four fitted references and selected $25\%$, the
-smallest point meeting the original gain and retention limits.
-We fixed this rule before official-test predictions. Preparation of
-healthy test features supplied no student or teacher accuracy for
-selection. Teacher and student fitting, including the 128-unit
-choice, used the training partition throughout.
+Routing uses the student's top-two logit gap, with cutoffs at the $10\%$,
+$25\%$ or $50\%$ fitting-score quantile. The single-reference pilot selects
+$10\%$; four-reference training-only validation selects $25\%$, the smallest
+point meeting gain and retention limits after averaging three continuations
+per reference. This final choice precedes official-test predictions.
+Healthy test-feature preparation supplies no student or teacher accuracy.
+All student fitting and width selection use the training partition.
 
 \begin{proposition}[A retained interface and a selective current output]
 \label{prop:selective_current}

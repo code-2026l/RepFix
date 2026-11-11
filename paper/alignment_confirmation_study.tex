@@ -1,12 +1,8 @@
 \subsection{Joint Alignment Baselines and Fresh Confirmation}\label{app:alignment_confirmation}
 
-Jointly learning a backward map is an established approach to compatibility.
-BC-Aligner~\citep{hu2022backward} provides this baseline, while model
-stitching~\citep{bansal2021stitching,mai2026stitching} studies related
-representation interfaces. We compare alignment targets under a matched
-parameterization before testing the HAR construction on new training seeds.
-The fixed protocol and development choices were publicly committed before
-the corresponding numerical runs.
+We compare BC-Aligner-style feature alignment~\citep{hu2022backward} with
+logit alignment and direct-head distillation, then confirm the selected
+HAR candidates on fresh seeds.
 
 Development reuses the healthy checkpoints, Adam moments, splits and future
 minibatches of seeds $800$--$802$. Both new families learn a bias-free
@@ -60,7 +56,7 @@ the same primary and reconstruction outcomes and ten certificates. The
 logit map has $1.64\%$ mean disagreement but certifies nine seeds. Its ten
 secondary-monitor certificates leave that primary failure unchanged.
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth]{figures/fig_alignment_confirmation.pdf}
 \caption{Fresh HAR confirmation separates aggregate utility from individual
@@ -84,9 +80,9 @@ diagnostic timing limits, whose current head computes logits in float64.
 Native primary predictions match that diagnostic across all $50$ saved
 branch endpoints.
 
-Independent tensor replay reproduces all $50$ metric sets and the protected
-readers' bounds exactly, including the OLS fitting conditions. Casting OLS
-to float32 changes $11$ seed--example predictions among $29{,}470$ comparisons
-with its float64 fit, with maximum logit difference $0.182$; all reported OLS
-certificates evaluate the actual float32 reader. The fresh HAR confirmation therefore retains a bounded fraction of legacy
+Tensor replay reproduces all $50$ metric sets and bounds. Casting OLS to
+float32 changes $11$ of $29{,}470$ seed--example predictions, with maximum
+logit difference $0.182$; certificates use the actual float32 reader.
+
+The fresh HAR confirmation therefore retains a bounded fraction of legacy
 decisions under the actual float32 implementation.

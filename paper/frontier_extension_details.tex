@@ -21,6 +21,21 @@ parameters and a bias on all $64$ channels rather than $16$. The intervals cover
 attributing the sparse-to-dense gain to rank alone. The SVD projection
 and fresh dense confirmation describe the respective saved and trained updates.
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/fig_suffix_frontier.pdf}
+\caption{Shared computation with enough nonlinear learning capacity.
+(a) A frozen prefix feeds healthy and current suffixes; expanded views show the
+learned residual block or two attention blocks, with ViT normalization and
+residual paths omitted. The old coarse readout keeps its class and
+fixed-threshold rules; the current task uses fine labels.
+(b,c) Serving gains at batch $128$ over head-only F and the richer
+frozen-feature probe H. Dots show all ten fresh continuation seeds; diamonds
+and bars show paired $95\%$ intervals. One pretrained reference, label mask and
+split are shared within each backbone.}
+\label{fig:shared_replay}
+\end{figure}
+
 \subsection{Opening a Complete Nonlinear Suffix}\label{app:nonlinear_suffix}
 
 All three pretrained backbones use a fixed healthy reference and split:

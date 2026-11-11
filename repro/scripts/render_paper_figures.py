@@ -9,6 +9,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def main():
+    authored_tex = {path: path.read_text(encoding='utf-8')
+                    for path in (ROOT / 'paper').glob('*.tex')}
     for script in ['paper/revision/build_figures.py',
                    'repro/scripts/plot_final_figures.py',
                    'repro/scripts/plot_probe_arms.py',
@@ -38,6 +40,12 @@ def main():
                    'repro/scripts/plot_vit_deployment.py',
                    'repro/scripts/plot_vit_shared_path.py']:
         runpy.run_path(str(ROOT / script), run_name='__main__')
+    # Keep editorial float placement when a numerical table writer changes
+    # only [htbp] back to its historical [H] template.
+    for path, before in authored_tex.items():
+        after = path.read_text(encoding='utf-8')
+        if before != after and before.replace('[htbp]', '[H]') == after:
+            path.write_text(before, encoding='utf-8', newline='\n')
     assert len(EXPORTS) == 35
     assert all(abs(v['width_inches'] - 5.5) < 1e-10 for v in EXPORTS.values())
     report = dict(figures=EXPORTS, figures_rebuilt=len(EXPORTS),
