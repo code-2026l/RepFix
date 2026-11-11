@@ -65,6 +65,10 @@ def fit_affine(features,labels):
 def make_reference(cache,seed):
     order=torch.randperm(50000,generator=torch.Generator().manual_seed(seed));fit=order[:10000];val=order[10000:15000];anchors=order[15000:17048]
     mask=torch.rand(10000,generator=torch.Generator().manual_seed(seed+10000))<.2
+    return fit_reference(cache,seed,fit,val,anchors,mask)
+
+
+def fit_reference(cache,seed,fit,val,anchors,mask):
     heads={name:fit_affine(cache['h'][0,fit[mask]],cache[label][fit[mask]]) for name,label in [('fine','y'),('coarse','coarse')]}
     labeled_features=cache['h'][:,fit[mask]].flatten(0,1);mean=labeled_features.mean(0);sd=labeled_features.std(0,unbiased=False);sd=sd.clamp_min(.1*sd[sd>0].median())
     primary=NormalizedHead(heads['fine']['weight']*sd,heads['fine']['bias']+heads['fine']['weight']@mean,mean,sd)

@@ -28,10 +28,7 @@ def evaluate_aux(model,x,head):
     return sum(n*v for n,v in losses)/sum(n for n,_ in losses)
 
 
-def main(a):
-    start=time.time();cache=torch.load(a.population,map_location='cpu',weights_only=True,mmap=True)
-    torch.manual_seed(a.reference_seed);ref=base.make_reference(cache,a.reference_seed)
-    _,healthy=factory.build_for(cache);healthy.load_state_dict(cache['healthy']);healthy.eval().requires_grad_(False)
+def train(cache,ref,healthy,a):
     torch.manual_seed(a.seed);model=copy.deepcopy(healthy).requires_grad_(True)
     for layer in model.modules():
         if isinstance(layer,torch.nn.LayerNorm):layer.requires_grad_(False)
@@ -56,6 +53,14 @@ def main(a):
         train_h=base.embeds(model,xx[:,mask].flatten(0,1));reader=base.fit_affine(train_h,y[mask].repeat(2));validation_h=base.embeds(model,cache['x'][0,val]);z=late.linear(validation_h,reader)
         own=paired.metrics(z,cache['y'][val]);aux=evaluate_aux(model,cache['x'][:,val],head)
         old=late.linear(cache['h'][0,val],ref['heads']['coarse'])
+    return model,head,reader,z,old,own,aux,trace
+
+
+def main(a):
+    start=time.time();cache=torch.load(a.population,map_location='cpu',weights_only=True,mmap=True)
+    torch.manual_seed(a.reference_seed);ref=base.make_reference(cache,a.reference_seed)
+    _,healthy=factory.build_for(cache);healthy.load_state_dict(cache['healthy']);healthy.eval().requires_grad_(False)
+    model,head,reader,z,old,own,aux,trace=train(cache,ref,healthy,a)
     folder=a.out.parent/(a.out.stem+'_states');folder.mkdir(exist_ok=True,parents=True);state=folder/'endpoint.pt'
     torch.save(dict(model=model.state_dict(),head=head.state_dict(),reader=reader,own_logits=z,old_logits=old,reference=ref),state)
     baseline=None
@@ -66,6 +71,7 @@ def main(a):
         stored=torch.load(source,map_location='cpu',weights_only=True)
         _,detached=factory.build_for(cache);detached.load_state_dict(stored['model']);detached.eval().requires_grad_(False)
         dhead=base.initial_head(ref);dhead.load_state_dict(stored['head'])
+        val=ref['validation']
         baseline=dict(state_sha256=base.digest(source),record_sha256=base.digest(a.baseline_record),
             accuracy=info['validation']['own']['acc'],contrastive_loss=evaluate_aux(detached,cache['x'][:,val],dhead))
     value=dict(complete=True,device='cpu',phase='contrastive_'+a.phase,alpha=a.alpha,reference_seed=a.reference_seed,seed=a.seed,
