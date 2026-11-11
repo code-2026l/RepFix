@@ -15,7 +15,7 @@ official test images were held out from fitting and model selection.
 | Routed joint vs routed two-view supervised | 0.86 [0.68, 1.05] |
 | Routed joint vs routed doubled-epoch supervised | 0.60 [0.41, 0.79] |
 | Routed joint vs direct supervised MLP | 2.23 [1.93, 2.54] |
-| Routed joint vs unrestricted joint teacher | -0.02 [-0.04, -0.00] |
+| Routed joint vs unrestricted joint teacher | -0.023 [-0.044, -0.003] |
 | Pure student vs unrestricted teacher | -0.97 [-1.14, -0.79] |
 
 The teacher receives 32.2% of real inputs. All audited old

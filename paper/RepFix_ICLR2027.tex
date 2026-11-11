@@ -124,17 +124,18 @@ thresholds. We audit the decisions specified by each consumer and compare three
 interventions: input repair, a learned replacement readout, and retention of
 the healthy function.
 
-Retaining the function is possible without running two encoders. We derive a
-construction that reuses the healthy dense computation and learns a nonlinear
-correction beside it, and confirm it on HAR and SNR with unchanged class and
-threshold decisions. Applied to a frozen pretrained prefix, the same idea
-improves supervised transfer on ResNet-18 and ViT-B/32 beyond stronger
-frozen-feature controls; a four-reference ViT confirmation gives
-$\ReferenceViTGainH$ points
-$[\ReferenceViTGainHLow,\ReferenceViTGainHHigh]$ over the richest control.
-The selected ViT program for supervised transfer meets the decision and CPU
-budgets with FP32 current outputs. Serving measurements track the decision
-and latency effects of lowering precision on the reference path.
+Retaining the function need not require two complete encoders. We derive
+an exact reuse identity across nonlinear layers, then test shared serving
+programs against their learning and CPU costs. On RadioML, a single forward
+keeps the healthy hidden units and learns new capacity; an equal-distillation
+comparison retains a $0.28$-point auxiliary gain with unchanged old decisions.
+On CIFAR-100, a student uses the healthy ViT features and sends low-margin
+inputs through an updated suffix. It preserves every audited fine and coarse
+decision while gaining $\VisualGainTwo$ points over two-view supervision and
+$\VisualGainDouble$ over doubled-epoch supervision on the official test.
+Complete FP32 forwards cost $\VisualCostOne/\VisualCostBatch\times$ at
+batches $1/128$. These constructions retain the old function; their measured
+cost determines whether retaining it is practical.
 
 \begin{figure}[t]
 \centering
