@@ -42,7 +42,7 @@ distillation, width selection, repair fitting, and action calibration.
 
 Pair the previous early-selected terminal-feature policy and the new
 prefix policy on the same strong updated encoder, consumer, and test
-images. Evaluate all three old decision rules against the exact healthy
+images, in batches of 128 with a final partial batch. Evaluate all three old decision rules against the exact healthy
 suffix. Record exact calls, disagreement, current predictions, the
 compression cost proxy, and the earlier policy's calibration access.
 The access gate requires at most 5% disagreement, at most 50% exact
