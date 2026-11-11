@@ -63,6 +63,9 @@ def main(a):
     model,head,reader,z,old,own,aux,trace=train(cache,ref,healthy,a)
     folder=a.out.parent/(a.out.stem+'_states');folder.mkdir(exist_ok=True,parents=True);state=folder/'endpoint.pt'
     torch.save(dict(model=model.state_dict(),head=head.state_dict(),reader=reader,own_logits=z,old_logits=old,reference=ref),state)
+    replay=folder/'replay.pt'
+    torch.save(dict(logits=z,labels=cache['y'][ref['validation']],
+                    reference_seed=a.reference_seed,seed=a.seed),replay)
     baseline=None
     if a.baseline_record:
         control=json.loads(a.baseline_record.read_text());assert (control['reference_seed'],control['seed'])==(a.reference_seed,a.seed)
@@ -77,7 +80,8 @@ def main(a):
     value=dict(complete=True,device='cpu',phase='contrastive_'+a.phase,alpha=a.alpha,reference_seed=a.reference_seed,seed=a.seed,
         plan_sha256=a.plan_sha256,source_sha256={Path(__file__).name:base.digest(Path(__file__)),**base.sources()},official_test_loaded=False,
         validation=own,contrastive_loss=aux,baseline=baseline,epochs=a.epochs,primary_two_view=a.primary_two_view,healthy_path='retained frozen prefix/suffix; cached output pending independent replay',trace=trace,
-        state_sha256=base.digest(state),elapsed_s=time.time()-start,branches=[])
+        state_sha256=base.digest(state),replay_sha256=base.digest(replay),
+        elapsed_s=time.time()-start,branches=[])
     base.save(a.out,value);print(json.dumps(dict(complete=True,alpha=a.alpha,accuracy=own['acc'],auxiliary_loss=aux)),flush=True)
 
 
