@@ -16,13 +16,14 @@ CHOICE = RESULTS / 'rml_one_pass_choice_20261111.json'
 STAGES = dict(development=('d', 8900, 8), confirmation=('c', 9000, 16), timing=('t', 9000, 16))
 
 
-def load(stage, records, arrays, confirmation):
+def load(stage, records, arrays, confirmation, plan, choice, anchored):
     prefix, start, count = STAGES[stage]
+    start += 200 * anchored
     for offset in range(count):
         name = f'{prefix}{offset:03d}'
         row = json.loads((records / f'{name}.json').read_text())
         assert row['complete'] and row['device'] == 'cpu' and row['stage'] == stage
-        assert row['plan_sha256'] == digest(PLAN) and row['seed'] == start + offset
+        assert row['plan_sha256'] == digest(plan) and row['seed'] == start + offset
         if stage == 'timing':
             reference = json.loads((confirmation / f'c{offset:03d}.json').read_text())
             assert row['program_sha256'] == reference['program_sha256']
@@ -31,7 +32,7 @@ def load(stage, records, arrays, confirmation):
             yield row
             continue
         assert row['test_loaded'] == (stage == 'confirmation')
-        assert row['choice_sha256'] == (digest(CHOICE) if stage == 'confirmation' else None)
+        assert row['choice_sha256'] == (digest(choice) if stage == 'confirmation' else None)
         folder = arrays / f'{name}_states'
         path = folder / 'replay.pt'
         assert digest(path) == row['replay_sha256']
@@ -56,29 +57,29 @@ def load(stage, records, arrays, confirmation):
 
 
 def added_macs(name):
-    width = int(name.split('/')[1]) if name.startswith('side/') else 0
+    width = int(name.split('/')[1]) if name.startswith(('side/', 'exact/')) else 0
     return 64 * 11 + width * (64 + 22)
 
 
-def choose(rows):
-    candidates = []
-    for name in CANDIDATES:
+def choose(rows, candidates, plan):
+    scored = []
+    for name in candidates:
         max_risk = max(max(row['disagreement'][name]) for row in rows)
         gain = float(np.mean([row['accuracy_pp'][name] - row['accuracy_pp']['joint'] for row in rows]))
-        candidates.append(dict(name=name, added_macs=added_macs(name), max_disagreement=max_risk,
+        scored.append(dict(name=name, added_macs=added_macs(name), max_disagreement=max_risk,
                                gain_vs_joint_pp=gain, qualifies=max_risk <= .04 and gain >= -.15))
-    eligible = [row for row in candidates if row['qualifies']]
+    eligible = [row for row in scored if row['qualifies']]
     if eligible:
         best = min(eligible, key=lambda row: (row['added_macs'], row['max_disagreement']))
     else:
-        usable = [row for row in candidates if row['gain_vs_joint_pp'] >= -.15]
-        best = min(usable or candidates, key=lambda row: (row['max_disagreement'], row['added_macs']))
-    return dict(plan_sha256=digest(PLAN), selected=best['name'], passed=bool(eligible),
-                candidates=candidates, references=rows)
+        usable = [row for row in scored if row['gain_vs_joint_pp'] >= -.15]
+        best = min(usable or scored, key=lambda row: (row['max_disagreement'], row['added_macs']))
+    return dict(plan_sha256=digest(plan), selected=best['name'], passed=bool(eligible),
+                candidates=scored, references=rows)
 
 
-def confirm(rows):
-    chosen = json.loads(CHOICE.read_text())['selected']
+def confirm(rows, plan, choice):
+    chosen = json.loads(choice.read_text())['selected']
     candidates = {}
     for name in rows[0]['disagreement']:
         risks = [row['disagreement'][name] for row in rows]
@@ -91,12 +92,12 @@ def confirm(rows):
                                 gain_vs_detach_pp=gain_vs_detach, change_vs_joint_pp=change_vs_joint,
                                 passed=max_risk <= .05 and gain_vs_detach['ci95'][0] > 0 and
                                 change_vs_joint['ci95'][0] > -.25)
-    return dict(plan_sha256=digest(PLAN), choice_sha256=digest(CHOICE), selected=chosen,
+    return dict(plan_sha256=digest(plan), choice_sha256=digest(choice), selected=chosen,
                 inference_compatibility_utility_passed=candidates[chosen]['passed'],
                 candidates=candidates, references=rows)
 
 
-def timing(rows):
+def timing(rows, plan):
     summaries = {}
     for batch, cap in (('1', 1.20), ('128', 1.10)):
         blocks = [row['timings'][batch] for row in rows]
@@ -108,7 +109,7 @@ def timing(rows):
         estimates['median_us'] = {name: float(np.median([np.median(run[name]) for run in blocks]) / 1000)
                                   for name in ('current', 'chosen', 'exact')}
         summaries[batch] = estimates
-    return dict(plan_sha256=digest(PLAN), passed=all(s['passed'] for s in summaries.values()),
+    return dict(plan_sha256=digest(plan), passed=all(s['passed'] for s in summaries.values()),
                 batches=summaries)
 
 
@@ -118,16 +119,26 @@ def main():
     parser.add_argument('--records', type=Path)
     parser.add_argument('--arrays', type=Path)
     parser.add_argument('--confirmation', type=Path)
+    parser.add_argument('--anchored', action='store_true')
     args = parser.parse_args()
     torch.set_num_threads(4)
-    default = ROOT / 'tmp' / ('conditional_contrastivermlonepass' + args.stage)
-    confirmation = args.confirmation or ROOT / 'tmp/conditional_contrastivermlonepassconfirmation'
-    rows = list(load(args.stage, args.records or default, args.arrays or default, confirmation))
+    group = 'anchored' if args.anchored else 'onepass'
+    name = 'anchored' if args.anchored else 'one_pass'
+    plan = ROOT / 'docs/plans/2026-11-11-rml-anchored-one-pass.md' if args.anchored else PLAN
+    choice = RESULTS / f'rml_{name}_choice_20261111.json'
+    default = ROOT / 'tmp' / f'conditional_contrastiverml{group}{args.stage}'
+    confirmation = args.confirmation or ROOT / 'tmp' / f'conditional_contrastiverml{group}confirmation'
+    rows = list(load(args.stage, args.records or default, args.arrays or default,
+                     confirmation, plan, choice, args.anchored))
     if args.stage == 'development':
-        result, path = choose(rows), CHOICE
+        candidates = CANDIDATES
+        if args.anchored:
+            from rml_anchored_one_pass_cpu import CANDIDATES as anchored_candidates
+            candidates = anchored_candidates
+        result, path = choose(rows, candidates, plan), choice
     else:
-        result = (confirm if args.stage == 'confirmation' else timing)(rows)
-        path = RESULTS / f'rml_one_pass_{args.stage}_20261111.json'
+        result = confirm(rows, plan, choice) if args.stage == 'confirmation' else timing(rows, plan)
+        path = RESULTS / f'rml_{name}_{args.stage}_20261111.json'
     save(path, result)
     print(json.dumps({k: v for k, v in result.items() if k != 'references'}, indent=2))
 
