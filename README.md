@@ -1,6 +1,6 @@
 # RepFix
 
-Silent Scale Shift: When Shared Updates Break Existing Readouts
+Silent Scale Shift: Variance Contraction Breaks Calibrated Readouts
 
 This repository contains the manuscript, editable figures, numerical records,
 fixed study plans and verification scripts.
@@ -63,8 +63,8 @@ monitor. [Risk estimation and audit results](docs/CACHED_RISK_RESULT_20261111.md
 ## Paper and files
 
 - [Paper](paper/RepFix_ICLR2027.pdf)
-- [Supplementary archive](artifacts/2026-11-11/RepFix_Concise_20261111_supplement.zip)
-- [Editable source](artifacts/2026-11-11/RepFix_Concise_20261111_source.zip)
+- [Supplementary archive](artifacts/2026-11-11/RepFix_Rebuttal19147_20261111_supplement.zip)
+- [Editable source](artifacts/2026-11-11/RepFix_Rebuttal19147_20261111_source.zip)
 - [Reading guide](docs/REVIEWER_GUIDE.md) 路 [Evidence index](docs/EVIDENCE_INDEX.md)
 - [Final argument and English](docs/STORY_FINAL_20261110.md) 路 [Scientific integrity](docs/STORY_INTEGRITY_20261110.json)
 - [Editorial and figure refinement](docs/EDITORIAL_FINISH_20261110.md) 路 [Integrity checks](docs/EDITORIAL_VISUAL_VERIFICATION_20261110.json)

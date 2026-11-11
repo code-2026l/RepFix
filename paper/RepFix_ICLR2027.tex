@@ -60,7 +60,7 @@
 
 % Use the conference defaults for headings, displays, and float spacing.
 
-\title{Silent Scale Shift: When Shared Updates Break Existing Readouts}
+\title{Silent Scale Shift: Variance Contraction Breaks Calibrated Readouts}
 \author{Anonymous authors\\Paper under double-blind review}
 
 \begin{document}
@@ -129,6 +129,27 @@ benefit and its existing interface together.
 \end{figure}
 
 \section{When Existing Readouts Fail}\label{sec:formulation}
+
+We study a shared encoder $h_\theta$, a current primary head $p_\phi$,
+and an auxiliary head $a_\psi$. Ordinary joint training minimizes
+$L_p(p_\phi(h_\theta(x)),y)+\alpha L_a(a_\psi(h_\theta(x)),t)$.
+The nonnegative weight $\alpha$ sets the auxiliary dose; $t$ is an input,
+metadata or a second-view target, depending on the task. Joint training
+updates the encoder from both losses. Its matched detached control trains
+the auxiliary head on stop-gradient features, so only the primary loss
+updates the encoder. Gradient-combination baselines modify these two
+encoder gradients. A separate deployed readout $C_0$ keeps its weights,
+input statistics and decision thresholds fixed after the healthy checkpoint.
+The current head and a newly fitted probe can adapt; $C_0$ cannot.
+
+We measure contraction by covariance trace, task information by a
+standardized-feature probe, and interface compatibility by the actual
+class or confidence decisions of $C_0$. A trace decrease alone establishes
+neither information loss nor decision failure. A practical intervention
+must also retain the learning benefit: our serving studies use positive
+paired gain bounds or their declared noninferiority margins, a fixed
+old-decision budget, and measured CPU latency. The per-study budgets and
+matched controls appear with the corresponding results.
 
 Let $h_\theta(x)\in\mathbb R^m$ be the shared features. The old readout applies the fixed map $C_0(h)=W_0D_0^{-1}(h-\mu_0)+b_0$, with healthy means $\mu_0$, positive diagonal scales $D_0$, weights $W_0$, and bias $b_0$. A \emph{consumer} is this map together with the output rule it feeds, such as a class decision or a fixed confidence threshold. Continuation holds the consumer fixed while its input $h_\theta(x)$ changes, so the complete function of $x$ can change even though every stored parameter is unchanged. A refitted probe measures what the new features support; the consumer measures whether the old interface still works.
 
@@ -207,6 +228,12 @@ modes. We measure variation, decodability and consumer utility separately.
 The cheaper radial feature-space proxy agrees with the exact derivative on
 $51\%$ of $405$ HAR checkpoints; its geometry and calibration controls are in
 Appendices~\ref{app:unsigned_probe} and~\ref{app:probe_controls}.
+The one-shot unsigned STF-cal gate is an empirical intervention heuristic.
+The local sign condition requires its stated geometry and discrepancy
+terms; the PCA rank rule requires identifying the specified PSD operator.
+Neither supplies a general trajectory guarantee. Computing the full sign
+certificate is an offline audit, more expensive than measuring the signed
+flux directly (Appendix~\ref{app:boundary_proof}).
 
 \section{Testing the Readout Interface}\label{sec:experiments}\label{sec:analysis}
 
@@ -468,7 +495,11 @@ We use existing datasets: UCI-HAR, RadioML2016.10A, the NASA PCoE and MATR batte
 
 
 \section*{Reproducibility Statement}
-The artifact contains theoretical assumptions, code, per-seed records, the fixed development/confirmation plan, checkpoint and consumer replays, scale-boundary checks, actual-step audits, and the corrected battery protocol. Historical battery checkpoint selection and readout calibration are exploratory. The anonymized repository supplies released code and earlier records: \url{https://github.com/code-2026l/RepFix}.
+The supplementary archive contains theoretical assumptions, source code,
+per-seed records, fixed development/confirmation plans, scale-boundary checks,
+actual-step audits and the corrected battery protocol. The separate numerical
+archive supplies the compact tensors used in result replay. Historical battery
+checkpoint selection and readout calibration are exploratory.
 
 \bibliographystyle{iclr2027_conference}
 \bibliography{RepFix_ICLR2027,contrastive_visual_references}
