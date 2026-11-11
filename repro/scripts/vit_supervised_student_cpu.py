@@ -59,12 +59,39 @@ def run(args):
         source_sha256={Path(__file__).name:base.digest(Path(__file__))},branches=[]))
 
 
+@torch.no_grad()
+def audit(args):
+    record=json.loads(args.control_record.read_text())
+    assert record['complete'] and record['stage']=='supervised' and not record['official_test_loaded']
+    source=args.control_record.parent/(args.control_record.stem+'_states/program.pt')
+    assert base.digest(source)==record['program_sha256']
+    state=torch.load(source,map_location='cpu',weights_only=True)
+    population=torch.load(args.official_population,map_location='cpu',mmap=True,weights_only=True)
+    model=LogitStudent(len(state['mean']),128,state['base_weight'],state['base_bias'],state['mean'],state['sd'])
+    model.load_state_dict(state)
+    model.eval().requires_grad_(False)
+    phi=torch.cat((population['h'],population['hidden']),1)
+    logits=torch.cat([model(batch) for batch in phi.split(256)])
+    folder=args.out.parent/(args.out.stem+'_states')
+    folder.mkdir(exist_ok=True,parents=True)
+    replay=folder/'replay.pt'
+    torch.save(dict(labels=population['labels'],predictions=logits.argmax(1)),replay)
+    base.save(args.out,dict(complete=True,device='cpu',stage='official',official_test_loaded=True,
+        reference_seed=record['reference_seed'],seed=record['seed'],plan_sha256=args.plan_sha256,
+        control_record_sha256=base.digest(args.control_record),control_program_sha256=record['program_sha256'],
+        replay_sha256=base.digest(replay),source_sha256={Path(__file__).name:base.digest(Path(__file__))},branches=[]))
+
+
 if __name__=='__main__':
     parser=argparse.ArgumentParser()
+    parser.add_argument('--stage',choices=('fit','audit'),default='fit')
+    parser.add_argument('--official-population',type=Path)
+    parser.add_argument('--control-record',type=Path)
     parser.add_argument('--population',type=Path,required=True)
-    parser.add_argument('--student-record',type=Path,required=True)
+    parser.add_argument('--student-record',type=Path)
     parser.add_argument('--plan-sha256',required=True)
     parser.add_argument('--out',type=Path,required=True)
     torch.set_num_threads(12)
     torch.set_num_interop_threads(1)
-    run(parser.parse_args())
+    args=parser.parse_args()
+    run(args) if args.stage=='fit' else audit(args)
