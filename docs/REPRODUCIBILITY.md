@@ -332,3 +332,25 @@ arrays (without images/backbone weights) are provided in the separate local
 both full primary and rate-level JSON results. Initial1024 map-fitting reference
 outputs are separate from the32--256 additional query budgets. These are MAE
 estimates and do not replace the finite-corpus certificate.
+
+## Visual checkpoint replication and matched latency
+
+For the AugReg run, install `safetensors` alongside CPU PyTorch and
+TorchVision. Download the [AugReg checkpoint](https://huggingface.co/timm/vit_base_patch32_224.augreg_in21k_ft_in1k/resolve/56508f8/model.safetensors)
+and retain its digest-pinned file as `model.safetensors`. Set
+`REPFIX_DATA_X` as above. Run the following command with reference seeds
+6201 through 6204 and the SHA-256 of `docs/plans/2026-11-11-augreg-replication.md`.
+
+```text
+python repro/scripts/augreg_replication_cpu.py --checkpoint model.safetensors --reference-seed 6201 --plan-sha256 PLAN_SHA256 --out a000.json
+```
+
+The driver fits both continuation arms, evaluates the old reader on the
+unsplit checkpoint and the protected program, and records logits for
+independent replay. The fixed [latency protocol](plans/2026-11-11-matched-batch-latency.md)
+uses the original TorchVision population and confirmation records
+`c000.json`, `c003.json`, `c006.json`, and `c009.json` and their adjacent
+endpoint states. Run each separately with `matched_batch_cpu.py` on the
+same CPU and thread count. Use `summarize_checkpoint_replication.py` to
+recompute paired intervals and the decision audits from the numerical
+archive. Its README lists the commands and expected JSON files.

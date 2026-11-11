@@ -75,24 +75,23 @@ this mechanism, and a signed update audit distinguishes contraction from
 gradient conflict. Class agreement can hold even when every fixed-threshold
 decision changes. We derive an exact replay construction that shares
 computation with a trainable nonlinear path, and observe unchanged class and
-threshold decisions on HAR and SNR. On CIFAR-100, a cross-view auxiliary
-improves ViT-B/32 accuracy by $0.84$ percentage points
-($95\%$ CI $[0.66,1.03]$) over matched supervised continuation and lowers
-held-out contrastive loss by $19.5\%$. The retained FP32 reference preserves
-all audited old decisions on the four fitted references.
+threshold decisions on HAR and SNR. On CIFAR-100 validation splits, a
+cross-view auxiliary improves ViT-B/32 accuracy over matched supervised
+continuation by $0.84$ points ($95\%$ CI $[0.66,1.03]$) with TorchVision
+weights and $0.60$ points ($[0.15,1.05]$) with AugReg weights. The auxiliary
+loss falls on both checkpoints, and the retained FP32 reference preserves
+every audited old class and threshold decision.
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
 
-Deployed models are rarely frozen. An encoder keeps training on new data or a
-new task, while a classifier, a confidence gate, or a monitoring head shipped
-with an earlier version keeps its weights and the input statistics it was
-fitted to. The encoder's own head improves. The old component, which we call
-the consumer, may still fail: its complete input-to-output rule was fitted to
-features that no longer exist. This is a maintenance problem rather than a
-distribution-shift problem: the inputs do not change; the features move. It
-connects backward-compatible learning~\citep{shen2020backward} with stale
-activation monitors~\citep{duan2026staleness}.
+An encoder may keep training after its classifier or confidence gate has
+shipped. The deployed component keeps its weights and normalization
+statistics. A new encoder can then change the component's decisions on the
+same inputs, even as the current head improves. We call the deployed
+component a \emph{consumer}, including the decision rule it implements.
+The problem arises in backward-compatible learning~\citep{shen2020backward}
+and in activation monitoring~\citep{duan2026staleness}.
 
 A matched HAR continuation isolates the effect. We clone a healthy model with
 its Adam state, keep the deployed readout, and train matched branches on
@@ -114,12 +113,11 @@ PCGrad~\citep{yu2020pcgrad} and CAGrad~\citep{liu2021cagrad}, does not
 determine the sign; the projection of the update onto the variance gradient
 does, and for Adam the applied step matters.
 
-Preserving the readout is not the same as preserving its accuracy. A repair can
-restore aggregate accuracy while changing individual decisions, and a distilled
-readout can keep classes while crossing fixed confidence thresholds. We
-therefore treat the consumer's output rule as the object to preserve and audit
-its decisions directly. This leads to three interventions: repair the
-consumer's input, learn a replacement readout, or retain the healthy function.
+A repair can restore aggregate accuracy while changing individual decisions.
+A distilled readout can preserve classes while crossing fixed confidence
+thresholds. We audit the decisions specified by each consumer and compare three
+interventions: input repair, a learned replacement readout, and retention of
+the healthy function.
 
 Retaining the function is possible without running two encoders. We derive a
 construction that reuses the healthy dense computation and learns a nonlinear
@@ -129,11 +127,9 @@ improves supervised transfer on ResNet-18 and ViT-B/32 beyond stronger
 frozen-feature controls; a four-reference ViT confirmation gives
 $\ReferenceViTGainH$ points
 $[\ReferenceViTGainHLow,\ReferenceViTGainHHigh]$ over the richest control.
-Serving measurements separate exact reference execution from a fixed numerical
-approximation, and the selected ViT implementation meets both decision and CPU
-budgets at FP32 current outputs. Across these settings, what changes is how
-much nonlinear capacity the new task needs and how the old function is
-executed.
+The selected ViT program for supervised transfer meets the decision and CPU
+budgets with FP32 current outputs. Serving measurements track the decision
+and latency effects of lowering precision on the reference path.
 
 \begin{figure}[t]
 \centering
@@ -395,7 +391,10 @@ three development seeds and evaluated on twelve paired continuations across
 four fitted references (Appendix~\ref{app:contrastive_visual}). Applying the
 old coarse head directly to the updated features changes $7.35\%$ of class
 decisions on average. The retained FP32 reference preserves all audited
-class and threshold decisions.
+class and threshold decisions. Holding the recipe fixed, a replication with
+AugReg weights gains $0.60$ points $[0.15,1.05]$ and lowers contrastive loss
+by $8.46\%$ across four paired references. The same FP32 reference
+construction preserves every old decision in the AugReg audit.
 
 Cheaper repairs fail the same compatibility screen: none of nine unlabeled
 visual repairs meets the one-percent class/selective gate on all development
@@ -404,10 +403,11 @@ seeds, and a one-forward distilled-head control fails its three-weight pilot
 
 \input{deployment_frontier_table.tex}
 
-The selected cross-view program costs $1.139/1.098\times$ at batches
-$1/128$, with at most $0.18\%$ old decision disagreement.
-The batch-$128$ interval extends above the $1.10$ limit
-(Table~\ref{tab:deployment_frontier}).
+The selected cross-view programs cost $1.139/1.078\times$ at batches
+$1/128$, with at most $0.18\%$ old decision disagreement. At batch $128$,
+both programs use the same FP32 current graph, and the BF16 reference
+meets the $1.10$ limit ($95\%$ CI $[1.069,1.088]$,
+Table~\ref{tab:deployment_frontier}).
 In supervised ViT transfer, selected reference serving costs
 $\ServedViTCostOne/\ServedViTCostBatch\times$ at batches $1/128$ against
 $1.20/1.10$ budgets; its largest class/selective disagreement is

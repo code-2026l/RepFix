@@ -17,6 +17,13 @@ four fitted references with shared ImageNet pretraining. The FP32 reference
 preserves every audited old decision. The selected lower-precision reference
 changes at most 0.18% of decisions. [Visual auxiliary results](docs/CONTRASTIVE_RESULT_20261111.md)
 
+The fixed recipe also improves accuracy with AugReg ViT-B/32 weights
+by 0.60 points [0.15, 1.05] and lowers contrastive loss by 8.46%.
+The retained FP32 reference preserves every audited AugReg decision.
+On the TorchVision endpoints, a BF16 reference with the same FP32 current
+graph costs 1.078× [1.069, 1.088] at batch 128.
+[Checkpoint replication](docs/CHECKPOINT_REPLICATION_20261111.md)
+
 The earlier supervised-transfer studies and the failed visual reconstruction
 and routing screens document how the result depends on the task and access
 conditions. [Earlier experiments](docs/FOLLOWUP_REPORT_20261110.md)
@@ -30,8 +37,8 @@ monitor. [Risk estimation and audit results](docs/CACHED_RISK_RESULT_20261111.md
 ## Paper and files
 
 - [Paper](paper/RepFix_ICLR2027.pdf)
-- [Supplementary archive](artifacts/2026-11-11/RepFix_VisualBenefit_20261111_supplement.zip)
-- [Editable source](artifacts/2026-11-11/RepFix_VisualBenefit_20261111_source.zip)
+- [Supplementary archive](artifacts/2026-11-11/RepFix_CheckpointReplication_20261111_supplement.zip)
+- [Editable source](artifacts/2026-11-11/RepFix_CheckpointReplication_20261111_source.zip)
 - [Reading guide](docs/REVIEWER_GUIDE.md) · [Evidence index](docs/EVIDENCE_INDEX.md)
 - [Final argument and English](docs/STORY_FINAL_20261110.md) · [Scientific integrity](docs/STORY_INTEGRITY_20261110.json)
 - [Editorial and figure refinement](docs/EDITORIAL_FINISH_20261110.md) · [Integrity checks](docs/EDITORIAL_VISUAL_VERIFICATION_20261110.json)
@@ -51,8 +58,8 @@ python -m pip install -r requirements-review.txt
 python repro/scripts/verify_supplement.py --tests --figures --paper
 ```
 
-This runs in a temporary copy and preserves the extracted source. It checks 132
-focused structural tests, reconstructs 28 manuscript figures from recorded data,
+This runs in a temporary copy and preserves the extracted source. It checks 142
+focused structural tests, reconstructs 29 manuscript figures from recorded data,
 and compares the rebuilt paper's page text and pixels. LaTeX requires `pdflatex`,
 `bibtex` and `pdftotext`. See the [reproduction guide](docs/REPRODUCIBILITY.md).
 

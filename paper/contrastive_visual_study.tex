@@ -23,6 +23,21 @@ ratio is $0.805$ $[0.794,0.816]$. Intervals use the four reference means.
 The references share one ImageNet-pretrained checkpoint. All comparisons
 use the held-out training-population splits.
 
+We repeat the two arms with AugReg ViT-B/32 weights pretrained on
+ImageNet-21k and fine-tuned on ImageNet-1k~\citep{steiner2022augreg}.
+The four pairs reuse the fitting examples, label masks, views, input
+normalization and continuation seed $6310$. Both arms start from the same
+newly fitted reference in each pair. We audit the retained FP32 suffix
+against the original unsplit AugReg encoder on every validation image.
+The gain is $0.60$ points $[0.15,1.05]$ and the contrastive loss ratio is
+$0.915$ $[0.910,0.921]$. Restricting the TorchVision comparison to seed
+$6310$ gives $0.88$ points $[0.65,1.11]$ and a loss ratio of $0.806$
+$[0.797,0.815]$. The unchanged coarse head applied directly to
+the updated features changes $6.92\%$ of class decisions on average.
+The retained reference changes zero of the $60{,}000$ audited decisions
+across the three rules, with a maximum FP32 logit difference of
+$1.15\times10^{-5}$.
+
 On the pilot split, using both views for cross-entropy reaches $70.62\%$
 and extending one-view training to twenty epochs reaches $70.92\%$.
 The ten-epoch D and selected joint runs reach $70.94\%$ and $71.44\%$.
@@ -43,25 +58,28 @@ individual batch-one inputs per endpoint check the batch-one implementation.
 Instance retrieval between the paired validation views improves by
 $0.69$ points $[0.60,0.77]$ over D in the secondary analysis.
 
-Isolated CPU timing uses one continuation per reference, twelve warmups,
-and thirty-one alternating repetitions. The current path remains FP32.
-The selected reference program costs $1.139\times$ $[1.124,1.154]$ at
-batch one and $1.098\times$ $[1.020,1.176]$ at batch $128$.
-The batch-one interval is within the $1.20$ limit. At batch $128$, the
-upper limit exceeds $1.10$. Full-precision reference execution costs
-$1.139\times$ $[1.128,1.150]$ and $1.118\times$ $[1.018,1.219]$,
-respectively. These results use the fixed implementations from the
-earlier serving comparison (Figure~\ref{fig:contrastive_benefit}).
+Isolated CPU timing uses one TorchVision endpoint per reference, twelve
+warmups, and thirty-one interleaved forward passes on preprocessed inputs.
+At batch one the original selected program costs $1.139\times$
+$[1.124,1.154]$. Its joint trace at batch $128$ gives $1.098\times$
+$[1.020,1.176]$. We repeat batch $128$ with the same compiled prefix and
+FP32 current suffix in the one-output and two-output programs. The added
+BF16 reference costs $1.078\times$ $[1.069,1.088]$ in total, with unchanged
+current classifications and at most $0.18\%$ old disagreement. The FP32
+reference costs $1.105\times$ $[1.092,1.119]$ and preserves every audited
+decision. The BF16 interval fits the $1.10$ budget on this CPU
+(Figure~\ref{fig:contrastive_benefit}).
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/fig_contrastive_benefit.pdf}
-\caption{Visual auxiliary learning and native serving. (a) The smallest
-weight meeting both development criteria is $0.1$. The open point marks
-the $0.01$ pilot. (b) Native primary gain and (c) held-out contrastive
-loss across four fitted references, averaging three continuations per
-reference. The diamonds show means and $95\%$ intervals. (d) Forward
-latency relative to the FP32 current program, using one endpoint per
-reference. Dashed segments mark the fixed latency limits.}
+\caption{Cross-view continuation across ViT-B/32 checkpoints. (a,b) Each
+point is a fitted-reference pair at continuation seed $6310$. Diamonds
+show means and paired $95\%$ intervals. (c) Old decisions on AugReg with
+the unchanged head and with the retained FP32 reference. The thresholds
+target $80\%$ and $50\%$ coverage on the reference fitting data. (d) Native
+forward latency on TorchVision endpoints. Batch one uses the original
+selected program. Batch $128$ holds the current graph fixed and varies
+reference precision. Dashed segments mark the latency limits.}
 \label{fig:contrastive_benefit}
 \end{figure}

@@ -1,7 +1,7 @@
 # Manuscript-to-evidence index
 
 This index refers to *Silent Scale Shift: When Shared Updates Break Existing
-Readouts*, the supplied 90-page manuscript. Figure numbers follow that PDF.
+Readouts*. Figure numbers follow the manuscript.
 Paths are relative to the artifact root. `C` below abbreviates
 `repro/results/CPUCONT/`.
 
@@ -12,6 +12,8 @@ Paths are relative to the artifact root. `C` below abbreviates
 | Can decodability survive a large frozen-readout loss? | `C/har/`, `C/replication/`, `C/projected/`, `C/summary.json` | `paired_readout_continuation.py`; Tables `tab:cpu_paired`, `tab:scale_audit` |
 | How much can unlabeled scale repair recover? | `C/mechanism/`, `C/mechanism_summary.json` | `checkpoint_repair_audit.py`, `readout_alignment.py`; Table `tab:repair_hierarchy` |
 | Does the failure occur while a real auxiliary improves? | `C/frontier/`, `C/task_validation/`, `C/recon_repairs/` | `reconstruction_task_audit.py`; Table `tab:reconstruction_full` |
+| Does the fixed visual auxiliary transfer to a second checkpoint? | `C/augreg_replication_20261111.json`, `C/contrastive_contrastiveaugreg_export/` | `augreg_replication_cpu.py`; fixed protocol `docs/plans/2026-11-11-augreg-replication.md` |
+| What is the marginal cost of the retained visual reference? | `C/matched_batch_latency_20261111.json`, `C/contrastive_contrastivematchedbatch_export/` | `matched_batch_cpu.py`; fixed protocol `docs/plans/2026-11-11-matched-batch-latency.md` |
 | What does the CNN change? | `C/frontier/`, `C/cnn_consumer/` | `cnn_reconstruction_continuation.py`; Table `tab:cnn_continuation` |
 | Does auxiliary-head state explain the historical SNR gap? | `C/head_state/`, `C/head_state_first/`, `C/head_state_summary.json` | `auxiliary_state_factorial.py`; Table `tab:head_state` |
 | Can a useful auxiliary coexist with unchanged old logits? | `C/benefit_development/`, `C/benefit_development_choice.json`, `C/benefit_confirmation/`, `C/benefit_replay/` | `benefit_compatibility_cpu.py`; fixed protocol `docs/plans/2026-11-09-prospective-benefit-compatibility.md` |
@@ -26,7 +28,7 @@ unless a full path is given. The main text's 0.453 to 0.938 repair comparison
 uses ten HAR continuation seeds. The reconstruction comparison uses five seeds;
 the protected-benefit confirmation uses ten new seeds. These studies are separate.
 
-## All 26 figures
+## Figure index
 
 Every file below is under `paper/figures/`. Use the coordinated entry point
 `repro/scripts/render_paper_figures.py` to reconstruct them. Numbering follows
@@ -60,6 +62,9 @@ the included manuscript figures in source order.
 | 24 | `fig_replay_vision.pdf` | `plot_replay_vision.py` | `C/vision_shared_replay_choice.json` |
 | 25 | `fig_suffix_repairs.pdf` | `plot_suffix_repairs.py` | `C/suffix_repair_development/`, `C/suffix_repair_choice.json` |
 | 26 | `fig_serving_frontier.pdf` | `plot_serving_frontier.py` | `C/served_frontier_summary.json`, `C/precision_serving_confirmation/` |
+| 27 | `fig_reference_replication.pdf` | `plot_reference_replication.py` | `C/vision_reference_summary.json` |
+| 28 | `fig_contrastive_benefit.pdf` | `plot_contrastive_benefit.py` | `C/augreg_replication_20261111.json`, `C/matched_batch_latency_20261111.json` |
+| 29 | `fig_risk_queries.pdf` | `plot_risk_query_result.py` | `C/cached_risk_transfer_20261111.json`, `C/small_budget_risk_confirmation.json` |
 
 Generator basenames are under `repro/scripts/`. Figure manifests retain source
 and numerical-artist hashes; diagrams are marked as schematics in their captions.

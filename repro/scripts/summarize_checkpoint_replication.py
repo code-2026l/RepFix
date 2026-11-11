@@ -41,6 +41,7 @@ def compare_decisions(current, old, thresholds, recorded):
 def replication(records, tensors, original):
     rows = []
     plan = Path('docs/plans/2026-11-11-augreg-replication.md')
+    preparation = json.loads((original.parent / 'vision_auxiliary_preparation/q002.json').read_text())
     config = None
     for i in range(4):
         result, data = replay(tensors, records / f'a{i:03d}.json', plan)
@@ -48,6 +49,7 @@ def replication(records, tensors, original):
         assert result['reference_seed'] == control['reference_seed'] == 6201 + i
         assert control['seed'] == 6310 and control['alpha'] == .1 and control['epochs'] == 10
         candidate = {k: result[k] for k in ('checkpoint_sha256', 'data_sha256', 'augmentation')}
+        assert candidate['data_sha256'] == preparation['data_sha256']
         if config is None:
             config = candidate
         assert candidate == config
