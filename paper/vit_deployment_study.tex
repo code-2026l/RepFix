@@ -133,12 +133,10 @@ We measured complete FP32 image forwards with twelve physical CPU
 cores on one NUMA node. A first traced implementation evaluated one
 padded suffix item per batch. Its ratios were $1.162 [1.104, 1.220]$ at batch 1
 and $1.047 [0.984, 1.110]$ at batch 128, missing the confidence-limit gates.
-The final graph scripts the conditional branch and skips an empty
-teacher set. It costs $1.046 [1.019, 1.074]\times$ and $1.032 [1.005, 1.058]\times$,
-respectively. Batch-one blocks average the same 32 fixed individual
-images, and batch-128 blocks use the same first 128 images. Nine
-alternating blocks provide one paired ratio per reference. A separate
-same-input check found no changes in 120,000 current predictions,
-720,000 old-rule decisions or 384 individual-input executions after
-the execution change. The numerical archive preserves the earlier
-padded result and the timing run excluded for overlapping CPU work.
+Scripted branches skip empty teacher sets, yielding
+$1.046 [1.019, 1.074]\times$ and $1.032 [1.005, 1.058]\times$.
+Batch-one blocks average 32 fixed images; batch 128 uses the first 128.
+Nine alternating blocks yield one paired ratio per reference.
+The implementation preserves all 120,000 current predictions,
+720,000 old-rule decisions and 384 individual-input executions.
+The archive retains the padded failure and excluded overlapping timing.
