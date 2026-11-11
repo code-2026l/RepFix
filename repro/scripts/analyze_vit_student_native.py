@@ -60,7 +60,8 @@ def audit(rows):
                          fraction={name:mask.double().mean().item() for name,mask in value['rescue_masks'].items()},
                          changed=changed,raw_current_changes=value['raw_sample_current_changes'],
                          raw_old_changes=value['raw_sample_old_changes'],raw_fine_changes=value['raw_sample_fine_changes'],
-                         compiled_current_changes=int((value['compiled_current']!=value['rescued']['joint']).sum())))
+                         compiled_current_changes=int((value['compiled_current']!=value['rescued']['joint']).sum()),
+                         teacher_disagreement_pp=100*(value['compiled_current']!=value['teachers']['joint']).double().mean().item()))
     groups=[]
     for seed in range(6201,6205):
         group=[r for r in refs if r['reference_seed']==seed]
@@ -81,6 +82,7 @@ def audit(rows):
                 versus_teacher_pp=retention,pure_versus_teacher_pp=interval([r['pure_vs_teacher_pp'] for r in groups]),
                 referral_fraction=interval([r['fraction']['joint'] for r in groups]),old_decision_changes=old_changes,
                 compiled_current_changes=sum(r['compiled_current_changes'] for r in refs),
+                maximum_teacher_disagreement_pp=max(r['teacher_disagreement_pp'] for r in refs),
                 passed=all(v['ci95'][0]>0 for v in gains.values()) and retention['ci95'][0]>-.25 and old_changes==0,
                 references=refs,reference_groups=groups)
 
