@@ -10,7 +10,16 @@ continuation and unlabeled repair isolate one scale mechanism. The serving
 studies measure which class and threshold decisions survive and how much
 computation the protected program uses.
 
-Cross-view auxiliary training on CIFAR-100 improves ViT-B/32 accuracy by
+On all 10,000 official CIFAR-100 test images, a fixed routed student
+preserves the old fine/coarse class and confidence rules and gains
+0.86 points [0.68, 1.05] over the paired two-view student and
+0.60 [0.41, 0.79] over its doubled-epoch counterpart. It uses the
+updated two-block tail on 32.2% of inputs. Complete FP32 CPU forwards
+cost 1.046× [1.019, 1.074] at batch 1 and 1.032× [1.005, 1.058]
+at batch 128 relative to the unrestricted current teacher.
+[Visual deployment](docs/VIT_DEPLOYMENT_RESULT_20261111.md)
+
+In the earlier training-only validation study, cross-view auxiliary training on CIFAR-100 improves ViT-B/32 accuracy by
 0.84 percentage points [0.66, 1.03] over matched supervised continuation
 and lowers held-out contrastive loss by 19.5%. Twelve continuations span
 four fitted references with shared ImageNet pretraining. The FP32 reference
@@ -26,7 +35,7 @@ The fixed recipe also improves accuracy with AugReg ViT-B/32 weights
 by 0.60 points [0.15, 1.05] and lowers contrastive loss by 8.46%.
 The retained FP32 reference preserves every audited AugReg decision.
 On the TorchVision endpoints, a BF16 reference with the same FP32 current
-graph costs 1.078× [1.069, 1.088] at batch 128.
+graph costs 1.078脳 [1.069, 1.088] at batch 128.
 [Checkpoint replication](docs/CHECKPOINT_REPLICATION_20261111.md)
 
 On CIFAR-10 with ResNet-18, an epoch-two monitor flags 15 of 17 later
@@ -37,8 +46,8 @@ and sends a median 25% of examples to the old suffix on unsafe updates.
 
 For the six strongest ResNet-18 updates, an INT8 old block uses zero
 exact FP32 old-block calls on 9,000 official CIFAR-10 test images.
-Maximum disagreement is 1.73%. Batch-128 latency is 1.043× current-only
-and 0.878× the prior referral program.
+Maximum disagreement is 1.73%. Batch-128 latency is 1.043脳 current-only
+and 0.878脳 the prior referral program.
 [Legacy precision study](docs/LEGACY_PRECISION_RESULT_20261111.md)
 
 The earlier supervised-transfer studies and the failed visual reconstruction
@@ -54,11 +63,11 @@ monitor. [Risk estimation and audit results](docs/CACHED_RISK_RESULT_20261111.md
 ## Paper and files
 
 - [Paper](paper/RepFix_ICLR2027.pdf)
-- [Supplementary archive](artifacts/2026-11-11/RepFix_LegacyPrecision_20261111_supplement.zip)
-- [Editable source](artifacts/2026-11-11/RepFix_LegacyPrecision_20261111_source.zip)
-- [Reading guide](docs/REVIEWER_GUIDE.md) · [Evidence index](docs/EVIDENCE_INDEX.md)
-- [Final argument and English](docs/STORY_FINAL_20261110.md) · [Scientific integrity](docs/STORY_INTEGRITY_20261110.json)
-- [Editorial and figure refinement](docs/EDITORIAL_FINISH_20261110.md) · [Integrity checks](docs/EDITORIAL_VISUAL_VERIFICATION_20261110.json)
+- [Supplementary archive](artifacts/2026-11-11/RepFix_VisualDeployment_20261111_supplement.zip)
+- [Editable source](artifacts/2026-11-11/RepFix_VisualDeployment_20261111_source.zip)
+- [Reading guide](docs/REVIEWER_GUIDE.md) 路 [Evidence index](docs/EVIDENCE_INDEX.md)
+- [Final argument and English](docs/STORY_FINAL_20261110.md) 路 [Scientific integrity](docs/STORY_INTEGRITY_20261110.json)
+- [Editorial and figure refinement](docs/EDITORIAL_FINISH_20261110.md) 路 [Integrity checks](docs/EDITORIAL_VISUAL_VERIFICATION_20261110.json)
 
 ## Verify the artifact
 
@@ -75,8 +84,8 @@ python -m pip install -r requirements-review.txt
 python repro/scripts/verify_supplement.py --tests --figures --paper
 ```
 
-This runs in a temporary copy and preserves the extracted source. It checks 142
-focused structural tests, reconstructs 33 manuscript figures from recorded data,
+This runs in a temporary copy and preserves the extracted source. It checks 145
+focused structural tests, reconstructs 35 manuscript figures from recorded data,
 and compares the rebuilt paper's page text and pixels. LaTeX requires `pdflatex`,
 `bibtex` and `pdftotext`. See the [reproduction guide](docs/REPRODUCIBILITY.md).
 
@@ -88,7 +97,7 @@ and compares the rebuilt paper's page text and pixels. LaTeX requires `pdflatex`
 - [`repro/scripts/`](repro/scripts/): numerical drivers, local analysis, plots and verification.
 - [`paper/figures/`](paper/figures/): publication-width vector PDF/SVG and PNG previews.
 - [`repro/source_versions/`](repro/source_versions/): exact executed source snapshots.
-- [Historical result map](results/README.md) · [Current script entry points](repro/README.md)
+- [Historical result map](results/README.md) 路 [Current script entry points](repro/README.md)
 
 Raw datasets, official weight files, trained tensors and large representation
 caches are outside the compact archives. Recovered tensor and output checks are

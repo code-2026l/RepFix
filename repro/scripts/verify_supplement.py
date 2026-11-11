@@ -35,8 +35,9 @@ TESTS = [
     'test_small_budget_risk.py',
     'test_certified_audit.py', 'test_coupling_control.py',
     'test_contrastive_benefit.py', 'test_ridge_loo.py',
+    'test_scripted_current_route.py',
 ]
-EXPECTED_TESTS=142
+EXPECTED_TESTS=145
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()

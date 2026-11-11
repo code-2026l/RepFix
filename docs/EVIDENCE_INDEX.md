@@ -229,3 +229,14 @@ The equal-work control is in `contrastive_contrastivermlmatched_export/`.
 See [Exact compatibility](RML_ONE_PASS_RESULT_20261111.md) for protocols and
 held-out results. The numerical archive includes replay tensors and
 the folded programs.
+
+## Exact visual interfaces and official-test deployment
+
+[Result and scope](VIT_DEPLOYMENT_RESULT_20261111.md).
+The `vit_*_20261111.json` records in `repro/results/CPUCONT` cover
+affine and nonlinear student screens, training-only routing calibration,
+official CIFAR-100 outcomes, direct supervised controls, full scripted
+output checks and isolated physical CPU timing. The numerical archive
+contains fitted students and prediction tensors for twelve independently
+recomputed summaries. Earlier padded and overlapping timing outcomes are
+retained with their execution exclusions.

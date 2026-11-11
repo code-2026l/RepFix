@@ -52,6 +52,7 @@
 \input{frontier_numbers.tex}
 \input{served_frontier_numbers.tex}
 \input{reference_replication_numbers.tex}
+\input{vit_deployment_numbers.tex}
 
 % ─── Compact table style (tighter spacing/format) ───
 \setlength{\tabcolsep}{4pt}          % default 6pt -> tighter column padding
@@ -77,10 +78,12 @@ hidden units and adds capacity for the current output. It preserves all
 audited old decisions and gains $0.33$ points ($95\%$ CI $[0.15,0.51]$)
 over detachment, at $1.070\times$ current-only CPU latency at batch 128.
 With equal distillation work, the gain is $0.28$ points ($[0.11,0.45]$).
-On CIFAR-100, a cross-view auxiliary improves ViT-B/32 accuracy by
-$0.73$ points over two-view supervision and $0.53$ over doubled-epoch
-supervision at matched suffix-forward budgets. The retained reference
-preserves all audited old decisions. Early logits also forecast terminal
+On the official CIFAR-100 test set, a ViT-B/32 program retains its old
+fine and coarse decisions while gaining $\VisualGainTwo$ points over
+two-view supervision and $\VisualGainDouble$ over doubled-epoch supervision.
+A student uses the healthy features; low-margin inputs also use the current
+two-block suffix. Complete FP32 forwards cost $\VisualCostOne/\VisualCostBatch\times$
+the unrestricted current model at batches $1/128$. Early logits also forecast terminal
 disagreement on RadioML, with $2.25$ points of error versus $2.87$ for
 a schedule-aware baseline and $8.27$ for persistence.
 \end{abstract}
@@ -369,15 +372,17 @@ $0.28$-point auxiliary gain ($[0.11,0.45]$)
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{figures/fig_rml_one_pass.pdf}
-\caption{Useful RadioML continuations with a single serving graph.
-(a) The largest old-rule disagreement across eight development
-references and the mean accuracy change from unrestricted joint.
-The shaded band and horizontal line mark the $4\%$ and $-0.15$-point
-development limits. Rings mark the two frozen choices. (b) Each point
-is one of 16 fresh references for its method. The band marks the $5\%$
-decision budget. The accuracy baseline is matched detached continuation.}
-\label{fig:rml_one_pass}
+\includegraphics[width=\linewidth]{figures/fig_vit_shared_path.pdf}
+\caption{Keeping old vision interfaces while retaining auxiliary gains.
+(a) A healthy ViT path serves fixed fine and coarse readers. A student
+uses its features; inputs with low student margin also traverse the updated
+two-block tail. (b) Official CIFAR-100 accuracy gains over routed two-view
+and doubled-epoch supervised students, and a direct supervised MLP.
+(c) Complete FP32 image-forward latency relative to the unrestricted
+current teacher; dashed marks show the $1.20/1.10$ limits. Small points
+are four fitted-reference means, diamonds and bars paired $95\%$ intervals.
+All old class and confidence decisions are unchanged.}
+\label{fig:vit_shared_path}
 \end{figure}
 
 A frozen prefix offers a different tradeoff: evaluate healthy and current
@@ -420,6 +425,25 @@ Cheaper repairs fail the same compatibility screen: none of nine unlabeled
 visual repairs meets the one-percent class/selective gate on all development
 seeds, and a one-forward distilled-head control fails its three-weight pilot
 (Appendices~\ref{app:suffix_repairs}--\ref{app:vision_head_control}).
+
+We can retain those visual gains with exact old decisions and FP32
+execution. A 128-unit student reads the healthy final features and last
+MLP activation. Low-margin inputs also use the updated two-block suffix,
+sharing the frozen prefix (Figure~\ref{fig:vit_shared_path}). The cutoff
+is fixed on training-only validation before the official test. On all
+10,000 CIFAR-100 test images, four references with three continuations
+each gain $\VisualGainTwo$ points
+$[\VisualGainTwoLow,\VisualGainTwoHigh]$ over the paired two-view student
+and $\VisualGainDouble$ $[\VisualGainDoubleLow,\VisualGainDoubleHigh]$
+over its doubled-epoch counterpart. The direct supervised MLP uses the
+same features, labels and training schedule; the gain over it is
+$\VisualGainSupervised$ points. Every old fine and coarse decision
+agrees. The current tail handles $\VisualRoutedPercent\%$ of inputs;
+the largest decision difference from the full joint teacher is
+$\VisualTeacherDifference\%$. Complete CPU forwards cost
+$\VisualCostOne/\VisualCostBatch\times$ at batches $1/128$.
+The pure student loses $0.97$ points from its teacher; selective
+computation closes that gap (Appendix~\ref{app:vit_deployment}).
 
 \input{deployment_frontier_table.tex}
 
@@ -540,6 +564,7 @@ DeltaCNN reuses sparse activation differences~\citep{parger2022deltacnn}.
 LoRA and adapter serving share base parameters~\citep{hu2022lora,chen2024punica,sheng2024slora}.
 Progressive networks and side-tuning retain frozen paths
 while training new capacity~\citep{rusu2016progressive,zhang2020sidetuning,sung2022lst}.
+Confidence cascades allocate computation adaptively~\citep{bolukbasi2017adaptive}.
 Our replay shares computations across two versions on the same input.
 The frozen-feature controls also address distortion from
 fine-tuning~\citep{kumar2022finetuning}.
@@ -2436,5 +2461,7 @@ Additional ten-seed sweeps use $\lambda\in\{2,5,20,50,200,500\}$ on HAR and $\la
 \input{legacy_precision_study.tex}
 \input{subject_transfer_study.tex}
 \input{rml_one_pass_study.tex}
+
+\input{vit_deployment_study.tex}
 
 \end{document}

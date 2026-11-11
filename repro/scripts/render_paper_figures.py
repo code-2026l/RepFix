@@ -34,16 +34,18 @@ def main():
                    'repro/scripts/plot_early_update.py',
                    'repro/scripts/plot_legacy_precision.py',
                    'repro/scripts/plot_subject_transfer.py',
-                   'repro/scripts/plot_rml_one_pass.py']:
+                   'repro/scripts/plot_rml_one_pass.py',
+                   'repro/scripts/plot_vit_deployment.py',
+                   'repro/scripts/plot_vit_shared_path.py']:
         runpy.run_path(str(ROOT / script), run_name='__main__')
-    assert len(EXPORTS) == 33
+    assert len(EXPORTS) == 35
     assert all(abs(v['width_inches'] - 5.5) < 1e-10 for v in EXPORTS.values())
     report = dict(figures=EXPORTS, figures_rebuilt=len(EXPORTS),
                   all_vector_type42=True, all_text_within_canvas=True,
                   legacy_visual_changes_preserve_numerical_artists=True)
     (ROOT / 'paper/figures/publication_figure_manifest.json').write_text(
         json.dumps(report, indent=2) + '\n',encoding='utf-8',newline='\n')
-    print('Rebuilt all thirty-three included figures at final 5.5-inch width.')
+    print('Rebuilt all thirty-five included figures at final 5.5-inch width.')
 
 
 if __name__ == '__main__':
