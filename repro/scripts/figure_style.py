@@ -8,25 +8,27 @@ import matplotlib.pyplot as plt
 from matplotlib.text import Text
 import numpy as np
 import json
+import re
 
 WIDTH = 5.5
 EXPORTS = {}
-COLORS = dict(current='#355D85', frozen='#B8475F', repair='#147D80',
-              reference='#89939D', purple='#7B669D', amber='#B57D32',
-              ink='#253446', grid='#E4E8EC')
+FONT = 'Arial'
+COLORS = dict(current='#416B8D', frozen='#BB4B64', repair='#14858A',
+              reference='#89949E', purple='#8974A2', amber='#B98338',
+              ink='#263746', grid='#E7EBEF')
 
 
 def apply_style():
     plt.rcParams.update({
-        'font.family': 'serif', 'font.serif':['Times New Roman','STIXGeneral','DejaVu Serif'],
+        'font.family': 'sans-serif', 'font.sans-serif':[FONT,'Helvetica','DejaVu Sans'],
         'mathtext.fontset': 'stix',
-        'font.size': 8, 'axes.labelsize': 8.2, 'axes.titlesize': 8.4,
+        'font.size': 8, 'axes.labelsize': 8.1, 'axes.titlesize': 8.1,
         'xtick.labelsize': 7.7, 'ytick.labelsize': 7.7, 'legend.fontsize': 7.5,
-        'axes.linewidth': .65, 'lines.linewidth': 1.5, 'lines.markersize': 3.5,
+        'axes.linewidth': .55, 'lines.linewidth': 1.35, 'lines.markersize': 3.5,
         'text.color': COLORS['ink'], 'axes.labelcolor': COLORS['ink'],
         'xtick.color': COLORS['ink'], 'ytick.color': COLORS['ink'],
         'axes.edgecolor': '#A6AFB7', 'axes.axisbelow': True,
-        'grid.color': COLORS['grid'], 'grid.linewidth': .5,
+        'grid.color': COLORS['grid'], 'grid.linewidth': .45,
         'axes.spines.top': False, 'axes.spines.right': False,
         'legend.frameon': False, 'xtick.major.size': 2.5, 'ytick.major.size': 2.5,
         'xtick.major.pad': 2.5, 'ytick.major.pad': 2.5,
@@ -36,7 +38,8 @@ def apply_style():
 
 
 def panel(ax, letter, heading):
-    ax.set_title(f'({letter}) {heading}',loc='left',pad=8,fontfamily='Times New Roman',fontweight='bold')
+    ax.set_title(f'$\\mathbf{{{letter}}}$  {heading}',loc='left',pad=8,
+                 fontfamily=FONT,fontweight='normal')
 
 
 def numerical_artists(fig):
@@ -62,13 +65,13 @@ def polish(fig):
     """Unify legacy text at final width without modifying scientific artists."""
     before = numerical_artists(fig)
     for t in fig.findobj(Text):
-        t.set_fontfamily('Times New Roman')
+        t.set_fontfamily(FONT)
         t.set_fontsize(max(7.1, t.get_fontsize()))
     for ax in fig.axes:
         ax.xaxis.label.set_fontsize(8)
         ax.yaxis.label.set_fontsize(8)
-        ax.title.set_fontsize(8.4)
-        ax._left_title.set_fontsize(8.4)
+        ax.title.set_fontsize(8.1)
+        ax._left_title.set_fontsize(8.1)
         ax.tick_params(labelsize=7.2)
         ax.spines[['top', 'right']].set_visible(False)
     assert before == numerical_artists(fig), 'A visual change modified plotted evidence'
@@ -78,6 +81,21 @@ def polish(fig):
 def save(fig, output):
     """Export fixed-size vectors and preview, rejecting clipped visible labels."""
     output = Path(output)
+    # Legacy generators can set their own font after apply_style(). Keep the
+    # complete export family coherent without moving measurement artists.
+    before = numerical_artists(fig)
+    for label in fig.findobj(Text):
+        label.set_fontfamily(FONT)
+        match=re.match(r'^\(([a-z])\)\s*(.*)',label.get_text(),flags=re.S)
+        if match and label.get_fontsize() >= 8:
+            label.set_text(r'$\mathbf{'+match[1]+'}$  '+match[2])
+            label.set_fontweight('normal')
+    for ax in fig.axes:
+        for title in [ax.title,ax._left_title,ax._right_title]:
+            title.set_fontweight('normal')
+            match=re.match(r'^([a-z])\s{2,}(.*)',title.get_text(),flags=re.S)
+            if match:title.set_text(r'$\mathbf{'+match[1]+'}$  '+match[2])
+    assert before == numerical_artists(fig)
     fig.canvas.draw()
     renderer = fig.canvas.get_renderer()
     sizes = []

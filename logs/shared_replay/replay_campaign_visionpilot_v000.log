@@ -1,0 +1,15 @@
+{"stage": "cache", "seed": 2600, "elapsed_s": 26.417815446853638}
+Traceback (most recent call last):
+  File "<cpu-path>", line 132, in <module>
+    torch.set_num_threads(8);torch.set_num_interop_threads(1);run(a)
+                                                              ^^^^^^
+  File "<cpu-path>", line 82, in run
+    g1,gb,g2=torch.autograd.grad(loss,[f.weight,f.bias,s.weight]);support=(g1.square().flatten(1).sum(1)+gb.square()).argsort(descending=True,stable=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<cpu-path>", line 502, in grad
+    result = _engine_run_backward(
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "<cpu-path>", line 824, in _engine_run_backward
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: One of the differentiated Tensors does not require grad

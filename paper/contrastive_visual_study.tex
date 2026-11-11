@@ -1,0 +1,98 @@
+\subsection{Cross-View Auxiliary Learning on ViT-B/32}\label{app:contrastive_visual}
+
+We continue the final two attention blocks on two fixed views of CIFAR-100.
+The frozen prefix, label mask, update schedule and final reader fitting
+match the supervised control D. Each reference uses $10{,}000$ fitting
+images with labels on $20\%$, $5{,}000$ held-out validation images, and a
+separate $2{,}048$-image anchor pool. The auxiliary applies NT-Xent with
+temperature $0.2$ directly to the normalized terminal features. It adds no
+learned projection or annotations. The selected view supplies the primary
+cross-entropy and its counterpart supplies the paired contrastive view.
+
+Weights $0.01$, $0.1$, and $1$ yield pilot gains of $0.18$, $0.50$, and
+$0.90$ points. The two qualifying weights extend to two further development
+seeds. Their three-seed mean gains are $0.56$ and $0.99$ points, and their
+mean loss ratios to D are $0.809$ and $0.734$. The fixed rule selects the
+smaller qualifying weight. Independent replay reproduces the pilot D
+weights and logits from the earlier supervised run. This check supports
+reuse of its matched D endpoints in confirmation.
+
+Across four fitted references and three continuations per reference, the
+paired primary gain is $0.84$ points $[0.66,1.03]$ and the auxiliary loss
+ratio is $0.805$ $[0.794,0.816]$. Intervals use the four reference means.
+The references share one ImageNet-pretrained checkpoint. All comparisons
+use the held-out training-population splits.
+
+Two supervised controls match the training suffix-forward budget.
+D2 averages cross-entropy on both views for ten epochs. D20 continues the
+original one-view objective for twenty epochs. Each arm processes
+$200{,}000$ image views through the trainable suffix in $1{,}580$ minibatch
+forwards. D2 and joint take $790$ optimizer steps, and D20 takes $1{,}580$.
+The contrastive objective additionally computes paired-feature similarities.
+Across the full four-reference, three-continuation grid, joint gains
+$0.73$ points $[0.29,1.16]$ over D2 and $0.53$ points $[0.20,0.86]$
+over D20. Their auxiliary loss ratios are $0.791$ $[0.781,0.800]$ and
+$0.785$ $[0.777,0.793]$. All $24$ control accuracies are independently
+recomputed from the saved validation outputs. Elapsed times are recorded
+for their separate numerical executions.
+
+We repeat the two arms with AugReg ViT-B/32 weights pretrained on
+ImageNet-21k and fine-tuned on ImageNet-1k~\citep{steiner2022augreg}.
+The four pairs reuse the fitting examples, label masks, views, input
+normalization and continuation seed $6310$. Both arms start from the same
+newly fitted reference in each pair. We audit the retained FP32 suffix
+against the original unsplit AugReg encoder on every validation image.
+The gain is $0.60$ points $[0.15,1.05]$ and the contrastive loss ratio is
+$0.915$ $[0.910,0.921]$. Restricting the TorchVision comparison to seed
+$6310$ gives $0.88$ points $[0.65,1.11]$ and a loss ratio of $0.806$
+$[0.797,0.815]$. The unchanged coarse head applied directly to
+the updated features changes $6.92\%$ of class decisions on average.
+The retained reference changes zero of the $60{,}000$ audited decisions
+across the three rules, with a maximum FP32 logit difference of
+$1.15\times10^{-5}$.
+
+On the pilot split, using both views for cross-entropy reaches $70.62\%$
+and extending one-view training to twenty epochs reaches $70.92\%$.
+The ten-epoch D and selected joint runs reach $70.94\%$ and $71.44\%$.
+Widening a frozen-feature residual decoder to $1{,}024$, $2{,}048$ and
+$4{,}096$ hidden units gives $68.46\%$, $67.90\%$ and $66.96\%$.
+These comparisons use the same labeled examples and reader-fitting recipe.
+
+We rerun the image prefix and evaluate both readers on its physical outputs.
+The unchanged coarse head applied directly to the updated features changes
+$7.35\%$ of class decisions on average. With the retained reference suffix,
+full-precision execution changes none of the audited old decisions.
+The selected lower-precision reference has at most $0.18\%$ disagreement.
+Both variants preserve all audited current classifications. Each variant
+passes the five-point remainder bound in all $72$ checks, covering twelve
+endpoints, two serving implementations and three old decision rules.
+The full-corpus output audit uses chunks of $128$. An additional $128$
+individual batch-one inputs per endpoint check the batch-one implementation.
+Instance retrieval between the paired validation views improves by
+$0.69$ points $[0.60,0.77]$ over D in the secondary analysis.
+
+Isolated CPU timing uses one TorchVision endpoint per reference, twelve
+warmups, and thirty-one interleaved forward passes on preprocessed inputs.
+At batch one the original selected program costs $1.139\times$
+$[1.124,1.154]$. Its joint trace at batch $128$ gives $1.098\times$
+$[1.020,1.176]$. We repeat batch $128$ with the same compiled prefix and
+FP32 current suffix in the one-output and two-output programs. The added
+BF16 reference costs $1.078\times$ $[1.069,1.088]$ in total, with unchanged
+current classifications and at most $0.18\%$ old disagreement. The FP32
+reference costs $1.105\times$ $[1.092,1.119]$ and preserves every audited
+decision. The BF16 interval fits the $1.10$ budget on this CPU
+(Figure~\ref{fig:contrastive_benefit}).
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/fig_contrastive_benefit.pdf}
+\caption{Cross-view utility and compatibility. (a,b) Accuracy gains and
+loss ratios against one-view (D), two-view (D2) and twenty-epoch (D20)
+supervision. Points average three seeds per TorchVision reference (TV)
+and use seed $6310$ for AugReg. Diamonds show means and paired $95\%$
+intervals. (c) Old decisions on AugReg. Gates target $80\%$ and $50\%$
+coverage on fitting data. (d) Native latency on TorchVision endpoints.
+Batch $128$ holds the FP32 current graph fixed. Dashed segments mark
+the latency limits.}
+\label{fig:contrastive_benefit}
+\end{figure}

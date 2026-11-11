@@ -1,0 +1,43 @@
+\subsection{A local validity boundary}
+
+The discrepancy can be exposed without assuming radial training dynamics. Let $J=\partial h/\partial\theta$, $K=JJ^\top$, $e=u/\|u\|$, and $n_p=\|g_p\|>0$. At an audited checkpoint choose any $k>0$ and write $K=k(I+E)$. Define
+\begin{equation}
+ a=\frac{e^\top g_a}{n_p},\quad d=-\frac{e^\top g_p}{n_p},\quad
+ \epsilon_a=\frac{e^\top E g_a}{n_p},\quad
+ \epsilon_p=-\frac{e^\top E g_p}{n_p}.
+ \label{eq:boundary_terms}
+\end{equation}
+Here $a$ is signed radial loading relative to the primary norm, $d$ measures restoration alignment, and the $\epsilon$ terms measure the effect of encoder geometry. For the actual auxiliary, $|a|=\rho_b$. Products with $K$ can be evaluated by Jacobian--vector and vector--Jacobian products, without constructing the full matrix.
+
+\begin{theorem}[Local validity boundary of a frozen probe]\label{thm:probe_boundary}
+For any frozen probe value $q\ge0$, the variance dynamics satisfy
+\begin{equation}
+ \frac{\dot V}{N}=1-\alpha q+\mathcal E,\qquad
+ N=\frac{k\|u\|n_p}{B}>0,\qquad
+ \mathcal E=(d-1)+\epsilon_p-\alpha(a-q+\epsilon_a).
+ \label{eq:probe_discrepancy}
+\end{equation}
+Consequently, with
+\begin{equation}
+ \Delta=|d-1|+|\epsilon_p|+\alpha\bigl(|a-q|+|\epsilon_a|\bigr),
+ \qquad |1-\alpha q|>\Delta,
+ \label{eq:validity_margin}
+\end{equation}
+the probe and the exact variance derivative agree in sign. If $1-\alpha q>\Delta$, variance increases; if $1-\alpha q<-\Delta$, it decreases. The remaining region requires the signed audit.
+\end{theorem}
+\begin{proof}
+The chain rule gives $\dot V=-u^\top K(g_p+\alpha g_a)/B$. Substitute $K=k(I+E)$, divide by $N$, and add and subtract $1-\alpha q$. The triangle inequality bounds $|\mathcal E|$ by $\Delta$.
+\end{proof}
+
+The checkpoint-local margin uses the exact flux to explain the cheap probe offline. On $405$ HAR checkpoints, the frozen certificate fires on $2$; the signed balance $\psi=d-\alpha a$ with a combined residual certifies $10$ at the same scale. Per-checkpoint scale optimization raises the counts to $15$ and $154$ (Table~\ref{tab:probe_arms}). Every certified sign is correct. The corrected balance alone agrees in sign on $58\%$ of checkpoints, leaving substantial encoder-geometry mismatch.
+
+In the identity metric ($E=0$), $\dot V/N=d-\alpha a$. If $a=q$ and $0<d<\alpha q<1$, the nominal gate stays closed while variance contracts: the primary norm overstates restoration. If $a=-q$, the same unsigned gate can open while the auxiliary expands variance. Drift after calibration contributes through $a-q$. These examples identify concrete sources of a wrong sign.
+
+The mismatch separates into drift, sign and estimation components. If $a_0$ is signed loading at calibration for the actual auxiliary, then
+\begin{equation}
+ |a_t-q|\le |a_t-a_0|+|a_0-|a_0||+\bigl||a_0|-q\bigr|.
+ \label{eq:mismatch_split}
+\end{equation}
+The terms separate temporal drift, discarded sign, and surrogate or aggregation mismatch. A radial approximation is informative when the auxiliary contracts, the primary gradient restores centered variation, the encoder metric is compatible with the approximation, and calibration transfers to the audited checkpoint.
+
+A scalar reduction, $\dot\sigma=-\alpha\kappa\sigma+b(\sigma)$, yields a saddle-node threshold $\alpha_c=\lambda_\star/\kappa$ under the explicit shape and endpoint assumptions of Theorem~\ref{thm:transition}. Equating $1/q$ with this threshold additionally requires calibration to $\kappa/\lambda_\star$. Empirically, we compare $1/q$ with the half-height crossing $\alpha_{1/2}$ and report the operational collapse threshold separately.

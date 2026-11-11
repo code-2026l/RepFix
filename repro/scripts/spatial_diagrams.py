@@ -2,9 +2,11 @@
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon,Rectangle,FancyBboxPatch,FancyArrowPatch,Circle
 
-from figure_style import COLORS as C
+from figure_style import COLORS as C,FONT
+from matplotlib.colors import to_rgb
 
-FONT='Times New Roman'
+def tint(color,amount):
+    return tuple((1-amount)*v+amount for v in to_rgb(color))
 
 
 def text(ax,x,y,value,size=8,color='#17212A',bold=False,ha='center',va='center',italic=False):
@@ -20,13 +22,26 @@ def line_arrow(ax,points,color='#27333C',head=6,lw=.65):
 
 
 def plane(ax,x,y,w,h,color,depth=4,slant=21,dx=11,dy=8,front_alpha=.055):
+    """Stacked slabs with visible thickness; perspective is schematic only."""
+    thickness=min(5,h*.10)
     for i in reversed(range(depth)):
         ox,oy=i*dx,i*dy
         p=[(x+ox,y+oy),(x+w+ox,y+oy),(x+w+slant+ox,y+h+oy),(x+slant+ox,y+h+oy)]
-        ax.add_patch(Polygon(p,closed=True,facecolor=color,alpha=front_alpha if i==0 else .045,
-                             edgecolor='none',zorder=2+i*.01))
+        z=2+(depth-i)*.02
+        if i==0:
+            ax.add_patch(Polygon([(p[0][0]+3,p[0][1]-thickness-3),
+                                 (p[1][0]+3,p[1][1]-thickness-3),
+                                 (p[2][0]+3,p[2][1]-thickness-3),
+                                 (p[3][0]+3,p[3][1]-thickness-3)],
+                                facecolor='#E8EDF0',edgecolor='none',alpha=.45,zorder=1))
+        ax.add_patch(Polygon([p[0],p[1],(p[1][0],p[1][1]-thickness),(p[0][0],p[0][1]-thickness)],
+                             facecolor=tint(color,.68),edgecolor='none',zorder=z))
+        ax.add_patch(Polygon([p[1],p[2],(p[2][0],p[2][1]-thickness),(p[1][0],p[1][1]-thickness)],
+                             facecolor=tint(color,.78),edgecolor='none',zorder=z))
+        ax.add_patch(Polygon(p,closed=True,facecolor=tint(color,.89 if i==0 else .96),
+                             edgecolor='none',zorder=z+.005))
         ax.add_patch(Polygon(p,closed=True,fill=False,edgecolor=color,alpha=.70 if i==0 else .22,
-                             lw=.65 if i==0 else .55,zorder=4))
+                             lw=.65 if i==0 else .4,zorder=z+.01))
     return x+w/2+slant/2,y+h/2
 
 
@@ -34,7 +49,7 @@ def small_head(ax,x,y,w,h,label,color):
     patch=FancyBboxPatch((x,y),w,h,boxstyle='round,pad=0,rounding_size=3',
         facecolor='white',edgecolor=color,lw=.65,zorder=8)
     ax.add_patch(patch)
-    label=text(ax,x+w/2,y+h/2,label,8.2,color)
+    label=text(ax,x+w/2,y+h/2,label,7.6,color)
     if not hasattr(ax,'_diagram_boxes'):ax._diagram_boxes=[]
     ax._diagram_boxes.append((patch,label))
 

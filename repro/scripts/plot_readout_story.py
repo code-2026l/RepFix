@@ -224,7 +224,8 @@ def main():
     consumer()
     AUDIT['source_sha256'] = SOURCES
     AUDIT['reconstruction_maps_match_consumer_bank'] = True
-    (OUT / 'story_figure_manifest.json').write_text(json.dumps(AUDIT, indent=2) + '\n')
+    (OUT / 'story_figure_manifest.json').write_text(
+        json.dumps(AUDIT, indent=2) + '\n',encoding='utf-8',newline='\n')
     print(json.dumps({k: v for k, v in AUDIT.items() if k.startswith('fig_')}, indent=2))
 
 

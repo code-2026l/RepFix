@@ -1,0 +1,80 @@
+\subsection{The Geometry of a Versioned Consumer}\label{app:consumer_cell_geometry}
+
+Let $p_0$ be a healthy categorical distribution with unique winning class $k$.
+In addition to the class reader, consider fixed consumers that return $k$ above
+a confidence threshold and abstain below it. Their joint output fixes the
+winning class and one confidence bin $[l,u)$. We retain a buffered subset of
+that bin: $r=\exp(\eta\min\{\log p_0[k]-\max_{j\ne k}\log p_0[j],1\})$,
+$\eta=0.1$, and internal confidence bounds
+$l'=0.9l+0.1p_0[k]$, $u'=0.9u+0.1p_0[k]$. Missing outer bounds remain $0$ or $1$.
+The closed cell is
+\begin{equation}
+\mathcal C_0=\{p\in\Delta^{C-1}:p[k]\ge r p[j]\ (j\ne k),\quad l'\le p[k]\le u'\}.
+\end{equation}
+It contains $p_0$, is convex, and retains all specified consumer outputs when
+the healthy class is unique and rejected-threshold boundaries are buffered.
+This construction uses healthy predictions and fixed thresholds, not labels.
+Set-valued targets and KL projection are established ideas; label relaxation
+already replaces a point label by a probability set~\citep{lienen2021labelrelaxation}. Here the set is induced
+by the particular deployed class and confidence-threshold consumers.
+
+\begin{proposition}[Projection onto a buffered consumer cell]\label{prop:consumer_cell_projection}
+For a positive new distribution $q$, the minimizer of $\mathrm{KL}(p\|q)$ over
+$\mathcal C_0$ is unique. Sort the non-$k$ components as
+$q_{(1)}\ge\cdots\ge q_{(C-1)}$. In the absence of confidence bounds, pool $k$
+and the violating prefix of length $m$, with
+\begin{equation}
+g_m=\left(\frac{q[k]^r\prod_{j=1}^m q_{(j)}}{r^r}\right)^{1/(r+m)},\qquad
+t_0=\frac{r g_m}{(r+m)g_m+\sum_{j>m}q_{(j)}}.
+\end{equation}
+The prefix satisfies $q_{(m)}\ge g_m\ge q_{(m+1)}$, with the usual empty-prefix
+conventions. Set $t=\operatorname{clip}(t_0,[l',u'])$. The full projection is
+$p^*[k]=t$ and $p^*[j]=\min(t/r,a q[j])$ for $j\ne k$, where $a\ge0$ makes
+the non-$k$ mass $1-t$. The latter scale follows from the same sorted prefix.
+For logits $z$ and $q=\operatorname{softmax}(z)$, the envelope gradient of
+$L_{\rm cell}^{\rm KL}=\min_{p\in\mathcal C_0}\mathrm{KL}(p\|q)$ is $q-p^*$.
+\end{proposition}
+\begin{proof}
+Strict convexity gives uniqueness. With $m$ active ratio constraints write
+$p[k]=rs$, $p[j]=s$ for the active non-$k$ classes and $p[j]=a q[j]$ elsewhere.
+Stationarity gives $s=a g_m$; normalization yields $t_0$. The value function
+at fixed $p[k]=t$ is convex, so imposing the interval clips its unconstrained
+minimizer. At fixed $t$, the remaining KKT conditions give capped proportional
+allocation. Differentiation of $-\sum_jp[j]\log q[j]$ at the unique optimizer
+gives $q-p^*$; differentiating through the sorting step is unnecessary.
+\end{proof}
+
+The probability metric can underweight an important consumer decision.
+Take binary $p_0=(1-\epsilon/2,\epsilon/2)$, $q=(1-2\epsilon,2\epsilon)$ and
+threshold $\tau=1-\epsilon$. The class agrees but the threshold decision flips.
+The buffered lower confidence is $1-0.95\epsilon$. Thus
+$L_{\rm cell}^{\rm KL}=O(\epsilon)$ and its binary-logit gradient is
+$O(\epsilon)$, whereas the log-odds violation tends to
+$\log(2/0.95)>0$. Small probability divergence need not mean small operational
+change for a high-confidence threshold.
+
+Let $s_k=z[k]-\log\sum_{j\ne k}\exp z[j]$. Define the largest positive cell
+violation in logit/log-odds coordinates as
+\begin{equation}
+v(z)=\max\!\left\{0,\max_{j\ne k}(z[j]-z[k]+\log r),
+\operatorname{logit}(l')-s_k,s_k-\operatorname{logit}(u')\right\},
+\qquad L_{\rm cell}^{\rm odds}=v(z)^2,
+\end{equation}
+omitting missing outer confidence bounds. Both cell losses vanish inside the
+same protected set and ignore a common additive logit offset. The log-odds
+loss avoids the saturation in the example; its gradient is not bounded, so
+all matched training arms use the same explicit gradient-norm cap.
+
+For each example let $\delta$ be the smallest protected distance to
+an original decision boundary: $\log r$ for class changes,
+$\operatorname{logit}(l')-\operatorname{logit}(l)$ for an accepted lower
+threshold, and $\operatorname{logit}(u)-\operatorname{logit}(u')$ for a
+rejected upper threshold. Missing boundaries impose no restriction. If
+$\delta>0$, any change of the specified consumers implies
+$L_{\rm cell}^{\rm odds}\ge\delta^2$: a changed class violates a ratio
+constraint, while a changed threshold crosses its buffered log-odds boundary.
+Hence the change indicator is at most
+$\min\{1,L_{\rm cell}^{\rm odds}/\delta^2\}$.
+Zero-margin cases make this bound uninformative and are counted explicitly.
+This pointwise surrogate relation complements the finite-corpus monitor,
+which tests actual served decisions under their floating-point implementation.

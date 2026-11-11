@@ -1,0 +1,19 @@
+\begin{table}[h]
+\centering
+\caption{Isolated float32 TorchScript inference, four CPU threads. Times
+are microseconds per batch; Replay/current is the median paired ratio.
+Prefix shares the healthy first map and recomputes both second maps.
+The registered limits are $1.20\times$ at batch $1$ and $1.10\times$ at $1024$.}
+\label{tab:replay_cost}
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+Task & Batch & Current & Replay & Prefix & Independent & Replay/current \\
+\midrule
+HAR & 1 & 20.6 & 45.3 & 43.4 & 40.1 & $2.20\times$ \\
+HAR & 1024 & 276.1 & 508.3 & 508.9 & 543.9 & $1.81\times$ \\
+SNR & 1 & 16.8 & 42.7 & 39.5 & 32.4 & $2.54\times$ \\
+SNR & 1024 & 157.2 & 324.7 & 352.7 & 312.4 & $2.07\times$ \\
+\bottomrule
+\end{tabular}
+\end{table}

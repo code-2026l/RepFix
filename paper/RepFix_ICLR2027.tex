@@ -10,6 +10,8 @@
 \usepackage{algorithmic}
 \usepackage{algorithm}
 \usepackage{graphicx}
+\usepackage{float}
+\usepackage{placeins}
 \usepackage{textcomp}
 \usepackage{booktabs}
 \usepackage{multirow}
@@ -42,6 +44,15 @@
 \input{benefit_numbers.tex}
 \input{compiled_numbers.tex}
 \input{nonlinear_numbers.tex}
+\input{chart_numbers.tex}
+\input{alignment_numbers.tex}
+\input{completion_numbers.tex}
+\input{shared_replay_numbers.tex}
+\input{dense_replay_numbers.tex}
+\input{frontier_numbers.tex}
+\input{served_frontier_numbers.tex}
+\input{reference_replication_numbers.tex}
+\input{vit_deployment_numbers.tex}
 
 % ─── Compact table style (tighter spacing/format) ───
 \setlength{\tabcolsep}{4pt}          % default 6pt -> tighter column padding
@@ -49,40 +60,100 @@
 
 % Use the conference defaults for headings, displays, and float spacing.
 
-\title{Silent Scale Shift: When Shared Updates Break Existing Readouts}
+\title{Silent Scale Shift: Variance Contraction Breaks Calibrated Readouts}
 \author{Anonymous authors\\Paper under double-blind review}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-Shared encoders can keep learning while breaking the readouts that depend on them. We study this failure under auxiliary-task updates and identify a scale-sensitive component, \emph{silent scale shift}: task information remains decodable, but an existing readout loses accuracy. In matched HAR continuations across ten seeds, frozen-readout accuracy falls from $\CpuHarHealthy$ to $\CpuHarJointMid$, while the current head reaches $\CpuHarOwnMid$; unlabeled scale correction restores $\MechHarScalarMid$. With a real reconstruction auxiliary, error falls to $\ReconHarMseRatioHigh$ of detachment while frozen accuracy drops to $\ReconHarFrozenHigh$; paired linear alignment restores $\ReconHarPairedLinearHigh$. Exact affine boundaries explain the scale mechanism, and a repair hierarchy separates it from richer drift. A signed update audit shows why task-gradient alignment and unsigned variance probes can miss these changes. Finally, an independently confirmed SNR experiment retains a $\BenefitGuardGain$-percentage-point auxiliary gain and the old logits under a reference-anchored constraint, at $\BenefitLatencyRatio\times$ CPU inference cost. Folding the constraint into a frozen-trunk encoder removes the reference cost but loses the gain. Together, these results make readout compatibility a distinct requirement for shared representation learning.
+An encoder update can improve its current task while breaking a deployed
+readout. We study this separation between task information and readout
+compatibility. In matched HAR continuations, frozen accuracy falls from
+$\CpuHarHealthy$ to $\CpuHarJointMid$ while the current head reaches
+$\CpuHarOwnMid$; unlabeled input rescaling restores $\MechHarScalarMid$.
+Exact affine crossings explain this scale-sensitive failure, and a signed
+update audit identifies contraction that task-gradient conflict alone
+cannot determine. Compatibility also depends on the output rule: preserving
+classes can leave fixed confidence thresholds invalid. We therefore evaluate
+the old consumer's decisions alongside the benefit and cost of an update.
+Retaining healthy computations supports both outputs efficiently. On RadioML,
+equal-distillation controls retain a $0.28$-point auxiliary gain with unchanged
+old decisions. On the official CIFAR-100 test set, a ViT-B/32 student with
+selective current-tail computation gains $\VisualGainTwo$ points over two-view
+supervision and $\VisualGainDouble$ over doubled-epoch supervision while
+preserving all audited fine and coarse decisions. Complete FP32 CPU forwards
+cost $\VisualCostOne/\VisualCostBatch\times$ the unrestricted current model at
+batches $1/128$.
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
 
-An encoder and its downstream readouts need not update together. Auxiliary training changes the features; a deployed classifier may retain the weights and input statistics fitted to an earlier version. The current task head can adapt to this change and remain accurate. What happens to the readout already in use?
+An encoder may keep training after its classifier or confidence gate has
+shipped. The deployed component keeps its weights and normalization
+statistics. A new encoder can then change the component's decisions on the
+same inputs, even as the current head improves. We call the deployed
+component a \emph{consumer}, including the decision rule it implements.
+The problem arises in backward-compatible learning~\citep{shen2020backward}
+and in activation monitoring~\citep{duan2026staleness}.
 
-We isolate a large compatibility failure by cloning a healthy HAR model and its Adam state, retaining the fitted readout, and continuing matched branches on identical minibatches. Across ten seeds at variance-auxiliary dose $3$, frozen-readout accuracy falls from $\CpuHarHealthy$ to $\CpuHarJointMid$, although the jointly trained head reaches $\CpuHarOwnMid$. A single global input-scale correction, fitted without new labels, restores $\MechHarScalarMid$ (Figure~\ref{fig:overview}b). We call this scale-sensitive component \emph{silent scale shift}. The information needed for the task remains available; the existing readout has become incompatible with its input.
+Matched HAR continuations expose the separation. Starting from the same
+model and Adam state, joint training reduces frozen accuracy from
+$\CpuHarHealthy$ to $\CpuHarJointMid$ while the current head reaches
+$\CpuHarOwnMid$. A global scale correction fitted without labels restores
+$\MechHarScalarMid$ (Figure~\ref{fig:overview}). We call this component
+\emph{silent scale shift}: information remains decodable, but the deployed
+readout no longer matches its input. Reconstruction training produces the
+same separation while improving its own objective.
 
-This failure also occurs with a real auxiliary objective. HAR reconstruction lowers held-out MSE to $\ReconHarMseRatioHigh$ of the dose-matched detached decoder, while frozen-readout accuracy falls to $\ReconHarFrozenHigh$. A linear map fitted to paired old and new training features restores $\ReconHarPairedLinearHigh$, leaving the encoder and reconstruction head unchanged (Figure~\ref{fig:overview}c). None of the five seeds meets the scatter-collapse criterion. Auxiliary progress and readout failure can therefore coexist before that criterion signals a problem.
+For an affine readout, contraction changes the balance between features
+and bias. We derive its decision crossings and use input repairs to test
+how much damage scale and alignment explain. A signed audit connects this
+geometry to the applied encoder update. Task-gradient conflict alone,
+addressed by PCGrad~\citep{yu2020pcgrad} and CAGrad~\citep{liu2021cagrad},
+does not determine whether that update contracts the representation.
 
-We study the failure through three complementary tests. First, exact affine-readout boundaries and a fixed repair hierarchy identify the contribution of scale. Second, a signed chain-rule audit explains what task-gradient relations and an unsigned radial probe leave unresolved. Methods such as PCGrad~\citep{yu2020pcgrad} and CAGrad~\citep{liu2021cagrad} act on task-gradient relations; variance change also depends on the update's alignment with the variance gradient. For Adam, we additionally measure the applied parameter increment. Third, we test whether useful auxiliary learning can coexist with an unchanged readout.
-
-For the third test, a reference-anchored readout-nullspace control~\citep{shen2020backward,farajtabar2020ogd} preserves healthy logits while leaving $53$ of $64$ feature directions free. After validation fixes the SNR recipe, ten new seeds confirm a $\BenefitGuardGain$-percentage-point auxiliary gain at $\BenefitLatencyRatio\times$ CPU inference cost. A single-encoder follow-up preserves the logits but loses the gain when its nonlinear trunk is frozen. The resulting picture is concrete: task decodability, existing-readout compatibility, and the cost of preserving both require separate measurements.
+Repair quality depends on the deployed rule. Accuracy can recover while
+individual decisions change, and classes can agree while confidence gates
+fail. We compare input repair, learned readouts and retention of the healthy
+function under the decisions each consumer actually makes. Shared healthy
+computations retain auxiliary gains on RadioML and CIFAR-100 at modest
+measured CPU cost. The question is whether an upgrade can keep its learning
+benefit and its existing interface together.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/fig_readout_overview.pdf}
-\caption{An updated representation can support the task while breaking an existing readout. (a) Three paths through shared features: the current head, the frozen readout, and the same readout after input repair. $\mathcal N_0$ is the healthy normalizer; $\mathcal T$ repairs normalization or alignment while retaining $(W_0,b_0)$. (b) HAR variance continuation: global scale correction restores much of the lost frozen accuracy. (c) HAR reconstruction: auxiliary MSE falls to $\ReconHarMseRatioHigh$ of detachment; paired linear alignment restores readout accuracy. Repairs use training features without new labels and leave both learned models fixed. *Linear repair requires paired old/new anchors. Accuracies use the full test set; bars show population seed SD.}
+\caption{An updated representation can support the task while breaking an existing readout. (a) Three paths through shared features: the current head, the frozen readout, and the same readout after input repair. $\mathcal N_0$ is the healthy normalizer; $\mathcal T$ repairs normalization or alignment while retaining $(W_0,b_0)$. (b) HAR variance continuation: global scale correction restores much of the lost frozen accuracy. (c) HAR reconstruction: auxiliary MSE falls to $\ReconHarMseRatioHigh$ of detachment; paired linear alignment restores readout accuracy. Repairs use training features without labels and leave both models fixed; *paired alignment also needs old features at the same anchors. Accuracy is on the full test set; bars show seed SD.}
 \label{fig:overview}
 \end{figure}
 
 \section{When Existing Readouts Fail}\label{sec:formulation}
 
-Let $h_\theta(x)\in\mathbb R^m$ be the shared features. An existing readout applies the fixed map $W_0D_0^{-1}(h_\theta(x)-\mu_0)+b_0$, with healthy means $\mu_0$, positive diagonal scales $D_0$, weights $W_0$, and bias $b_0$. We use \emph{consumer} for this complete input-to-output map. During continuation, the current task head learns with the encoder, while the old consumer stays fixed. A refitted probe tests what the new features can support; the old consumer tests whether its interface still works.
+We study a shared encoder $h_\theta$, a current primary head $p_\phi$,
+and an auxiliary head $a_\psi$. Ordinary joint training minimizes
+$L_p(p_\phi(h_\theta(x)),y)+\alpha L_a(a_\psi(h_\theta(x)),t)$.
+The nonnegative weight $\alpha$ sets the auxiliary dose; $t$ is an input,
+metadata or a second-view target, depending on the task. Joint training
+updates the encoder from both losses. Its matched detached control trains
+the auxiliary head on stop-gradient features, so only the primary loss
+updates the encoder. Gradient-combination baselines modify these two
+encoder gradients. A separate deployed readout $C_0$ keeps its weights,
+input statistics and decision thresholds fixed after the healthy checkpoint.
+The current head and a newly fitted probe can adapt; $C_0$ cannot.
 
-Pure contraction already separates these two questions. For $H_c=cH$, an affine readout has logits $cWh+b$, which approach $b$ as $c\to0$. A unique bias winner then makes the prediction constant, although every $c>0$ preserves linear decodability. The following boundaries locate the relevant class changes.
+We measure contraction by covariance trace, task information by a
+standardized-feature probe, and interface compatibility by the actual
+class or confidence decisions of $C_0$. A trace decrease alone establishes
+neither information loss nor decision failure. A practical intervention
+must also retain the learning benefit: our serving studies use positive
+paired gain bounds or their declared noninferiority margins, a fixed
+old-decision budget, and measured CPU latency. The per-study budgets and
+matched controls appear with the corresponding results.
+
+Let $h_\theta(x)\in\mathbb R^m$ be the shared features. The old readout applies the fixed map $C_0(h)=W_0D_0^{-1}(h-\mu_0)+b_0$, with healthy means $\mu_0$, positive diagonal scales $D_0$, weights $W_0$, and bias $b_0$. A \emph{consumer} is this map together with the output rule it feeds, such as a class decision or a fixed confidence threshold. Continuation holds the consumer fixed while its input $h_\theta(x)$ changes, so the complete function of $x$ can change even though every stored parameter is unchanged. A refitted probe measures what the new features support; the consumer measures whether the old interface still works.
+
+Pure contraction separates the two questions. For $H_c=cH$, an affine readout has logits $cWh+b$, which approach $b$ as $c\to0$. A unique bias winner then makes the prediction constant, although every $c>0$ preserves linear decodability.
 
 \begin{proposition}[Two scale boundaries of a frozen affine readout]\label{prop:scale_law}
 Write the logits after fixed input statistics as $z_i(c)=z_0+c\,s_i$. Assume unique winners $t=\arg\max_jz_0[j]$ and $p_i=\arg\max_jz_i(1)[j]$. The bias-only class first loses as $c$ increases from zero at
@@ -96,24 +167,39 @@ with the minimum of an empty set taken as $\infty$. The first class change while
  \xi_{ij}=\frac{z_0[j]-z_0[p_i]}{s_i[p_i]-s_i[j]},
  \label{eq:shrink_first}
 \end{equation}
-with zero denoting no positive-scale flip. These boundaries can differ in multiclass problems. With nonzero feature variances and exact statistics, refitting the input statistics makes the readout invariant to every $c>0$.
+with zero denoting no positive-scale flip. The two boundaries differ in general. With nonzero feature variances and exact statistics, refitting the input statistics makes the readout invariant to every $c>0$.
 \end{proposition}
 \begin{proof}
 Each pairwise margin is affine in $c$. Increasing $c$ from zero reaches the smallest positive crossing of the bias winner; decreasing $c$ from one reaches the largest crossing of the healthy winner in $(0,1)$. Standardising $cH$ cancels $c$ from numerator and denominator. For example, logits $(1,10c,-1+12c)$ give $c^{\rm bias}=0.1$ but $c^{\rm first}=0.5$.
 \end{proof}
 
-The imposed-scale sweep in Figure~\ref{fig:scale_law} tests the scale mechanism (Appendix~\ref{app:readout}). It isolates scaling from the additional drift learned during training.
+The imposed-scale sweep in Figure~\ref{fig:scale_law} isolates this mechanism from the drift that training adds (Appendix~\ref{app:readout}).
 
-The matched HAR trajectory in Figure~\ref{fig:paired_dose}a starts from one healthy checkpoint and excludes calibration examples from encoder and readout fitting. At $\alpha=3$, the current head recovers while the frozen consumer remains inaccurate. Repairs fitted to training features without new labels distinguish mean and scale changes: mean correction reaches $\MechHarMeanMid$, global scale correction $\MechHarScalarMid$, and their combination $\MechHarMeanScalarMid$, close to per-feature recalibration ($\CpuHarRecalMid$). At $\alpha=100$, per-feature repair reaches $\CpuHarRecalHigh$ versus $\CpuHarRetrainHigh$ after refitting. Scale explains much of the moderate-dose failure; stronger or projected contraction requires richer alignment (Appendix~\ref{app:repair_hierarchy}).
+Matched HAR trajectories separate mean from scale. At $\alpha=3$, global
+scale correction reaches $\MechHarScalarMid$ and adding a mean correction
+reaches $\MechHarMeanScalarMid$, close to per-feature recalibration
+($\CpuHarRecalMid$). At $\alpha=100$, per-feature repair reaches
+$\CpuHarRecalHigh$ versus $\CpuHarRetrainHigh$ for a supervised refit.
+Stronger and projected contraction require richer alignment
+(Appendix~\ref{app:repair_hierarchy}).
 
+All repairs act upstream of the frozen weights, through a versioned encoder output or a consumer-input adapter. Mean and scale repairs need cached healthy statistics and unlabeled new features; paired alignment also needs old features at the same anchors. A supervised refit reuses labels and is the stronger-access baseline. We report NLL and $15$-bin ECE with accuracy.
 
-Separately trained encoders show the same decodability--compatibility gap at $m=32,128$ and with a Transformer (Appendix~\ref{app:readout}). Those historical studies include calibration examples in encoder fitting. We report negative log-likelihood (NLL) and expected calibration error (ECE), using $15$ equal-width bins for ECE. Positive temperature scaling preserves predicted classes; input normalization can repair their scale dependence.
+The output rule decides whether a repair succeeds. A fixed confidence threshold can move even when classes and probabilities barely do. Let
+$p_0=(1-\epsilon/2,\epsilon/2)$, $q=(1-2\epsilon,2\epsilon)$ and
+$\tau=1-\epsilon$ with $0<\epsilon<1/4$. Both predictors choose the same
+class, yet the healthy consumer accepts and the new one abstains on every
+example, while $\mathrm{KL}(p_0\|q)=O(\epsilon)\to0$.
+Classification agreement and a small distillation loss can therefore coexist
+with complete selective disagreement. A buffered log-odds metric avoids
+this saturation, but does not beat the standard controls in its planned
+comparison (Appendices~\ref{app:consumer_cell_geometry}
+and~\ref{app:consumer_cell_study}). We audit consumer outputs rather
+than infer survival from one representation or loss statistic.
 
 \section{Auditing Shared Updates}\label{sec:theory}\label{sec:diagnosis}
 
-\subsection{Signed variance change}
-
-Let $H(\theta)\in\mathbb R^{B\times m}$ be the outputs of a shared encoder on a fixed diagnostic batch; a linear primary head and an auxiliary head consume $H$. Training minimizes $L_p+\alpha L_a$, where $L_p$ is the primary loss, $L_a$ the auxiliary loss, and $\alpha\ge0$ the dose; multiple auxiliaries can be absorbed into their weighted sum. Write $G_p=\nabla_\theta L_p$ and $G_a=\nabla_\theta L_a$. Define
+Let $H(\theta)\in\mathbb R^{B\times m}$ be the outputs of a shared encoder on a fixed diagnostic batch; a linear primary head and an auxiliary head consume $H$. Training minimizes $L_p+\alpha L_a$, where $L_p$ is the primary loss, $L_a$ the auxiliary loss, and $\alpha\ge0$ the dose; several auxiliaries can be folded into the weighted sum. Write $G_p=\nabla_\theta L_p$ and $G_a=\nabla_\theta L_a$. Define
 \begin{equation}
  V(\theta)=\frac{1}{2B}\|C_BH(\theta)\|_F^2,
  \qquad C_B=I-\mathbf1\mathbf1^\top/B,
@@ -125,7 +211,7 @@ Here $2V$ is the covariance trace with divisor $B$: a rotation-invariant measure
  \dot V=r-\alpha c,\qquad r=-v^\top G_p,\qquad c=v^\top G_a.
  \label{eq:signed_variance}
 \end{equation}
-We call $c>0$ \emph{auxiliary contraction}, and $r>0$ \emph{primary restoration}. When both are positive, $\alpha c/r>1$ defines the instantaneous contraction-dominated regime. Reporting $(r,c)$ also covers a primary update that itself reduces variance. This identity retains the encoder Jacobian; it defines a signed diagnostic without a reduced dynamical model.
+We call $c>0$ \emph{auxiliary contraction}, and $r>0$ \emph{primary restoration}. When both are positive, $\alpha c/r>1$ defines the instantaneous contraction-dominated regime. The pair $(r,c)$ also covers a primary update that reduces variance on its own. Because the identity retains the encoder Jacobian, no reduced dynamical model is needed.
 
 \begin{proposition}[Conflict information does not identify contraction]\label{prop:conflict_gap}
 The task-gradient Gram matrix does not determine the sign of $\dot V$. In particular, there are two auxiliary updates with identical task-gradient norms and conflict, but opposite effects on variance under the same primary update.
@@ -134,197 +220,289 @@ The task-gradient Gram matrix does not determine the sign of $\dot V$. In partic
 Take $G_p=e_1$, $G_a^\pm=\pm e_2$, and $v=-e_1+\beta e_2$ for $\beta>0$. Both pairs have identity Gram matrix and zero conflict, whereas $r=1$ and $c^\pm=\pm\beta$. For $\alpha\beta>1$, $\dot V^+<0<\dot V^-$. These gradients are locally realizable by a smooth encoder and losses (Appendix~\ref{app:boundary_proof}).
 \end{proof}
 
-Task-gradient relations therefore leave variance change unidentified. A combiner may preserve variance by reducing the auxiliary dose, but preserving a particular auxiliary update requires checking its projection onto $v$. The fixed-dose comparisons below test this distinction.
+Local contraction and loss of task information are separate outcomes.
+In HAR, a $4{,}600\times$ trace contraction leaves standardized-probe
+accuracy unchanged (Appendix~\ref{app:scale_audit}). The spectral model in
+Theorem~\ref{thm:spectral} distinguishes contraction of some modes from all
+modes. We measure variation, decodability and consumer utility separately.
+The cheaper radial feature-space proxy agrees with the exact derivative on
+$51\%$ of $405$ HAR checkpoints; its geometry and calibration controls are in
+Appendices~\ref{app:unsigned_probe} and~\ref{app:probe_controls}.
+The one-shot unsigned STF-cal gate is an empirical intervention heuristic.
+The local sign condition requires its stated geometry and discrepancy
+terms; the PCA rank rule requires identifying the specified PSD operator.
+Neither supplies a general trajectory guarantee. Computing the full sign
+certificate is an offline audit, more expensive than measuring the signed
+flux directly (Appendix~\ref{app:boundary_proof}).
 
-The local balance also differs from eventual collapse. In the symmetric linear model $\dot z=(R-\alpha A)z$, $R\succ0$, $A\succeq0$, some mode contracts when $\alpha\lambda_{\max}(R^{-1/2}AR^{-1/2})>1$; all modes contract when $\alpha\lambda_{\min}(R^{-1/2}AR^{-1/2})>1$ (Theorem~\ref{thm:spectral}). A head can exploit the surviving modes. In HAR, even a $4{,}600\times$ trace contraction leaves standardized-probe accuracy unchanged (Appendix~\ref{app:scale_audit}). We therefore measure variance, effective rank, task decodability, and old-readout utility separately.
+\section{Testing the Readout Interface}\label{sec:experiments}\label{sec:analysis}
 
-\subsection{What an unsigned probe leaves out}
+\subsection{Matched continuation}
 
-Let $h$ and $u$ stack the rows of $H$ and $C_BH$, respectively, and let $g_p=\nabla_h L_p$, $g_a=\nabla_h L_a$. A cheap feature-space probe uses the centered radial direction:
-\begin{definition}[Unsigned radial toxicity proxy]\label{def:toxicity}
-For $u\ne0$ and $\|g_p\|>0$, define
+We clone a healthy model with its optimizer state, freeze the deployed readout,
+and continue joint and detached branches on identical minibatches. A refitted
+probe measures retained decodability; the frozen consumer measures compatibility.
+Mean, scale and paired-alignment repairs use training features without new labels.
+We report held-out accuracy, NLL and $15$-bin ECE with feature variation and the
+actual class and threshold decisions. The benchmark spans
+HAR~\citep{ucihar}, RadioML~\citep{radioml}, battery health~\citep{nasa_battery}
+and NYUv2; architectures, grids and the scatter criterion are in
+Appendices~\ref{app:tables}--\ref{app:moved} and~\ref{app:probe_controls}.
+Error bars show population seed SD unless noted.
+
+\subsection{The update and architecture determine the failure}\label{sec:real_aux}
+
+Real auxiliaries separate gradient loading from contraction. Across four heads,
+mean per-example task-gradient cosines stay below $0.06$ in magnitude, while
+SNR radial loading reaches $88\%$ (Figure~\ref{fig:conflict_toxicity}a).
+The signed flow contribution is expanding at $74$ of $75$ historical
+epoch-end checkpoints, and flow and Adam signs disagree on
+$\CpuRmlAuditDisagree/\CpuRmlAuditN$ sampled paired updates. We therefore
+audit the applied increment and a primary-only Adam counterfactual when
+attributing a change (Appendix~\ref{app:cpu_paired}).
+
+Encoder capacity changes the failure. At I/Q reconstruction dose
+$3000$, the waveform CNN's frozen readout reaches $\CnnFrozenHigh$ against
+$\CnnPrimary$ for detachment, while its current head reaches $\CnnOwnHigh$.
+The MLP is less compatible under the same auxiliary
+(Appendices~\ref{app:head_state} and~\ref{app:cnn_continuation}). Failure is a
+property of the updated representation and its consumer, not of auxiliary
+loading or model size alone.
+
+\section{Preserving a Specified Consumer}\label{sec:stf}\label{sec:stfcal}
+
+\subsection{Repairing the readout interface}
+
+Repairing the input can keep both the learning and the old readout, up to a
+point. At HAR reconstruction dose $100$, the current head reaches
+$\ReconHarOwnHigh$ while frozen accuracy falls to $\ReconHarFrozenHigh$.
+Paired linear alignment restores $\ReconHarPairedLinearHigh$ and keeps the
+learned encoder with a reconstruction MSE of $\ReconHarMseRatioHigh$ relative
+to detachment (Figure~\ref{fig:overview}c).
+
+Recovered accuracy does not imply recovered decisions. A post-hoc chart
+improves accuracy, NLL and ECE yet changes $\ChartDisagreement\%$ of
+decisions. Distilling a legacy head~\citep{hinton2015distilling,li2016lwf}
+gives a useful HAR tradeoff: reconstruction MSE is $\FreshMse$ of
+detachment, primary accuracy changes by $+\FreshGain$ points
+$[\FreshGainLow,\FreshGainHigh]$, and all ten class-disagreement bounds
+certify. Cheaper OLS and full-feature alignment preserve the class interface
+but fail the fixed confidence rules. The matched controls and vision
+counterexamples are in Appendices~\ref{app:posthoc_chart}--\ref{app:completion_controls}
+and~\ref{app:vision_boundary}.
+
+\subsection{Retaining the healthy function}
+
+Retaining a healthy function gives exact outputs in real arithmetic.
+For an affine consumer $A$, the features
+$H_0+(H_\theta-H_0)P_\perp$, with $P_\perp$ projecting onto $\ker A$,
+preserve its logits. On ten fresh SNR seeds this keeps a
+$\BenefitGuardGain$-point auxiliary gain, but evaluating both encoders costs
+$\BenefitLatencyRatio\times$. Freezing the nonlinear trunk permits folding
+and loses the gain (Appendices~\ref{app:benefit_confirmation}
+and~\ref{app:compiled_interface}). Sharing healthy computations offers a
+cheaper way to keep the function while adding learning capacity.
+
+For a two-layer nonlinear trunk, let $a_1^0$ and $t_2^0$ denote the
+healthy first activation and second preactivation. If the first-map update
+changes rows $S$ and the second-map update is $UV$, then
 \begin{equation}
- \rho_b=\frac{\|\Pi_u g_a\|}{\|g_p\|},\qquad
- \Pi_u g=\frac{u^\top g}{\|u\|^2}u.
- \label{eq:order}
+t_2=t_2^0+W_2^0[:,S](a_1-a_1^0)[S]+UVa_1+\delta b_2.
+\label{eq:shared_replay}
 \end{equation}
-The experimental estimator $\hat\rho$ instead averages regularized per-example ratios. The frozen decision uses a recorded value $q=\hat\rho_{t_0}$ and the nominal dose $\alpha_{\rm probe}=1/q$.
-\end{definition}
+The activation difference stays on $S$ through any coordinatewise
+nonlinearity, even when gates change. Shared dense products and correction
+terms therefore evaluate both healthy and current functions.
+Proposition~\ref{prop:shared_replay} gives the construction and proof;
+its saved parameters retain the healthy path, while current features learn.
 
-The proxy discards the sign of the auxiliary direction and uses the entire primary-gradient norm as its reference. Both choices matter: expansion and contraction can give the same $\rho_b$, and a large primary gradient need not restore centered variation. There is also a measurement mismatch. The controlled driver probes the isotropic surrogate $\|C_BH\|_F^2/(Bm)$ but trains with fixed projected-variance auxiliaries; the real-head driver probes the actual auxiliary. The signed audit below accounts for these choices.
+\subsection{Learning capacity and measured cost}
 
-\subsection{A local validity boundary}
+Sparse and dense replay retain old decisions and improve learning, but
+their small-network CPU cost exceeds the $1.20/1.10$ batch limits
+(Table~\ref{tab:deployment_frontier}). Their support/rank controls and
+negative development outcomes are in
+Appendices~\ref{app:shared_replay_protocol}--\ref{app:shared_replay_rank}.
 
-The discrepancy can be exposed without assuming radial training dynamics. Let $J=\partial h/\partial\theta$, $K=JJ^\top$, $e=u/\|u\|$, and $n_p=\|g_p\|>0$. At an audited checkpoint choose any $k>0$ and write $K=k(I+E)$. Define
-\begin{equation}
- a=\frac{e^\top g_a}{n_p},\quad d=-\frac{e^\top g_p}{n_p},\quad
- \epsilon_a=\frac{e^\top E g_a}{n_p},\quad
- \epsilon_p=-\frac{e^\top E g_p}{n_p}.
- \label{eq:boundary_terms}
-\end{equation}
-Here $a$ is signed radial loading relative to the primary norm, $d$ measures restoration alignment, and the $\epsilon$ terms measure the effect of encoder geometry. For the actual auxiliary, $|a|=\rho_b$. Products with $K$ can be evaluated by Jacobian--vector and vector--Jacobian products, without constructing the full matrix.
-
-\begin{theorem}[Local validity boundary of a frozen probe]\label{thm:probe_boundary}
-For any frozen probe value $q\ge0$, the variance dynamics satisfy
-\begin{equation}
- \frac{\dot V}{N}=1-\alpha q+\mathcal E,\qquad
- N=\frac{k\|u\|n_p}{B}>0,\qquad
- \mathcal E=(d-1)+\epsilon_p-\alpha(a-q+\epsilon_a).
- \label{eq:probe_discrepancy}
-\end{equation}
-Consequently, with
-\begin{equation}
- \Delta=|d-1|+|\epsilon_p|+\alpha\bigl(|a-q|+|\epsilon_a|\bigr),
- \qquad |1-\alpha q|>\Delta,
- \label{eq:validity_margin}
-\end{equation}
-the probe and the exact variance derivative agree in sign. If $1-\alpha q>\Delta$, variance increases; if $1-\alpha q<-\Delta$, it decreases. The remaining region requires the signed audit.
-\end{theorem}
-\begin{proof}
-The chain rule gives $\dot V=-u^\top K(g_p+\alpha g_a)/B$. Substitute $K=k(I+E)$, divide by $N$, and add and subtract $1-\alpha q$. The triangle inequality bounds $|\mathcal E|$ by $\Delta$.
-\end{proof}
-
-The margin is sufficient and checkpoint-local. Computing it requires the exact flux, so it serves as an offline explanation of the cheap probe. On $405$ HAR checkpoints, the frozen certificate fires on $2$; the signed balance $\psi=d-\alpha a$ with a combined residual certifies $10$ at the same scale. Per-checkpoint scale optimization raises the counts to $15$ and $154$ (Table~\ref{tab:probe_arms}). Every certified sign is correct. The corrected balance alone agrees in sign on $58\%$ of checkpoints, leaving substantial encoder-geometry mismatch.
-
-In the identity metric ($E=0$), $\dot V/N=d-\alpha a$. If $a=q$ and $0<d<\alpha q<1$, the nominal gate stays closed while variance contracts: the primary norm overstates restoration. If $a=-q$, the same unsigned gate can open while the auxiliary expands variance. Drift after calibration contributes through $a-q$. These examples identify concrete sources of a wrong sign.
-
-The mismatch term also separates into actionable components. If $a_0$ is signed loading at calibration for the actual auxiliary, then
-\begin{equation}
- |a_t-q|\le |a_t-a_0|+|a_0-|a_0||+\bigl||a_0|-q\bigr|.
- \label{eq:mismatch_split}
-\end{equation}
-The terms separate temporal drift, discarded sign, and surrogate or aggregation mismatch. A radial approximation is informative when the auxiliary contracts, the primary gradient restores centered variation, the encoder metric is compatible with the approximation, and calibration transfers to the audited checkpoint.
-
-A scalar reduction, $\dot\sigma=-\alpha\kappa\sigma+b(\sigma)$, yields a saddle-node threshold $\alpha_c=\lambda_\star/\kappa$ under the explicit shape and endpoint assumptions of Theorem~\ref{thm:transition}. Equating $1/q$ with this threshold additionally requires calibration to $\kappa/\lambda_\star$. Empirically, we compare $1/q$ with the half-height crossing $\alpha_{1/2}$ and report the operational collapse threshold separately.
-
-\section{Evidence Across Tasks and Protocols}\label{sec:experiments}\label{sec:analysis}
-
-\subsection{Protocols and observables}\label{sec:unified_protocol}
-
-The controlled benchmark spans HAR~\citep{ucihar}, RadioML~\citep{radioml}, battery health~\citep{nasa_battery}, and NYUv2. A three-layer MLP with a fixed projected-variance auxiliary isolates contraction; Transformer, CNN, real-head, CelebA, and financial studies test its scope. Appendices~\ref{app:tables}--\ref{app:moved} give the protocols and optimizer grids. Error bars show population seed SD unless stated otherwise.
-
-The operational label is relative scatter $s=\mathcal S_h/\mathcal S_{\rm single}<0.3$, using the same-seed single-task reference and
-\begin{equation}
- \mathcal S_h=\mathbb E_b\!\left[\operatorname{std}_j\!\left(h_j^{(b)}-\mathbb E_{b'}h_j^{(b')}\right)\right].
- \label{eq:cross_sample_scatter}
-\end{equation}
-This coordinate-dependent proxy misses variation along the all-ones feature direction. We use ``collapse'' for the declared $0.3$ criterion and measure information separately. The log-dose interpolated crossing at $s=0.5$, $\alpha_{1/2}$, summarizes the dose curve.
-
-\subsection{Calibration is task- and width-dependent}\label{sec:validation}\label{sec:har}\label{sec:radioml}\label{sec:battery}\label{sec:nyu}\label{sec:capacity_law}
-
-Across sixteen domain--width cells, the ratio of predicted dose to observed half-height crossing is $0.95$--$3.01$ for battery and $30$--$116$ for RadioML; HAR reverses bias with width (Figure~\ref{fig:probe_prediction}a). All cells train projected auxiliaries and probe the isotropic surrogate. The calibration error varies substantially across domains even in this controlled setting.
-
-\subsection{Calibration and drift change the decision}\label{sec:negatives}
-
-On HAR at $m=64$, detached warm-up moves $1/\overline{\hat\rho}$ from $1.34$ at $W=1$ to $0.00907$ at $W=4$, against a half-height crossing of $0.00141$. At dose $0.03$, $W=1,2$ leave all gates closed and all ten seeds collapse; $W\ge4$ opens every gate and prevents collapse. At dose $100$, all tested warm-ups protect scatter (Figure~\ref{fig:probe_prediction}b,d). An extreme dose can therefore hide a calibration error.
-
-Recomputing the probe during training can produce false alarms. HAR ratios grow even at zero auxiliary dose, and running gates activate in every seed of ten configurations with final scatter $0.50$--$1.04$. Battery has one activation among 35 seeds ending above half-height (Appendix~\ref{app:online}). A shrinking primary-gradient denominator can inflate the ratio. On $405$ HAR checkpoints, the unsigned predictor agrees with the exact variance derivative on $51\%$, with median restoration alignment $0.065$.
-
-\subsection{Real auxiliaries and stronger encoders}\label{sec:real_aux}
-
-Four real auxiliary heads further separate loading from contraction (Figure~\ref{fig:conflict_toxicity}a). Mean per-example task-gradient cosines have magnitude at most $0.06$, while SNR radial loading is $88\%$. Yet SNR's endpoint signed radial cosine is negative, and $c_t=v^\top G_a<0$ at $74/75$ historical epoch-end checkpoints. Its relative collapse cannot be attributed to persistent positive sampled flow contraction. Flow and actual Adam signs also disagree on $\CpuRmlAuditDisagree/\CpuRmlAuditN$ sampled paired updates. We record both the applied increment and a primary-only Adam counterfactual (Appendix~\ref{app:cpu_paired}).
-
-Protocol changes alter the observed failure. Historical SNR scatter onset lies between doses $3$ and $10$, whereas I/Q reconstruction stays above the criterion through $10000$. Under healthy-checkpoint continuation, I/Q at $3000$ gives frozen accuracy $\ReconRmlFrozenHigh$ versus $\ReconRmlPrimary$ detached, with trace $\ReconRmlTraceHigh$; SNR at $30$ gives $\CpuRmlJointThirty$ versus $\CpuRmlPrimary$, with scatter $\CpuRmlScatterThirty$. Resetting auxiliary weights or their Adam state also fails to reproduce the historical severe collapse (Appendix~\ref{app:head_state}). Warm-up, split, architecture, and horizon define the operating regime.
-
-A waveform CNN on the same I/Q split reaches $\CnnHealthy$ healthy-readout accuracy. At reconstruction dose $3000$, frozen accuracy is $\CnnFrozenHigh$ versus $\CnnPrimary$ detached, while the current head reaches $\CnnOwnHigh$. This stronger encoder shows little consumer damage on the fixed real-auxiliary grid (Appendix~\ref{app:cnn_continuation}).
-
-\section{Repairing and Preserving Compatibility}\label{sec:stf}\label{sec:stfcal}
-
-Real reconstruction tests repair while the auxiliary makes progress (Table~\ref{tab:reconstruction_full}, Appendix~\ref{app:reconstruction_paired}). At HAR dose $100$, frozen accuracy falls from $\ReconHarPrimary$ under detachment to $\ReconHarFrozenHigh$, while the current head reaches $\ReconHarOwnHigh$. Test reconstruction MSE falls to $\ReconHarMseRatioHigh$ of detachment, with $0/5$ scatter collapses. Per-feature recalibration reaches $\ReconHarRecalHigh$; paired linear alignment reaches $\ReconHarPairedLinearHigh$ (Figure~\ref{fig:overview}c). Repair changes only the consumer input, retaining the auxiliary improvement.
-
-\input{benefit_confirmation_table.tex}
+On RadioML, we instead retain the healthy hidden units and distill the
+current output into 16 added nonlinear units. With equal architecture,
+initialization and distillation work, the joint student gains $0.28$ points
+$[0.11,0.45]$ over its detached counterpart across 16 fresh references.
+Every old class and confidence decision agrees. The folded graph costs
+$1.016\times$ at batch 1 and $1.070\times$ at batch 128
+(Appendices~\ref{app:rml_one_pass}--\ref{app:rml_matched_distillation}).
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{figures/fig_nullspace_control.pdf}
-\caption{A fixed readout leaves a nullspace for learning. Projecting $\Delta H=H_\theta-H_0$ into $\ker A$ and adding $H_0$ gives one shared $64$-vector with unchanged reference logits in real arithmetic. The normalized head is $A=W_0D_0^{-1}$ and its effective bias is $b'_0=b_0-A\mu_0$. The inset shows the annihilation condition; planes are schematic. Both encoders are evaluated at inference.}
-\label{fig:nullspace_control}
+\includegraphics[width=\linewidth]{figures/fig_vit_shared_path.pdf}
+\caption{Keeping old vision interfaces while retaining auxiliary gains.
+(a) A healthy ViT path serves fixed fine and coarse readers. A student
+uses its features; inputs with low student margin also traverse the updated
+two-block tail. (b) Official CIFAR-100 accuracy gains over routed two-view
+and doubled-epoch supervised students, and a direct supervised MLP.
+(c) Complete FP32 image-forward latency relative to the unrestricted
+current teacher; dashed marks show the $1.20/1.10$ limits. Small points
+are four fitted-reference means, diamonds and bars paired $95\%$ intervals.
+All old class and confidence decisions are unchanged.}
+\label{fig:vit_shared_path}
 \end{figure}
 
-Let $A=W_0\operatorname{diag}(1/s_0)$ and let $P_\perp$ project onto $\ker A$. The reference-anchored control $H_0+(H_\theta-H_0)P_\perp$ preserves all healthy logits while emitting one shared $64$-vector (Proposition~\ref{prop:consumer_nullspace}, Figure~\ref{fig:nullspace_control}). Validation selects SNR dose $1$ from six fixed candidates, using $20\%$ of fitting primary labels. Ten new seeds confirm ordinary auxiliary gain J--D of $\BenefitJointGain$ percentage points, paired $95\%$ interval $[\BenefitJointGainLow,\BenefitJointGainHigh]$, and guarded gain GJ--GD of $\BenefitGuardGain$, $[\BenefitGuardGainLow,\BenefitGuardGainHigh]$ (Table~\ref{tab:benefit_confirmation}). The guarded model meets the declared $0.5$-point noninferiority margin against J. All guarded predictions, NLL, and ECE match the reference; maximum logit error is $\BenefitLogitError$. The ten guarded joint endpoints also pass a separate five-point disagreement budget. Ordinary frozen accuracy barely changes, but ECE rises from $\BenefitHealthyECE$ to $\BenefitJointECE$. Both encoders remain at inference, at a measured $\BenefitLatencyRatio\times$ CPU cost (Appendix~\ref{app:benefit_confirmation}).
+Pretrained vision models can share a frozen prefix while learning complete
+nonlinear suffixes. ResNet-18 and ViT-B/32 then improve supervised transfer
+over richer frozen-feature controls; smaller update scopes and the fixed
+reconstruction grid miss their gain targets
+(Appendices~\ref{app:nonlinear_suffix}--\ref{app:reference_replication}).
 
-With a frozen nonlinear trunk, the last-affine constraint folds into one encoder. Ten new seeds per task on SNR and HAR retain logits but confirm no compiled auxiliary benefit (Appendix~\ref{app:compiled_interface}). On SNR, compiled joint training (CJ) falls below full joint training (J) by $\CompileRmlJointCost$ points, $[\CompileRmlJointCostLow,\CompileRmlJointCostHigh]$: freezing accounts for $-3.53$, and the added constraint changes accuracy by $-0.003$. A separately fixed nonlinear-side development grid also fails its benefit screen (Appendix~\ref{app:nonlinear_interface}). These controls locate the practical difficulty in retaining useful adaptation at lower deployment cost.
+On ViT-B/32, a cross-view contrastive auxiliary~\citep{chen2020simclr}
+improves training-only validation accuracy over both two-view and
+doubled-epoch supervision at matched suffix-forward budgets. A fixed-recipe
+AugReg replication also improves accuracy and contrastive loss. Directly
+applying the old coarse head to updated features changes $7.35\%$ of its
+class decisions on average. Nine unlabeled repairs and the initial
+distilled-head screen fail their compatibility targets
+(Appendices~\ref{app:suffix_repairs}--\ref{app:vision_head_control},
+\ref{app:contrastive_visual}).
 
-Detachment blocks auxiliary gradients to the encoder and provides the reference when the auxiliary brings no primary-task value. The spectral toxicity filter (\STF{}) instead removes a chosen component of the auxiliary channel. Its idealized backward form is
+We can retain those visual gains with exact old decisions and FP32
+execution. A 128-unit student reads the healthy final features and last
+MLP activation. Low-margin inputs also use the updated two-block suffix,
+sharing the frozen prefix (Figure~\ref{fig:vit_shared_path}). The cutoff
+is fixed on training-only validation before the official test. On all
+10,000 CIFAR-100 test images, four references with three continuations
+each gain $\VisualGainTwo$ points
+$[\VisualGainTwoLow,\VisualGainTwoHigh]$ over the paired two-view student
+and $\VisualGainDouble$ $[\VisualGainDoubleLow,\VisualGainDoubleHigh]$
+over its doubled-epoch counterpart. The direct supervised MLP uses the
+same features, labels and training schedule; the gain over it is
+$\VisualGainSupervised$ points. Every old fine and coarse decision
+agrees. The current tail handles $\VisualRoutedPercent\%$ of inputs;
+the largest decision difference from the full joint teacher is
+$\VisualTeacherDifference\%$. Complete CPU forwards cost
+$\VisualCostOne/\VisualCostBatch\times$ at batches $1/128$.
+The pure student loses $0.97$ points from its teacher; selective
+computation closes that gap. In a retrospective equal-call comparison,
+fixed routing gains $0.63$ points $[0.51,0.75]$ over the exact random-routing
+expectation: the fixed gate captures $99.33\%$ of student--teacher
+decision differences (Appendix~\ref{app:vit_deployment}).
+
+\input{deployment_frontier_table.tex}
+
+Table~\ref{tab:deployment_frontier} places the retained-function programs
+alongside their learning gains and observed decision changes. The routed
+ViT result uses one pretrained checkpoint and one official test cohort;
+intervals are across four fitted-reference means. ResNet-18 still exceeds
+the batch-128 cost limit. Reduced-precision reference serving offers a
+different accuracy--cost tradeoff, evaluated separately with the FP32
+current function fixed (Appendix~\ref{app:served_frontier}).
+
+\section{Checking Compatibility Before Serving}\label{sec:standard}
+
+Evaluation has three objects: the features, the current task, and the existing
+consumer. We measure variation and decodability for the features, primary and
+auxiliary utility for learning, and the specified class or threshold outputs
+for compatibility. A repair has to meet its consumer target without giving up
+the utility that motivated the update.
+
+For a fixed corpus of $N$ inputs, let $f_0$ be the healthy consumer, $f$ a fixed candidate, and $R_T$ the mean $0$--$1$ error on subset $T$. For every assignment of labels,
 \begin{equation}
- F_w[g_a]=g_a-w\Pi_u g_a,\qquad w\in[0,1],
- \label{eq:stf}
+ R_T(f)-R_T(f_0)\le D_T(f,f_0),\qquad
+ D_T=|T|^{-1}\sum_{i\in T}\mathbf1\{f(x_i)\ne f_0(x_i)\}.
+ \label{eq:consumer_disagreement}
 \end{equation}
-The implemented selective arms transform the auxiliary input, $\widetilde H=H-wC_BHP$, using a frozen projector $P$ or a centered radial direction. The transformation changes the forward input as well as its gradient, while the auxiliary head continues training (Appendix~\ref{app:general}).
+The inequality is pointwise: error can increase only where predictions change,
+and it is sharp when the labels equal the healthy predictions. The bound is
+one-sided; large disagreement does not by itself imply harm.
 
-The calibrated arm freezes the warm-up probe and opens the gate when $\alpha\hat\rho\ge1$. The rank variant then selects
-\begin{equation}
- \mathrm{rank}_{\rm sel}=\min\{\mathrm{rank}\le \mathrm{rank}_{\max}:\alpha\hat\rho_{\rm res}[\mathrm{rank}]<1\},
- \label{eq:calrule}
-\end{equation}
-from nested candidate subspaces. If none passes, it uses the cap and records the unresolved residual. The radial arm is a separate intervention. Theorem~\ref{thm:minimalrank} gives the minimum deletion rank for a specified PSD operator; using an empirical PCA basis adds a basis-identification question. Gate calibration and subspace choice therefore need separate evaluation.
+When healthy predictions are available, this gives a label-free check. With
+$1{,}024$ monitor inputs we select the first member of a fixed repair hierarchy
+whose finite-corpus bound meets the budget, and otherwise abstain. Across
+$\ConsumerJointN$ joint endpoints, a $10$-point budget certifies
+$\ConsumerSelectedTen$, with $\ConsumerFalseSafeTen$ violations and
+$\ConsumerAbstainTen$ abstentions; a scatter heuristic makes
+$\ConsumerScatterFalseSafeTen$ false-safe declarations
+(Appendix~\ref{app:consumer_audit}). Where labels exist we also report negative
+flips~\citep{yan2021positive}, separating old-correct errors from useful
+corrections.
 
-\label{sec:conflict_ablations}
-The low-label SNR dose scan shows both the value and limits of filtering (Figure~\ref{fig:intervention}a,b). With $20\%$ primary labels, joint training is healthy at low dose but collapses in every seed from $\alpha=30$. Calibrated STF avoids collapse at every sampled dose and exceeds detachment by $0.5$--$1.0$ percentage points over $\alpha\in[15,100]$; the advantage disappears at extreme doses. This five-seed scan uses a different label budget from the fully labeled study in Appendix~\ref{app:rml_dose}.
-
-The fully labeled SNR comparison shows why clearing the scatter threshold is insufficient (Figure~\ref{fig:intervention}c). Detachment reaches $0.307$ accuracy with $0/10$ collapses. The radial arm reaches $0.199$ with $1/10$, and the rank-3 arm $0.211$ with $0/10$. Basis choice also changes how much auxiliary learning is removed: in HAR reconstruction, an auxiliary-gradient basis uses $30.75$ directions versus PCA's $62.0$ among the same four gate-open seeds, at similar accuracy (Table~\ref{tab:realbasis}).
-
-\label{sec:bmtl}\label{sec:bmtl_ablation}\label{sec:finance}
-At the controlled high doses, calibrated filtering reduces collapse from $10/10$ to $0/10$ on HAR, battery, and RadioML, and from $5/5$ to $0/5$ on CelebA Smiling~\citep{liu2015celeba}. With a Transformer at RadioML dose $3000$, joint training collapses in $10/10$ seeds at accuracy $0.156$; filtering gives $0/10$ collapses and relative scatter $0.970$. Reliable gate activation at these extreme doses coexists with the calibration errors in Figure~\ref{fig:probe_prediction}.
-
-
-\section{Evaluating a Shared Representation}\label{sec:standard}
-
-The evidence suggests three questions for evaluation: how did the features change, what task information remains decodable, and does the existing consumer still work? Algorithm~\ref{alg:survival_audit} combines these checks with the signed update audit.
-
-\begin{algorithm}[t]
-\caption{Auditing representation survival and probe validity}\label{alg:survival_audit}
-\begin{algorithmic}[1]
-\REQUIRE Diagnostic batch, healthy reference, checkpoint $\theta$, operating losses and dose $\alpha$, recorded calibration value $q$.
-\STATE Report task metrics, covariance trace $2V$, effective rank, standardized linear probe, and the declared operational scatter criterion.
-\STATE Audit healthy-readout accuracy/NLL/ECE, mean/global/per-feature repairs, and any paired alignment; compare with a refitted probe.
-\STATE With unlabeled monitor inputs and healthy reference predictions, bound consumer disagreement; select a certified candidate or abstain.
-\STATE Report gradient-flow fluxes $(r,c)$ from \eqref{eq:signed_variance}. For Adam, audit $v^\top s_\theta$ and the actual post-step $V$ change; specify any auxiliary counterfactual.
-\STATE Record $1-\alpha q$, the signed balance $\psi=d-\alpha a$, and the corresponding residuals. Form $q^\star=a/d$ only when $d\ne0$.
-\IF{$|1-\alpha q|>\Delta$}
-\STATE Mark the gradient-flow sign locally certified for this batch.
-\ELSE
-\STATE Use the signed audit; report restoration misalignment, geometry, and probe mismatch separately.
-\ENDIF
-\STATE Compare joint training, detachment, and any selective intervention using both survival and task utility at matched doses and seeds.
-\end{algorithmic}
-\end{algorithm}
-
-When $\Delta$ exceeds the probe margin, the unsigned decision remains unresolved. The signed audit attributes its current error to restoration alignment, encoder geometry, discarded sign, or calibration mismatch. Repeating the same unsigned ratio cannot separate these effects.
-
-The intervention comparison also needs both compatibility and task utility. A rank-3 SNR filter can pass the scatter criterion while underperforming detachment; the low-label radial filter can lose its advantage at extreme doses. An open gate alone says little about the quality of the selected subspace.
-
-For a present checkpoint, unlabeled inputs can support a conservative consumer decision. On a fixed corpus, the increase in classification error is bounded by disagreement with healthy predictions. We sample $1{,}024$ monitor inputs, select the first candidate in a fixed repair hierarchy whose disagreement bound meets the budget, and otherwise abstain. Across $\ConsumerJointN$ joint endpoints, a $10$-percentage-point budget certifies $\ConsumerSelectedTen$, with $\ConsumerFalseSafeTen$ observed violations and $\ConsumerAbstainTen$ abstentions; a healthy-reference scatter heuristic makes $\ConsumerScatterFalseSafeTen$ false-safe declarations (Appendix~\ref{app:consumer_audit}).
-
-The checks have different scopes. The signed flux diagnoses the current gradient-flow direction; Adam needs its applied increment. The STF gate is an empirical calibration rule. The disagreement bound covers the fixed checkpoint family and unmonitored corpus remainder, with access to healthy predictions; it leaves changed populations and future updates open. The CNN and single-encoder controls likewise limit the evidence for broadly useful, inexpensive protection.
+Early logits can also guide a pending upgrade. On CIFAR-10, an epoch-two
+monitor flags $15/17$ later budget exceedances and clears all seven safe
+updates. A fixed replay policy stays within $5\%$ disagreement on all
+24 held-out cases. RadioML trajectory forecasts reduce terminal-risk error
+from $2.87$ to $2.25$ points relative to a schedule-aware baseline;
+the corresponding advantage is uncertain on subject-disjoint HAR.
+These forecast studies and cheaper legacy-path experiments are reported
+in Appendices~\ref{app:cached_anchor_risk}--\ref{app:legacy_precision}
+and~\ref{app:subject_transfer}. They extend the interface audit to release
+decisions; the main serving results above use fixed, completed updates.
 
 \section{Related Work}\label{sec:related}
 
-Multi-task learning~\citep{caruana1997multitask} and task grouping~\citep{standley2020tasks} ask when shared training helps. PCGrad and CAGrad address gradient conflict~\citep{yu2020pcgrad,liu2021cagrad}; MGDA, Nash-MTL, and FAMO optimize Pareto, bargaining, or progress-balancing criteria~\citep{sener2018multi,navon2022multi,liu2023famo}. Other methods adapt task-gradient geometry or loss weights~\citep{senushkin2023aligned,liu2021imtl,chen2018gradnorm,kendall2018multi,wang2021gradient,limarenko2026gcond,zhou2025imgrad}. We add the variance gradient to this picture: task-gradient relations alone leave the sign of variance change unidentified.
+Backward-compatible learning treats the readout as an
+interface~\citep{shen2020backward,hu2022backward}. Positive-congruent
+training targets negative flips~\citep{yan2021positive}. Weight interpolation
+changes the current function~\citep{schumann2023bcwi}, while BC-Aligner
+fits an encoder and backward map jointly. Unlabeled alignment also repairs
+stale language-model monitors~\citep{duan2026staleness}. We test repairs
+against class and confidence contracts. Related tools include model
+stitching~\citep{bansal2021stitching,mai2026stitching,smith2025functional},
+moment adaptation~\citep{li2016adabn,gomezvilla2024ldc,sun2016coral,wang2021tent},
+calibration and unlabeled risk estimation~\citep{guo2017calibration,ovadia2019trust,garg2022unlabeled,zhao2023pitfalls}.
 
-Backward-compatible representation learning explicitly studies model-version compatibility~\citep{shen2020backward}, including jointly trained transformations~\citep{hu2022backward}. We examine the scale-sensitive component of compatibility loss during auxiliary updates. CORAL-style covariance alignment~\citep{sun2016coral}, paired linear alignment, calibration under shift~\citep{guo2017calibration,ovadia2019trust}, normalization~\citep{ioffe2015batchnorm}, and linear probes~\citep{alain2016probe} provide established diagnostic controls. Negative transfer~\citep{wang2019negative} concerns task performance; here the old readout can fail while a current or refitted head succeeds. Our fixed-corpus consumer check complements work on unlabeled performance estimation~\citep{garg2022unlabeled} and update certification~\citep{usama2026envelopes} through reference disagreement and abstention.
+Multi-task learning and task grouping ask when shared training
+helps~\citep{caruana1997multitask,standley2020tasks}. PCGrad and CAGrad address
+gradient conflict~\citep{yu2020pcgrad,liu2021cagrad}. Pareto, bargaining and
+progress-balancing methods choose different update
+directions~\citep{sener2018multi,navon2022multi,liu2023famo}. The applied
+step's projection onto the variance gradient determines local contraction.
 
-Self-supervised learning studies collapse through stop-gradient mechanisms~\citep{grill2020bootstrap,chen2021simsiam,caron2021emerging}, variance and covariance regularization~\citep{zbontar2021barlow,bardes2022vicreg,ermolov2021whitening}, and spectral dynamics~\citep{jing2022understanding,dong2021attention,kim2025taxonomy}. RankMe evaluates representations by effective rank~\citep{garrido2023rankme}. Our observable is variation across examples, distinct from terminal classifier geometry in neural collapse~\citep{papyan2020prevalence,wang2026neuralcollapse}. Input repair shows how reduced variation can coexist with retained decodability and lost readout compatibility.
+Self-supervised work studies collapse through stop-gradient
+mechanisms~\citep{grill2020bootstrap,chen2021simsiam,caron2021emerging},
+variance regularization~\citep{zbontar2021barlow,bardes2022vicreg,ermolov2021whitening}
+and spectral measures~\citep{jing2022understanding,dong2021attention,kim2025taxonomy,garrido2023rankme}.
+We measure variation across examples and use input repair to test
+decodability after contraction.
 
-Auxiliary-gradient projection~\citep{dery2021attittud,zhu2025gradops}, auxiliary selection~\citep{navon2021auxiliary,jiang2023forkmerge,shin2024dgr}, weight-space nullspace adaptation~\citep{pham2026ness}, and mergeable frozen-backbone updates~\citep{hu2022lora} provide the context for our intervention controls. Activity recognition~\citep{ucihar}, modulation recognition~\citep{radioml}, and battery health~\citep{nasa_battery,severson2019data,attia2020closed,pradhan2022soh} provide the test domains. We use these controls to measure compatibility, useful adaptation, and cost.
+Our intervention controls build on auxiliary-gradient projection~\citep{dery2021attittud,zhu2025gradops}, auxiliary selection~\citep{navon2021auxiliary,jiang2023forkmerge,shin2024dgr}, and nullspace
+constraints~\citep{pham2026ness,fang2025alphaedit}. We test activity and
+modulation recognition~\citep{ucihar,radioml} and battery health~\citep{nasa_battery,severson2019data,attia2020closed,pradhan2022soh}.
+
+DeltaCNN reuses sparse activation differences~\citep{parger2022deltacnn}.
+LoRA and adapter serving share base parameters~\citep{hu2022lora,chen2024punica,sheng2024slora}.
+Progressive networks and side-tuning retain frozen paths
+while training new capacity~\citep{rusu2016progressive,zhang2020sidetuning,sung2022lst}.
+Confidence cascades allocate computation adaptively~\citep{bolukbasi2017adaptive}.
+We use these tools to separate two requirements: retaining the complete
+old consumer function and recovering the benefit of an updated model.
+The old path supplies the first; paired learning controls and measured
+serving costs test the second. Our replay shares computations across
+two versions on the same input.
+The frozen-feature controls also address distortion from
+fine-tuning~\citep{kumar2022finetuning}.
 
 \section{Conclusion}\label{sec:conclusion}
 
-An accurate current head can conceal a broken existing readout. Matched continuation and fixed input repairs expose this gap, with exact affine boundaries explaining its scale-sensitive component. Signed audits identify what gradient alignment and unsigned probes miss. The SNR confirmation shows that auxiliary benefit and unchanged old logits can coexist, while the single-encoder controls expose the cost of preserving both. Shared-representation evaluation should therefore measure what new features can predict and whether existing readouts can still use them.
+Task information can survive an update that invalidates an existing readout.
+Scale correction can recover the old interface, and exact replay can keep
+it in service while the encoder learns. The decisions an upgrade preserves
+and the cost of serving them deserve the same scrutiny as its task accuracy.
 
 \clearpage
 \section*{AI Use Statement}
 Generative AI tools assisted with drafting, language editing, code, literature retrieval, proof development, and figure design. The new diagnostic identities were checked with executable numerical examples; assumptions are stated explicitly with each claim and in Appendix~\ref{app:proofs}. Figures are drawn from recorded experimental results. The authors remain responsible for verifying the final text, claims, code, and artifacts.
 
 \section*{Ethics Statement}
-We use existing datasets: UCI-HAR, RadioML2016.10A, the NASA PCoE and MATR battery archives, public A-share market data, NYUv2, and CelebA. We collected no new human-subject data. The HAR identity auxiliary is evaluated as a training-head probe, not a held-out privacy attack. Battery prediction is safety-relevant; Section~\ref{sec:negatives} describes the observed limitations, and deployment requires task-specific validation.
+We use existing datasets: UCI-HAR, RadioML2016.10A, the NASA PCoE and MATR battery archives, public A-share market data, NYUv2, CelebA, CIFAR-10 and CIFAR-100, with ImageNet-pretrained vision weights. We collected no new human-subject data. The HAR identity auxiliary is evaluated as a training-head probe, not a held-out privacy attack. Battery prediction is safety-relevant; Appendix~\ref{sec:negatives} describes the observed limitations, and deployment requires task-specific validation.
 
 
 \section*{Reproducibility Statement}
-The artifact contains theoretical assumptions, code, per-seed records, the fixed development/confirmation plan, checkpoint and consumer replays, scale-boundary checks, actual-step audits, and the corrected battery protocol. Historical battery checkpoint selection and readout calibration are exploratory. The anonymized repository supplies released code and earlier records: \url{https://github.com/code-2026l/RepFix}.
+The supplementary archive contains theoretical assumptions, source code,
+per-seed records, fixed development/confirmation plans, scale-boundary checks,
+actual-step audits and the corrected battery protocol. The separate numerical
+archive supplies the compact tensors used in result replay. Historical battery
+checkpoint selection and readout calibration are exploratory.
 
 \bibliographystyle{iclr2027_conference}
-\bibliography{RepFix_ICLR2027}
+\bibliography{RepFix_ICLR2027,contrastive_visual_references}
 
 
 % ═══════════════════════════════════════════════════════════════════
@@ -333,8 +511,21 @@ The artifact contains theoretical assumptions, code, per-seed records, the fixed
 \clearpage
 \appendix
 
+The supplementary material is organized by question. Readout crossings and
+update geometry are developed in Appendices~\ref{app:boundary_proof}
+and~\ref{app:proofs}. Matched continuation, repairs and their failure cases
+are in Appendix~\ref{app:moved}. Shared computation and serving controls
+begin at Appendix~\ref{app:frontier_extension}; the matched RadioML and
+official-test vision programs are in Appendices~\ref{app:rml_one_pass}
+and~\ref{app:vit_deployment}. Complete development grids and recorded
+protocols accompany the source artifact.
+
 
 \section{Proofs and Audit Details for the Diagnostic Boundary}\label{app:boundary_proof}
+
+\input{unsigned_probe_details.tex}
+
+\input{local_probe_boundary.tex}
 
 
 Let $\theta\in\mathbb R^2$, $v_0=-e_1+\beta e_2$, and $z(\theta)=v_0+\theta$.
@@ -374,10 +565,8 @@ certificate costs $20.7$\,s, a factor of $69.6$
 (\texttt{results/CERTCOST/}). The trace enters only through the canonical scale:
 an envelope at any other $k$, including the per-checkpoint minimizer of
 Table~\ref{tab:probe_arms}, needs the exact flux and the head-level gradients but
-no trace of $K$. The certificate is therefore an offline audit, not a
-cheap substitute for measuring the flux; the cheap object in the deployed rule is
-the probe $q$. Its purpose is to identify why the cheap decision can or cannot be
-transported to an operating checkpoint.
+no trace of $K$. The certificate is an offline audit of the deployed probe $q$: it identifies
+which terms prevent transporting that cheap decision to the operating checkpoint.
 The archive contains cheap proxies and intervention outcomes for $405$ HAR checkpoints. The frozen predictor agrees in sign with the exact variance derivative on $51\%$. Its sufficient certificate fires on $2$ checkpoints at the trace-normalized scale $k=\operatorname{tr}(K)/(Bm)$ and $15$ under per-checkpoint scale optimization, with no incorrect firing.
 
 The signed balance $\psi=d-\alpha a$ replaces the unsigned loading and primary-norm reference with directional quantities. When $d\ne0$, it equals $d(1-\alpha q^\star)$ with $q^\star=a/d$. Sign agreement rises to $58\%$ overall and $61\%$ at positive dose. Computing the balance needs the same two head-level backward passes as the original probe; certifying it additionally needs the exact flux.
@@ -473,7 +662,7 @@ Corollary~\ref{cor:transport} requires the frozen margin to exceed the current e
 \label{fig:probe_phase}
 \end{figure}
 
-Figure~\ref{fig:probe_phase} shows how closely the margin approaches the transport envelope. The $14$ certified checkpoints in (a) lie just above it; the margin/envelope ratio in (b) has median $0.86$ and upper quartile $0.996$. Across the $27$ width--dose cells in (c), sign agreement is $0.56$ above median restoration alignment and $0.47$ below it. Signed mismatch $|a-q|$ varies largely independently of $d$ (log-scale correlation $-0.05$). Panel (d) compares $|\mathcal E|$ and the minimum envelope at the same per-checkpoint scale, with median ratio $0.885$. Matching the normalization is essential to interpreting envelope tightness. These archive associations describe where the offline audit is informative; they leave prospective performance to a separate evaluation.
+Figure~\ref{fig:probe_phase} shows how closely the margin approaches the transport envelope. The $14$ certified checkpoints in (a) lie just above it; the margin/envelope ratio in (b) has median $0.86$ and upper quartile $0.996$. Across the $27$ width--dose cells in (c), sign agreement is $0.56$ above median restoration alignment and $0.47$ below it. Signed mismatch $|a-q|$ varies largely independently of $d$ (log-scale correlation $-0.05$). Panel (d) compares $|\mathcal E|$ and the minimum envelope at the same per-checkpoint scale, with median ratio $0.885$. Matching the normalization is essential to interpreting envelope tightness. These associations locate the informative region of the retrospective audit.
 
 For $K=I$, the local condition is $d-\alpha a<0$.
 Take $d=0.1$, $a=q=0.2$, and $\alpha=1$: the nominal gate is closed while
@@ -576,9 +765,11 @@ another expands. This permits task performance on a surviving direction
 without preserving the full representation. The NYUv2 result is compatible
 with this mechanism but does not identify its dynamical eigenvectors.
 
+\input{probe_scope_controls.tex}
+
 \section{Detailed Intervention Comparisons}\label{app:intervention_details}
 
-This section collects the per-method intervention comparisons (Table~\ref{tab:conflict}) and the cross-domain diagnostics (Figure~\ref{fig:unified}).
+\input{filter_interventions.tex}
 
 \begin{table}[t]
 \centering
@@ -664,7 +855,7 @@ RadioML SNR regression & $3000$ & $.205$ ($1.0$) & $\mathbf{.307}$ ($\mathbf{0.0
 
 The battery application uses a temporal encoder with a mixer and gated state-space block, feeding SOH, RUL, reconstruction, and distributional heads. The corrected protocol keeps train, validation, and test cells disjoint, selects checkpoints on validation SOH, and separates observed-lifetime MAE from censored shortfall. Across ten initializations, detachment minus joint training is $-3.47$ SOH percentage points (95\% $t$ interval $[-4.20,-2.74]$) and $-34.8$ observed-RUL cycles ($[-57.8,-11.8]$). These intervals describe initialization variability on the fixed split.
 
-On this MATR protocol~\citep{severson2019data}, detachment improves SOH RMSE from $5.57$ to $2.10$ percentage points and observed-RUL MAE from $81.5$ to $46.7$ cycles (Table~\ref{tab:bmtl_corrected}); selective filtering gives no further improvement. Joint training has relative covariance trace $3.55$, so the gain is a negative-transfer result without representation contraction. The rank arm's large trace and low participation rank also illustrate why amplitude and diversity need separate measurement. Checkpoint selection and censoring-aware evaluation changed together relative to the historical protocol; their individual contributions to the changed ranking remain unresolved.
+On this MATR protocol~\citep{severson2019data}, detachment improves SOH RMSE from $5.57$ to $2.10$ percentage points and observed-RUL MAE from $81.5$ to $46.7$ cycles (Table~\ref{tab:bmtl_corrected}); selective filtering gives no further improvement. Joint training has relative covariance trace $3.55$, so the gain is a negative-transfer result without representation contraction. The rank arm's large trace and low participation rank also illustrate why amplitude and diversity need separate measurement. Checkpoint selection and censoring-aware evaluation changed together, so their separate contributions to the new ranking are unknown.
 
 Figure~\ref{fig:unified} collects the dose sweeps, width crossings, NYUv2 gate boundary, intervention counts, and financial outcomes. Width changes both empirical crossing locations and probe calibration~\citep{yang2021feature}; Appendix~\ref{app:proofs} examines their scaling separately.
 
@@ -675,16 +866,16 @@ Figure~\ref{fig:unified} collects the dose sweeps, width crossings, NYUv2 gate b
 \label{fig:unified}
 \end{figure}
 
-The remaining appendices give the financial application (Appendix~\ref{app:finance}), proofs and scaling analysis (Appendix~\ref{app:proofs}), operator and sampling results (Appendix~\ref{app:general}), protocols (Appendix~\ref{app:tables}), NYUv2 (Appendix~\ref{app:nyu}), supplementary experiments (Appendix~\ref{app:moved}), and regularization baselines (Appendix~\ref{app:reg}).
-
+\FloatBarrier
 \section{Financial Ranking Application}\label{app:finance}
 
 The motivating observation came from multi-task equity selection. A production model shared an encoder of A-share factors across pairwise ranking, distributional (MDN~\citep{bishop1994mixture}), reconstruction (AE), and view-contrastive (SCARF-style~\citep{bahri2022scarf}) heads. After deployment, predicted rankings became nearly constant under the unchanged training objective: cross-sectional prediction spreads fell by approximately $93\%$ relative to validation while individual training losses stayed low. The observation prompted us to measure feature and prediction variation alongside loss; identifying its cause required the controlled studies.
 
-The separate financial experiment uses walk-forward training with real distributional, reconstruction, and contrastive heads. Its R5fin records set \texttt{fixed\_aux=0}, so Table~\ref{tab:finance_repair} evaluates real auxiliaries. Across ten folds and ten initialization seeds, mean out-of-sample (OOS) rank-IC is $0.060$ for joint training, $0.036$ for detachment, $0.063$ for the hard gate, and $0.056$ for the soft gate. Averaging seeds within each fold gives paired differences from joint of $-0.0237$, $+0.0029$, and $-0.0042$. Two-sided Wilcoxon $p$ values are $0.037$, $0.432$, and $0.695$; none survives Holm correction across the three comparisons. Dependence between temporal folds makes these sensitivity analyses. Detachment is costly in this sample, while a benefit from retaining a particular subspace remains unresolved. Script \texttt{finance\_fold\_audit.py} reproduces the comparisons from all 40 source files.
+The separate financial experiment uses walk-forward training with real distributional, reconstruction, and contrastive heads. Its R5fin records set \texttt{fixed\_aux=0}, so Table~\ref{tab:finance_repair} evaluates real auxiliaries. Across ten folds and ten initialization seeds, mean out-of-sample (OOS) rank-IC is $0.060$ for joint training, $0.036$ for detachment, $0.063$ for the hard gate, and $0.056$ for the soft gate. Averaging seeds within each fold gives paired differences from joint of $-0.0237$, $+0.0029$, and $-0.0042$. Two-sided Wilcoxon $p$ values are $0.037$, $0.432$, and $0.695$; none survives Holm correction across the three comparisons. Temporal folds are dependent, so these comparisons are sensitivity analyses. Detachment costs accuracy in this sample, and no retained subspace shows a benefit. Script \texttt{finance\_fold\_audit.py} reproduces the comparisons from all 40 source files.
 
 In the separate synthetic testbed, initialization probes give $\rho=0.74\pm0.19$ over 12 seeds and predicted critical weight $\alpha_c=\langle1/\rho\rangle=1.45\pm0.37$, consistent with the observed onset. Other domains use the projected-gradient diagnostic of Definition~\ref{def:toxicity}, but its numerical value depends on the task, encoder, and calibration time.
 
+\FloatBarrier
 \section{Proofs and Additional Analysis}\label{app:proofs}
 
 \subsection{Statements Deferred from the Main Text}
@@ -784,7 +975,7 @@ All eigenvalues scale by $1-\lambda$; solve the displayed inequality. This state
 \end{proof}
 
 \begin{theorem}[Annihilation by orthogonal compression]\label{thm:filters}
-Let $T\succeq0$, $U=\mathrm{range}(T)$, and $Q=I-P_S$ be an orthogonal projector. Then $QTQ=0$ iff $U\subseteq S$. Among such deletions the unique smallest deleted subspace is $U$, and $I-P_U$ preserves its orthogonal complement. This is an algebraic statement about two-sided compression.
+Let $T\succeq0$, $U=\mathrm{range}(T)$, and $Q=I-P_S$ be an orthogonal projector. Then $QTQ=0$ iff $U\subseteq S$. Among such deletions the unique smallest deleted subspace is $U$, and $I-P_U$ preserves its orthogonal complement.
 \end{theorem}
 \begin{proof}
 $QTQ=(T^{1/2}Q)^\top(T^{1/2}Q)=0$ iff $\mathrm{range}(Q)\subseteq\ker T$, equivalently $U\subseteq S$. A general one-sided backward operator $QT$ need not describe symmetric neural-network dynamics; a signed filter can even reverse contraction, so its operator norm cannot supply the missing implication.
@@ -798,7 +989,7 @@ If $\|P_U-P_{\hat U}\|\le\epsilon$ and $Q=I-P_{\hat U}$, then
 \end{equation}
 \end{corollary}
 \begin{proof}
-Use $T=P_UTP_U$ and $\|QP_U\|\le\epsilon$ on one or both sides. Whitening must precede this argument if $T$ is restoration-normalized; an angle bound in other coordinates is insufficient. These are upper bounds on residual magnitude, not evidence of a nonzero residual or inevitable failure at a finite dose.
+Use $T=P_UTP_U$ and $\|QP_U\|\le\epsilon$ on one or both sides. Whitening must precede this argument if $T$ is restoration-normalized; an angle bound in other coordinates is insufficient. The bounds concern residual magnitude, not the existence of a residual.
 \end{proof}
 
 \begin{theorem}[Minimum rank for a PSD compression]\label{thm:minimalrank}
@@ -821,11 +1012,11 @@ The theorem concerns a specified operator, not a mean of gradient-norm ratios. F
 C_g=\mathbb E\!\left[\frac{g_ag_a^\top}{(\|g_p\|+\varepsilon)^2}\right]
 =W^\top\mathbb E\!\left[\frac{\delta\delta^\top}{(\|g_p\|+\varepsilon)^2}\right]W.
 \]
-For any rank-$r$ projector $P$, the squared residual is $\operatorname{tr}((I-P)C_g)$, minimized by the top $r$ eigenvectors of $C_g$ (the Rayleigh--Ritz principle). Its square root upper-bounds the corresponding mean norm by Jensen's inequality. It does not generally minimize that mean itself. Hessian eigenvectors coincide with this basis under isotropic weighted residual covariance; representation PCA requires its leading subspace to coincide with the leading eigenspace of $C_g$. Commutation gives a common eigenbasis but does not ensure the same ordering. A nonlinear decoder additionally contributes residual-weighted second derivatives to its Hessian. Thus a nearly flat PCA residual curve is consistent with gradient energy outside leading representation components, but does not prove that the reconstruction residual is orthogonal to those components.
+For any rank-$r$ projector $P$, the squared residual is $\operatorname{tr}((I-P)C_g)$, minimized by the top $r$ eigenvectors of $C_g$ (the Rayleigh--Ritz principle). Its square root upper-bounds the corresponding mean norm by Jensen's inequality. It does not generally minimize that mean itself. Hessian eigenvectors coincide with this basis under isotropic weighted residual covariance; representation PCA requires its leading subspace to coincide with the leading eigenspace of $C_g$. Commutation gives a common eigenbasis but does not ensure the same ordering. A nonlinear decoder additionally contributes residual-weighted second derivatives to its Hessian. A nearly flat PCA residual curve is therefore consistent with gradient energy outside leading representation components, without establishing orthogonality of the reconstruction residual to those components.
 
 Table~\ref{tab:doserank} gives the variance-shrinkage rank sweep. For real HAR reconstruction at $\alpha=12$, auxiliary-gradient and PCA bases give mean candidate ranks $22.6$ and $57.0$. Both gates open in four of ten seeds, with active ranks $30.75$ and $62.0$ at similar aggregate accuracy (Table~\ref{tab:realbasis}). This comparison isolates basis sensitivity. The artifact also includes the three-seed RMS-basis pilot and its negative accuracy result.
 
-In the ten-seed battery cap32 experiment, \texttt{stfcalrank} reaches its cap in every seed and gives SOH RMSE $5.26$, versus $5.24$ for joint training. The larger cap therefore does not establish minimum-rank protection. A single-seed full-depth audit gives representation covariance traces $3.131$, $4.065$, $0.906$, and $0.821$ for joint training, detachment, the radial calibrated arm, and the rank arm, respectively, versus $1.147$ for the SOH-only reference. Corresponding normalized SOH prediction variances are $0.00826$, $0.01380$, $0.01253$, and $0.01019$, versus $0.01379$. These distinct quantities establish neither representation recovery nor constant predictions. Historical checkpoints were selected on the evaluation split and remain exploratory. The corrected cell-disjoint protocol fits preprocessing on training cells and evaluates test data after validation-based checkpoint selection.
+In the ten-seed battery cap32 experiment, \texttt{stfcalrank} reaches its cap in every seed and gives SOH RMSE $5.26$, versus $5.24$ for joint training. The larger cap therefore does not establish minimum-rank protection. A single-seed full-depth audit gives representation covariance traces $3.131$, $4.065$, $0.906$, and $0.821$ for joint training, detachment, the radial calibrated arm, and the rank arm, respectively, versus $1.147$ for the SOH-only reference. Corresponding normalized SOH prediction variances are $0.00826$, $0.01380$, $0.01253$, and $0.01019$, versus $0.01379$. These quantities separate variance from prediction spread and establish neither representation recovery nor constant predictions. Historical checkpoints were selected on the evaluation split and remain exploratory. The corrected cell-disjoint protocol fits preprocessing on training cells and evaluates test data after validation-based checkpoint selection.
 
 Forward and backward-only filters differ even when their Jacobians agree. For fixed $U$, let $\widetilde H_f=H-C_BHUU^\top$ and $\widetilde H_b=\operatorname{sg}(H)+D-C_BDUU^\top$, where $D=H-\operatorname{sg}(H)$ and $\operatorname{sg}$ stops gradients. Both induce the backward map $G\mapsto G-C_BGUU^\top$, but only $\widetilde H_b$ preserves the auxiliary input. Consequently, the loss gradients are evaluated at different forward values and need not produce the same update. Even at full rank, both retain a batch-mean gradient channel, unlike full detachment.
 
@@ -835,7 +1026,7 @@ A complementary experimental intervention uses $v=\nabla_\theta V$, proposed upd
 \[
 u^\star=u_0-\frac{(v^\top u_0-kh)_+}{\|v\|^2}v.
 \]
-The KKT conditions prove this Euclidean halfspace projection. Under a well-defined continuous flow, $\dot h\ge-kh$ preserves feasibility on this \emph{fixed batch}. At $v=0$ feasibility requires $kh\ge0$. Discrete updates require checking the actual post-step variance: the supplied SGD implementation backtracks and restores parameters on failure. The argument covers neither unseen data nor Adam without modeling its applied update. This applies established constrained-gradient ideas~\citep{allibhoy2024safe}, without claiming halfspace projection as novel; empirical benefits remain to be established.
+The KKT conditions prove this Euclidean halfspace projection. Under a well-defined continuous flow, $\dot h\ge-kh$ preserves feasibility on this \emph{fixed batch}. At $v=0$ feasibility requires $kh\ge0$. Discrete updates require checking the actual post-step variance: the supplied SGD implementation backtracks and restores parameters on failure. The argument covers neither unseen data nor Adam without modeling its applied update. The projection is the established constrained-gradient construction~\citep{allibhoy2024safe}; its empirical benefit is untested here.
 
 Table~\ref{tab:attenuation} compares deletion with positive attenuation on UCI-HAR ($m=64$, sixty epochs). The calibrated multiplier uses the unprojected mean gradient ratio, so its $c=1$ is a calibration setting rather than an identified dynamical threshold. The $c=0.1$ setting is competitive with the tested fixed multipliers. This exploratory grid has three seeds per configuration and includes non-finite runs. At $\alpha=300$, seed $0$ diverges for every arm, including detachment, whose auxiliary heads still train during detached warm-up. We record numerical divergence separately from representation collapse.
 
@@ -994,7 +1185,7 @@ The corrected battery protocol uses cell-disjoint train/validation/test partitio
 \label{alg:stf}
 \begin{algorithmic}[1]
 \STATE \textbf{Input:} domain data $\mathcal{D}$, encoder width $m$, toxicity schedule $\{\alpha\}$, seeds
-\STATE \textbf{Phase 1 -- health anchor:} train the single-task encoder ($\alpha=0$), record healthy scatter $\mathcal{S}_{single}=\mathcal{S}_h(\theta^*)$ and healthy spectral ratio $\rho_0$.
+\STATE Phase 1 -- health anchor: train the single-task encoder ($\alpha=0$), record healthy scatter $\mathcal{S}_{single}=\mathcal{S}_h(\theta^*)$ and healthy spectral ratio $\rho_0$.
 \STATE \textbf{Phase 2 -- calibration:} sweep $\alpha$ with mode \textsc{joint}; record $\rho$, relative scatter $\mathcal{S}_h/\mathcal{S}_{single}$, collapse flag; locate $\alpha_c$ by the threshold crossing.
 \STATE \textbf{Phase 3 -- repair:} at a selected dose, train each arm on $L_p(H)+\alpha L_a(\widetilde H)$, using its specified forward map $\widetilde H$ (or detached $H$ for \textsc{stf-0}); backpropagate this loss and monitor the gradient diagnostic and relative scatter.
 \STATE \textbf{Report:} collapse rate, recovery rate, $\rho$, $\mathcal{S}_h/\mathcal{S}_{single}$.
@@ -1200,7 +1391,7 @@ FAMO & $+31.0\%$ & $+31.1\%$ & $+23.9\%$ & $+19.6\%$ \\
 
 \section{NYUv2: Dense Perception Beyond Time Series}\label{app:nyu}
 
-NYUv2~\citep{silberman2012indoor,ladicky2014pulling} contains 795 training and 654 test scenes with semantic segmentation (13 classes), depth, and surface normals. Images are resized to $144\times192$; segmentation pixels labeled $-1$ and zero-norm normal targets are masked. The convolutional encoder uses four stride-2 blocks with batch normalization and ReLU ($3\to32\to64\to128\to256$ channels), followed by a $d=128$ representation and linear task heads. Losses are cross-entropy, $L_1$ depth error, and cosine normal error. We report final-epoch pixel accuracy, mIoU, depth RMSE/MAE, and mean angular error over ten seeds, without test-based checkpoint selection. The \emph{proj} auxiliary is a fixed random variance-shrinkage projection to $d/4$, evaluated at $\alpha=1$. The \emph{ae} auxiliary is a trainable three-layer input-reconstruction head, evaluated at $\alpha=250$, or $3.4$ times its probe-based threshold. A separate unified-protocol experiment uses an MLP and a $9\times12$ coarse depth grid (108 outputs), with the optimizer, probe, and collapse criterion of Section~\ref{sec:unified_protocol}.
+NYUv2~\citep{silberman2012indoor,ladicky2014pulling} contains 795 training and 654 test scenes with semantic segmentation (13 classes), depth, and surface normals. Images are resized to $144\times192$; segmentation pixels labeled $-1$ and zero-norm normal targets are masked. The convolutional encoder uses four stride-2 blocks with batch normalization and ReLU ($3\to32\to64\to128\to256$ channels), followed by a $d=128$ representation and linear task heads. Losses are cross-entropy, $L_1$ depth error, and cosine normal error. We report final-epoch pixel accuracy, mIoU, depth RMSE/MAE, and mean angular error over ten seeds, without test-based checkpoint selection. The \emph{proj} auxiliary is a fixed random variance-shrinkage projection to $d/4$, evaluated at $\alpha=1$. The \emph{ae} auxiliary is a trainable three-layer input-reconstruction head, evaluated at $\alpha=250$, or $3.4$ times its probe-based threshold. A separate unified-protocol experiment uses an MLP and a $9\times12$ coarse depth grid (108 outputs), with the optimizer, probe, and collapse criterion of Appendix~\ref{sec:unified_protocol}.
 
 After four detached warm-up epochs, the unified MLP probe gives $\hat\rho=2.26\pm0.16$, $2.01\pm0.10$, $1.64\pm0.09$, and $1.29\pm0.05$ at widths $32,64,128,256$. Per-seed ranges are $2.06$--$2.65$, $1.90$--$2.20$, $1.51$--$1.77$, and $1.22$--$1.38$. The inverse-mean calibration values are $0.44$, $0.50$, $0.61$, and $0.78$, yielding a probe-based width slope of $0.27$ ($R^2=0.98$, 95\% CI $[+0.15,+0.40]$).
 
@@ -1274,7 +1465,7 @@ joint3 (no aux) & 0.356 & 0.100 & 1.130 & 0.586 & 7.30 \\
 \label{fig:probe_prediction}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/fig_diagnostic_intervention.pdf}
 \caption{Filtering can retain an auxiliary gain, but scatter protection alone is insufficient. RadioML SNR regression, width $64$. (a,b) With $20\%$ primary labels, STF exceeds detachment at intermediate doses; the gain disappears at extreme doses despite scatter above $0.3$. Five unique seeds per dose; bands show seed SD and crosses mark at least one collapsed joint run. (c) In the separate fully labeled dose-$3000$ protocol, rank-3 filtering avoids collapse in all ten seeds but underperforms detachment. Small points are seeds; large points and bars show means and SD. The dotted line marks the $0.3$ criterion.}
@@ -1325,9 +1516,10 @@ Battery & log-SOH RMSE & $1.0$ / $0.0$ & $0.0$ / $1.0$ & $0.0$ / $1.0$ & $0.0$ /
 \end{tabular}}
 \end{table}
 
-The battery encoder maps a per-cycle window $x\in\mathbb R^{T\times D}$ of normalized voltage, current, temperature, and resistance to $h\in\mathbb R^d$. It combines a \textsc{TSMixer} feature/temporal-mixing block~\citep{ekambaram2023tsmixer} with a gated state-space block~\citep{gu2022s4,gu2023mamba}. SOH ($L_2$), RUL ($L_1$), reconstruction, and distributional heads share this representation. The real auxiliary heads are evaluated empirically and are not assumed to satisfy Definition~\ref{def:degmin}.
+\clearpage
+The battery encoder maps a per-cycle window $x\in\mathbb R^{T\times D}$ of normalized voltage, current, temperature, and resistance to $h\in\mathbb R^d$. It combines a \textsc{TSMixer} feature/temporal-mixing block~\citep{ekambaram2023tsmixer} with a gated state-space block~\citep{gu2022s4,gu2023mamba}. SOH ($L_2$), RUL ($L_1$), reconstruction, and distributional heads share this representation. The empirical real-head studies complement the degenerate-minimum model of Definition~\ref{def:degmin}.
 
-RUL targets require careful handling of right censoring. If a cell has not reached end of life when recording stops, its remaining lifetime is known only to exceed a lower bound. Treating that bound as an exact target can label a healthy cell with zero remaining life. In MATR, $59.2\%$ of samples are censored and $96/185$ cells do not reach EOL within their records. Initialization zeros in summary arrays cause a further $48/185$ cells to receive an EOL index of zero under a naive threshold search. Restricting the search to each trajectory's physically valid suffix recovers these cells. We retain censored cells and use $|\hat r-r|$ for observed lifetimes and $\max(0,r_{\mathrm{lb}}-\hat r)$ for censored lower bounds. This one-sided loss is motivated by censored regression~\citep{tobin1958estimation}, but is not a Tobit likelihood. Excluding cells without observed EOL would leave only 14 test cells in the historical split (Section~\ref{sec:bmtl_ablation}).
+RUL targets require careful handling of right censoring. If a cell has not reached end of life when recording stops, its remaining lifetime is known only to exceed a lower bound. Treating that bound as an exact target can label a healthy cell with zero remaining life. In MATR, $59.2\%$ of samples are censored and $96/185$ cells do not reach EOL within their records. Initialization zeros in summary arrays cause a further $48/185$ cells to receive an EOL index of zero under a naive threshold search. Restricting the search to each trajectory's physically valid suffix recovers these cells. We retain censored cells and use $|\hat r-r|$ for observed lifetimes and $\max(0,r_{\mathrm{lb}}-\hat r)$ for censored lower bounds. This one-sided loss is motivated by censored regression~\citep{tobin1958estimation}, but is not a Tobit likelihood. Excluding cells without observed EOL would leave only 14 test cells in the historical split (Table~\ref{tab:cens_ablation}).
 
 To emphasize fast-charge, extreme-temperature, and rapid-degradation windows, BatteryMTL uses three multiplicative weighting factors:
 \begin{equation}
@@ -1428,7 +1620,7 @@ The frozen calibration in Section~\ref{sec:stfcal} is motivated by the behavior 
 
 Three observations matter. First, HAR probe values rise sharply during training: from $0.017$ to $1.9\times10^5$ at $m=32$, $0.010$ to $1.0\times10^5$ at $m=64$, and $0.006$ to $3.5\times10^4$ at $m=256$. Second, similar terminal values occur when the toxifier is inactive ($\alpha=0$) and at the lowest positive dose ($10^{-4}$), so a large probe value alone does not establish auxiliary-induced contraction. At $m=32$, increasing the dose instead lowers the terminal probe, to $5.3\times10^2$ at $10^{-2}$ and $1.1\times10^2$ at $3\times10^{-2}$. Third, in ten HAR configurations whose final scatter lies between $0.50$ and $1.04$ of the reference, the gate $\alpha\hat\rho\ge1$ opens in every seed between steps 110 and 590. A gate using this running statistic therefore activates on runs that do not meet the collapse criterion at the recorded endpoint.
 
-Battery behaves differently: probe values remain $O(1)$, ranging from $0.29$--$0.49$ initially to $0.3$--$2.9$ at the final step. Among 35 seeds whose final scatter lies above the half-height level, the gate opens only once, at the last step. These domain-dependent trajectories motivate a specified calibration time; they do not establish that a fixed probe is universally preferable to every adaptive rule. The script \texttt{repro/scripts/rho\_trace\_analyze.py} reproduces both analyses.
+Battery behaves differently: probe values remain $O(1)$, ranging from $0.29$--$0.49$ initially to $0.3$--$2.9$ at the final step. Among 35 seeds whose final scatter lies above the half-height level, the gate opens only once, at the last step. The contrast with HAR shows that calibration time must be specified by protocol. The script \texttt{repro/scripts/rho\_trace\_analyze.py} reproduces both analyses.
 
 \subsection{Sensitivity to Calibration Time}\label{app:warmup}
 
@@ -1482,7 +1674,7 @@ $0.1$ & $0.953$ ($3/3$) & $0.182$ ($3/3$) & $0.183$ ($3/3$) & $0.832$ ($3/3$) & 
 \end{tabular}
 \end{table}
 
-At $\alpha=0.001$, the tested operators contract features even though the auxiliary gradient is tiny and plain summation remains healthy. The low-dose behavior therefore depends on the default scalarization as well as the auxiliary dose. MGDA still collapses after lowering the learning rate to $10^{-4}$ (Table~\ref{tab:lowalpha_lr}), which rules out the tested step-size reduction as a remedy. The fixed-dose comparisons establish the outcomes of these implementations; identifying their general performance requires separate optimization studies.
+At $\alpha=0.001$, the tested operators contract features even though the auxiliary gradient is tiny and plain summation remains healthy. The low-dose behavior therefore depends on the default scalarization as well as the auxiliary dose. MGDA still collapses after lowering the learning rate to $10^{-4}$ (Table~\ref{tab:lowalpha_lr}), which rules out the tested step-size reduction as a remedy. This conditioning effect is evaluated under the recorded default scalarizations and schedules.
 
 Table~\ref{tab:lowalpha_lr} compares the default learning rate with a tenfold smaller one at $\alpha=0.001$. The loss-weighting families (UW, GradNorm, IMTL-L) become healthy at this low dose, as does plain summation; the gradient-geometry operators (PCGrad, CAGrad, FAMO, IMTL-G, Nash, Aligned, MGDA) collapse in every seed at both learning rates, and several of their accuracies worsen at the lower rate. The low-dose contraction is therefore operator-specific, not a single step-size artifact. At the high doses of Table~\ref{tab:conflict}, all ten operators collapse.
 
@@ -1542,7 +1734,7 @@ The next experiment measures the compatibility of a readout fitted to healthy fe
 
 Proposition~\ref{prop:scale_law} isolates the scale mechanism. A unique bias-only winner gives a constant predicted class at sufficiently small positive scale; ties need a specified convention. Fixed input centering contributes to the effective offset even with a bias-free head. Figure~\ref{fig:scale_law} summarizes finite $c_i^{\rm bias}$ by their within-seed median and then the median across seeds. This statistic describes bias exit, distinct from the first prediction flip when shrinking from $c=1$. The standard-deviation floor is inactive over the plotted range; exact invariance for every $c>0$ assumes unfloored statistics.
 
-The historical readout-transfer study trains the healthy and contracted encoders separately from the same initialization; it measures compatibility across fitted models rather than continuation of one checkpoint. Its calibration subset is withheld from readout fitting but participates in supervised encoder training. Historical nominal-$90\%$ conformal coverage ($0.802$ healthy, $0$ frozen, $0.806$ recalibrated, $0.834$ retrained) is consequently descriptive, not a split-conformal guarantee; its quantile also lacks the finite-sample order-statistic correction. The paired continuation study below excludes calibration examples from encoder and head fitting and uses the corrected quantile. The official HAR subject split still changes the test population, so we report empirical coverage without assuming calibration--test exchangeability.
+The historical transfer study measures compatibility between encoders trained separately from the same initialization. Its calibration subset is withheld from readout fitting but participates in supervised encoder training. Historical nominal-$90\%$ conformal coverage ($0.802$ healthy, $0$ frozen, $0.806$ recalibrated, $0.834$ retrained) is therefore descriptive, not a split-conformal guarantee; its quantile also omits the finite-sample order-statistic correction. The paired continuation study below excludes calibration examples from encoder and head fitting and uses the corrected quantile. The official HAR subject split still changes the test population, so we report empirical coverage without assuming calibration--test exchangeability.
 
 The unchanged readout models a fixed deployment interface behind a changing encoder. Its NLL and ECE rise sharply; input-statistic recalibration restores accuracy and most of ECE, while a new head also restores NLL. Applying the same healthy readout to STF-0 and STF-cal encoders gives $0.946$ and $0.943$ accuracy (\texttt{stf\_readout\_audit.py}). The gap also appears at $m=32$ (frozen $0.236$, recalibrated $0.887$, refitted $0.909$), $m=128$ ($0.166$, $0.955$, $0.954$), and with a Transformer ($0.162$, $0.950$, $0.952$). These tested widths and encoders exhibit the same separation between decodability and compatibility. Driver: \texttt{repro/scripts/readout\_transfer\_audit.py}; records: \texttt{results/READOUT/}.
 
@@ -1597,7 +1789,7 @@ The richer repairs are fixed post-hoc controls. Paired diagonal regression predi
 
 \input{repair_hierarchy_table.tex}
 
-At isotropic dose $3$, scale-only correction reaches $\MechHarScalarMid$, versus $\MechHarMeanMid$ for mean correction, $\MechHarMeanScalarMid$ for their combination, and $\MechHarDiagonalMid$ for per-coordinate statistics. A strong scale-sensitive readout component survives substantial feature drift. At projected dose $3$, scale-only reaches $\MechProjScalarMid$, per-coordinate statistics $\MechProjDiagonalMid$, and paired ridge $\MechProjRidgeMid$, close to the refitted probe. At isotropic dose $100$, the corresponding scores are $\MechHarScalarHigh$, $\MechHarDiagonalHigh$, and $\MechHarRidgeHigh$. The effective repair therefore depends on the drift. Covariance matching also leaves covariance-preserving rotations unidentified. Numerical controls recover known shifts, scales, positive diagonal changes, and scaled rotations, and include a covariance-identical sign flip.
+At isotropic dose $3$, scale-only correction reaches $\MechHarScalarMid$, against $\MechHarMeanMid$ for mean correction, $\MechHarMeanScalarMid$ for their combination, and $\MechHarDiagonalMid$ for per-coordinate statistics. A scale-sensitive component survives substantial feature drift. At projected dose $3$, scale-only reaches $\MechProjScalarMid$, per-coordinate statistics $\MechProjDiagonalMid$, and paired ridge $\MechProjRidgeMid$, close to the refitted probe. At isotropic dose $100$, the corresponding scores are $\MechHarScalarHigh$, $\MechHarDiagonalHigh$, and $\MechHarRidgeHigh$. The effective repair therefore depends on the drift. Covariance matching also leaves covariance-preserving rotations unidentified. Numerical controls recover known shifts, scales, positive diagonal changes, and scaled rotations, and include a covariance-identical sign flip.
 
 All nine arms, all doses, and the primary-only, detached, and STF-cal endpoints are retained. Records include accuracy, NLL, ECE, agreement with healthy predictions, fitting/calibration/test alignment residuals, and map hashes. Fitting residuals and evaluation residuals are reported separately. Drivers: \texttt{checkpoint\_repair\_audit.py} and \texttt{readout\_alignment.py}; records: \texttt{repro/results/CPUCONT/mechanism/d*.json}.
 
@@ -1609,9 +1801,9 @@ We extend the unchanged paired-continuation driver to a real reconstruction deco
 
 The trained decoder is evaluated on fitting, calibration, and test data at the fixed endpoint. The reported ratio averages seed-wise test-MSE ratios to the dose-matched detached decoder. STF-cal evaluation uses its forward filter and frozen gate on ordered batches of $256$; raw-input decoder error is also archived. Reconstruction progress, primary-task benefit, and frozen-consumer preservation are scored separately.
 
-At HAR dose $100$, reconstruction improves while frozen accuracy is $\ReconHarFrozenHigh$ and current-head accuracy $\ReconHarOwnHigh$; the primary-only current head reaches $\ReconHarPrimaryOwn$. The paired frozen difference is $\ReconHarFrozenGapHigh$, with descriptive seed-level $95\%$ interval $[\ReconHarFrozenGapLowerHigh,\ReconHarFrozenGapUpperHigh]$. Relative scatter is $\ReconHarScatterToPrimaryHigh$ against primary-only continuation, with no seed below $0.3$. Per-coordinate repair reaches $\ReconHarRecalHigh$ versus $\ReconHarRetrainedHigh$ after refitting. These results establish reconstruction progress and repairable consumer loss; primary-task benefit is tested in the separate low-label study. RadioML I/Q is a near-null control: at $3000$, frozen accuracy is $\ReconRmlFrozenHigh$ versus $\ReconRmlPrimary$ detached and trace is $\ReconRmlTraceHigh$ of healthy. All grid cells and paired seed intervals are retained.
+At HAR dose $100$, reconstruction improves while frozen accuracy is $\ReconHarFrozenHigh$ and current-head accuracy $\ReconHarOwnHigh$; the primary-only current head reaches $\ReconHarPrimaryOwn$. The paired frozen difference is $\ReconHarFrozenGapHigh$, with descriptive seed-level $95\%$ interval $[\ReconHarFrozenGapLowerHigh,\ReconHarFrozenGapUpperHigh]$. Relative scatter is $\ReconHarScatterToPrimaryHigh$ against primary-only continuation, with no seed below $0.3$. Per-coordinate repair reaches $\ReconHarRecalHigh$ against $\ReconHarRetrainedHigh$ after refitting. Reconstruction thus improves while the consumer breaks, and input repair recovers most of it; primary-task benefit is measured in the low-label study. RadioML I/Q is a near-null control: at $3000$, frozen accuracy is $\ReconRmlFrozenHigh$ versus $\ReconRmlPrimary$ detached and trace is $\ReconRmlTraceHigh$ of healthy. All grid cells and paired seed intervals are retained.
 
-The prepared RadioML cache is checked read-only against the original dictionary using the data loader's per-modulation 50/50 split, NumPy \texttt{RandomState(0)}, and original dictionary iteration order. Every input, modulation label, and SNR target tensor must match exactly; the record stores source/cache and index hashes. This is a seeded benchmark partition, not a claim of a unique official RadioML split. Calibration is then reserved within its training portion before encoder updates. Drivers: \texttt{reconstruction\_task\_audit.py} and \texttt{radioml\_split\_audit.py}; full records: \texttt{repro/results/CPUCONT/\{mechanism,task\_validation\}/}.
+The prepared RadioML cache is checked read-only against the original dictionary using the data loader's per-modulation 50/50 split, NumPy \texttt{RandomState(0)}, and original dictionary iteration order. Every input, modulation label, and SNR target tensor must match exactly; the record stores source/cache and index hashes. This verifies the seeded RadioML benchmark partition. Calibration is then reserved within its training portion before encoder updates. Drivers: \texttt{reconstruction\_task\_audit.py} and \texttt{radioml\_split\_audit.py}; full records: \texttt{repro/results/CPUCONT/\{mechanism,task\_validation\}/}.
 
 \subsection{Waveform CNN Continuation}\label{app:cnn_continuation}
 
@@ -1621,7 +1813,7 @@ We reuse the unchanged paired training engine: 25 healthy epochs with a detached
 
 \input{cnn_continuation_table.tex}
 
-The healthy CNN readout reaches $\CnnHealthy$, compared with the MLP's $\CpuRmlHealthy$ on the same split. At dose $3000$, frozen accuracy is $\CnnFrozenHigh$ versus $\CnnPrimary$ detached; recalibration gives $\CnnRecalHigh$, refitting $\CnnRefitHigh$, and the current head $\CnnOwnHigh$. Relative trace is $\CnnTraceHigh$ and the reconstruction MSE ratio to detachment is $\CnnMseRatioHigh$. The full dose grid and a pure-scale sweep for each healthy CNN readout are recorded. This stronger encoder shows little real-auxiliary consumer damage under the tested recipe, setting a useful boundary on transfer from the MLP failures. Driver: \texttt{cnn\_reconstruction\_continuation.py}; records: \texttt{repro/results/CPUCONT/frontier/c*.json}.
+The healthy CNN readout reaches $\CnnHealthy$, compared with the MLP's $\CpuRmlHealthy$ on the same split. At dose $3000$, frozen accuracy is $\CnnFrozenHigh$ versus $\CnnPrimary$ detached; recalibration gives $\CnnRecalHigh$, refitting $\CnnRefitHigh$, and the current head $\CnnOwnHigh$. Relative trace is $\CnnTraceHigh$ and the reconstruction MSE ratio to detachment is $\CnnMseRatioHigh$. The full dose grid and a pure-scale sweep for each healthy CNN readout are recorded. The small consumer loss contrasts with the MLP result on the same split. Driver: \texttt{cnn\_reconstruction\_continuation.py}; records: \texttt{repro/results/CPUCONT/frontier/c*.json}.
 
 \subsection{Conditional Auxiliary Head-State Factorial}\label{app:head_state}
 
@@ -1634,6 +1826,15 @@ Warm/retained reproduces the original model and Adam endpoint bitwise in all fiv
 Dense early audits and selected later audits record 620 dependent step observations, not 620 independent trials. First-step primary-only counterfactual increments match across all four cells; changing only auxiliary moments also leaves the first encoder increment unchanged, as expected from the parameterwise optimizer. Shared-state and batch hashes, CPU checkpoint validation, bitwise endpoint replays, and seed-paired intervals are archived in \texttt{head\_state\_verification.json} and \texttt{head\_state\_summary.json}. The 20 endpoint states include five exact replays and 15 new conditional trajectories; they are outside the fixed consumer-certificate bank below. Numerical driver: \texttt{auxiliary\_state\_factorial.py}.
 
 \subsection{Readout-Nullspace Protection with a Useful Real Auxiliary}\label{app:benefit_confirmation}
+
+\input{benefit_confirmation_table.tex}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/fig_nullspace_control.pdf}
+\caption{A fixed readout leaves a nullspace for learning. Projecting $\Delta H=H_\theta-H_0$ into $\ker A$ and adding $H_0$ gives one shared $64$-vector with unchanged reference logits in real arithmetic. The normalized head is $A=W_0D_0^{-1}$ and its effective bias is $b'_0=b_0-A\mu_0$. The inset shows the annihilation condition; planes are schematic. Both encoders are evaluated at inference.}
+\label{fig:nullspace_control}
+\end{figure}
 
 The old consumer applies $z_0(x)=W_0D_0^{-1}(h_0(x)-\mu_0)+b_0$, with fixed positive diagonal $D_0=\operatorname{diag}(s_0)$. Let $A=W_0D_0^{-1}$ and $P_\perp=I-A^\dagger A$, the orthogonal projector onto $\ker A$. We use established projection and backward-compatibility ideas~\citep{farajtabar2020ogd,shen2020backward} as a constructive control for measuring retained benefit and compatibility.
 
@@ -1649,16 +1850,31 @@ The frozen affine consumer has exactly the reference logits on every input in re
 Since $AP_\perp=0$, the logit difference is $AP_\perp(h_\theta-h_0)=0$. Rank--nullity gives the free dimension and the converse. The construction is the orthogonal projection onto the affine set $h_0(x)+\ker A$, proving the minimum-distance statement. The fixed normalizer's mean and the head's bias cancel in the difference.
 \end{proof}
 
-The row-vector implementation is $\widetilde H=H_0+(H_\theta-H_0)P_\perp$. A float64 SVD of the normalized head $A$ fixes the projector before continuation. Because the reference branch remains present, the logit identity holds for later encoder parameters and arbitrary inputs in real arithmetic. It also preserves fixed post-processing and its resulting NLL and ECE. Corpus-level float64 checks measure the numerical residual. This functional identity is stronger than the checkpoint-local flow statement and covers a different object from the sampled disagreement bound.
+We compute $P_\perp$ by float64 SVD before continuation and implement
+$\widetilde H=H_0+(H_\theta-H_0)P_\perp$. Retaining $H_0$ preserves fixed
+post-processing as well as logits; corpus checks measure floating-point error.
 
+Development seeds $200$--$202$ compare HAR reconstruction at doses
+$1,10,100$ with $10\%$ labels and RadioML SNR at $0.1,1,10$ with $20\%$.
+Validation is reserved before fitting. Each candidate shares the healthy
+state, Adam moments and minibatches. Selection maximizes the minimum
+validation gain among J--D, GJ--GD and GJ--D, where D/J denote detached/joint
+training and GD/GJ their guarded versions.
 
-The committed plan separates development from confirmation. Development seeds $200$--$202$ test HAR reconstruction with $10\%$ of fitting primary labels at doses $1,10,100$, and RadioML SNR with $20\%$ at $0.1,1,10$. A training reservation made before any model or readout fit supplies validation only. Candidates share healthy states, Adam moments, and future minibatches. Healthy readouts use labeled fitting examples; all fitting inputs and auxiliary targets remain available. HAR reconstructs the $561$-dimensional input, while SNR metadata are standardized on fitting data. The rule maximizes the minimum mean validation gain among J--D, GJ--GD, and GJ--D. The frozen choice record retains all six candidates, including null and adverse results; development computes no test metrics.
-
-The selected recipe is RadioML SNR dose $1$, width $64$, Adam $10^{-3}$, batch $256$, $25$ healthy plus $25$ continuation epochs. Ten new seeds $300$--$309$ receive this unchanged recipe and all four branches: ordinary detachment/joint training (D/J), and guarded detachment/joint training (GD/GJ). Classification logits and the projector use float64 in every arm; encoder/auxiliary parameters and Adam states remain fp32. The guard and losses are fixed before continuation. Training-anchor prediction drift is logged at fixed epochs with a $0.05$ disagreement threshold; it is a diagnostic trace rather than an adaptive controller or warning-lead-time claim. Endpoints are fixed; neither checkpoint nor seed selection uses test outcomes.
+The selected SNR recipe uses dose $1$, width $64$, Adam $10^{-3}$, batch
+$256$ and $25+25$ warm-up/continuation epochs. Confirmation uses ten seeds
+$300$--$309$ and all four branches. Logits and projection are float64;
+encoder, auxiliary parameters and Adam states are fp32. The $0.05$ drift
+threshold is logged diagnostically at fixed epochs. All six development
+candidates and fixed-endpoint confirmation outcomes are archived.
 
 \input{benefit_contrasts_table.tex}
 
-Confirmation requires five predeclared conditions: positive paired lower $95\%$ limits for J--D, GJ--GD, and GJ--D; GJ--J above $-0.5$ percentage point; and logit error below $10^{-8}$ with zero prediction changes. All five pass. Intervals are paired seed-level $t$ intervals conditional on this dataset, split, and recipe. Current-head accuracy is $\BenefitOwnGuardJoint$ for GJ, $\BenefitOwnJoint$ for J, $\BenefitOwnGuardDetach$ for GD, and $\BenefitOwnDetach$ for D. The guarded comparison GJ--GD isolates the auxiliary's contribution, with SNR MSE $\BenefitMseRatio$ of matched guarded detachment.
+All five confirmation conditions pass: positive paired lower $95\%$ limits
+for J--D, GJ--GD and GJ--D; GJ--J above $-0.5$ points; and old-logit error
+below $10^{-8}$ with zero changed predictions. Table~\ref{tab:benefit_contrasts}
+reports the contrasts. SNR MSE is $\BenefitMseRatio$ of guarded detachment.
+Intervals describe seed variation on this fixed split and recipe.
 
 \begin{figure}[t]
 \centering
@@ -1669,15 +1885,20 @@ Confirmation requires five predeclared conditions: positive paired lower $95\%$ 
 
 The separate confirmation bank contains forty fixed consumers, total tail probability $0.05$, an independent $1{,}024$-input monitor per seed, and a $0.05$ relative classification-error budget. GD and GJ each certify in $10/10$ seeds with a bound near $0.0065$; D and J each certify in $0/10$. Ordinary consumers change many predictions while aggregate frozen accuracy remains nearly unchanged. J's frozen ECE rises from $\BenefitHealthyECE$ to $\BenefitJointECE$; guarded predictions, NLL, and ECE match the reference, with maximum logit error $\BenefitLogitError$. This bank is distinct from the earlier $3{,}015$-candidate family.
 
-All ten normalized heads have rank $11$, leaving $53$ free directions. Stacking normalized matrices protects several affine heads on the same reference features, at the cost of a smaller nullspace; full column rank leaves no compatible displacement. Nonlinear consumers need their own constraint. The reference encoder remains at inference. On one Xeon Platinum 8570 CPU thread, batch $1{,}024$, the mean ratio of per-seed median latencies is $\BenefitLatencyRatio\times$, using nine repetitions after three warm-ups. Reference fitting features are cached during training. Thus the confirmed low-label result includes the cost of retaining and evaluating the reference.
-
-A direct dual-routing baseline also retains both encoders, serving the old consumer from $h_0$ and the current head from J. It inherits J's primary metric and the reference legacy metrics. The guarded control instead emits one shared fixed-width vector for both heads and adds a projection. Its distinctive constraint is a common representation; it has no measured efficiency advantage over dual routing. The nearest-vector property concerns Euclidean feature distance.
-
-The full study verifies $104$ development/confirmation model--Adam states, shared initial states, primary-label masks, future-order hashes, and all consumer bounds. An independent process reconstructs all forty saved consumers and replays their accuracy/NLL/ECE and bounds exactly. Numerical drivers are \texttt{benefit\_compatibility\_cpu.py} and \texttt{verify\_benefit\_consumers\_cpu.py}; local analysis is \texttt{summarize\_benefit\_compatibility.py}. The committed plan, frozen validation choice, full records, verification and all negative development cases accompany the artifact.
+All heads have rank $11$, leaving $53$ feature directions. Stacking affine
+heads reduces this nullspace; nonlinear consumers need a separate constraint.
+At batch $1{,}024$, nine post-warm-up repetitions on one Xeon Platinum 8570
+thread give mean per-seed median cost $\BenefitLatencyRatio\times$.
+The direct two-encoder baseline serves old outputs from $h_0$ and current
+outputs from J; projection additionally enforces one shared fixed-width
+representation. Training caches reference fitting features. Independent
+tensor replay checks all forty consumers; source and state hashes are in
+the artifact's verification records.
 
 \subsection{Folding Compatibility into a Single Encoder}\label{app:compiled_interface}
 
-The reference branch makes compatibility expensive. Freezing the nonlinear trunk lets us fold the constraint into its final affine map, retaining ordinary inference shapes but restricting feature learning. A new plan, committed after the earlier confirmation and before execution, tests this tradeoff as a separate study.
+Freezing the nonlinear trunk allows the compatibility constraint to fold into
+the final affine map. We test its learning cost under a separate fixed protocol.
 
 \begin{corollary}[Foldable affine compatibility]\label{cor:compiled_interface}
 Let $h_0(x)=B_0\phi_0(x)+c_0$, with a retained deterministic trunk $\phi_0$. For arbitrary trainable $B,c$, set
@@ -1692,7 +1913,8 @@ Then $\overline h(x)=\overline B\phi_0(x)+\overline c$ has the reference affine-
 Both $A(\overline B-B_0)$ and $A(\overline c-c_0)$ vanish. Folding is a substitution of one weight and bias, not a second inference operation. Each of the $d+1$ weight/bias columns can vary in $\ker A$.
 \end{proof}
 
-The construction uses constrained affine adaptation, related to nullspace updates and mergeable frozen-backbone methods~\citep{farajtabar2020ogd,pham2026ness,hu2022lora}. With a linear current head it remains a linear predictor of fixed trunk features. Folding preserves the constrained function exactly; whether that function retains auxiliary benefit is the empirical question.
+This constrained affine adaptation~\citep{farajtabar2020ogd,pham2026ness,hu2022lora}
+remains a linear predictor of fixed trunk features when its current head is linear.
 
 \begin{figure}[t]
 \centering
@@ -1703,7 +1925,7 @@ The construction uses constrained affine adaptation, related to nullspace update
 
 RadioML uses SNR regression, dose $1$ and $20\%$ of fitting primary labels, inherited from the prior validation choice. HAR uses input reconstruction, dose $10$ and $10\%$ labels, the positive max-min candidate in the previously archived three-seed HAR validation grid. No new grid is searched. Each task uses ten new seeds $400$--$409$, the same prepared test split, a stratified $20\%$ training reservation before any model/head fit, width $64$, Adam $10^{-3}$ and batch $256$. HAR has $60$ healthy plus $30$ continuation epochs; RadioML has $25+25$. The last encoder affine map is natively float64 in every arm, as are classification logits; trunk and auxiliary parameters are fp32. The healthy consumer is fitted to that same mixed-precision interface. This explicit precision change prevents pooling with the earlier encoder-fp32 experiment.
 
-Six branches clone each healthy model and full Adam state, with identical fitting-label masks and future minibatches: full-network D/J; frozen-trunk, unconstrained-last-layer LD/LJ; and frozen-trunk, constrained-last-layer CD/CJ. Heads continue learning in every branch. The constraint is fixed before continuation; the fixed training-anchor diagnostic is not an adaptive policy. Validation/test inputs never train the encoder or healthy consumer. Frozen trunk parameters \emph{and their Adam states} are checked unchanged. Every branch uses the declared endpoint and every seed is retained.
+Six branches clone each healthy model and full Adam state, with identical fitting-label masks and future minibatches: full-network D/J; frozen-trunk, unconstrained-last-layer LD/LJ; and frozen-trunk, constrained-last-layer CD/CJ. Heads continue learning in every branch. The constraint is fixed before continuation; the training-anchor diagnostic is recorded at fixed epochs. Validation/test inputs never train the encoder or healthy consumer. Frozen trunk parameters \emph{and their Adam states} are checked unchanged. Every branch uses the declared endpoint and every seed is retained.
 
 \input{compiled_interface_table.tex}
 \input{compiled_contrasts_table.tex}
@@ -1723,7 +1945,9 @@ All $40$ CD/CJ consumers retain old predictions, NLL, and ECE, with maximum logi
 
 Deployed encoders retain exactly three affine evaluations and the baseline parameter shapes, with no reference or projector parameters. At batch $1$, mean ratios of per-seed median CPU latency are $\CompileRmlSingleLatency\times$ for SNR and $\CompileHarSingleLatency\times$ for HAR. At batch $1{,}024$, they are $\CompileRmlLatency\times$ and $\CompileHarLatency\times$. Measurements cover the encoder and current head, using one Xeon Platinum 8570 thread, five warm-ups and $21$ alternating timed repetitions per path; the baseline uses the same mixed precision. The corresponding two-encoder paths average $2.22\times$ and $2.16\times$ at batch $1{,}024$. These deployment measurements establish the cost reduction, not useful adaptation.
 
-Local checks cover all $180$ healthy, endpoint model--Adam, and compiled states. A separate tensor-based process reconstructs all $120$ consumers and exactly replays accuracy, NLL, ECE, and sampling bounds. Structural checks cover the normalized-head constraint, Adam steps, folding, reference and projector removal, nonzero gradients, and failure under trunk drift. The artifact includes the committed plan, drivers, complete outcomes, and verification. This control removes reference computation but loses the confirmed SNR benefit, motivating a trainable nonlinear channel.
+State checks cover all $180$ healthy, endpoint and compiled model--Adam
+states; independent replay covers $120$ consumers. The compiled control
+reduces serving cost but loses the confirmed SNR auxiliary benefit.
 
 \subsection{A Compatible Nonlinear Channel: Development Gate and Limits}\label{app:nonlinear_interface}
 
@@ -1733,9 +1957,9 @@ A narrow side network allows nonlinear learning while the base remains fixed. We
  A\widetilde h(x)=Af_0(x).
  \label{eq:nonlinear_side}
 \end{equation}
-The healthy base $f_0$ stays fixed, and a two-ReLU side MLP $g_\psi$ learns its nonlinear prefix. Both heads receive one shared $64$-vector. Projection preserves affine-consumer logits; the following experiment measures whether the added flexibility also retains useful learning.
+The healthy base $f_0$ stays fixed, and a two-ReLU side MLP $g_\psi$ learns its nonlinear prefix. Both heads receive one shared $64$-vector. Projection preserves affine-consumer logits; we test whether that flexibility retains useful learning.
 
-\begin{figure}[H]
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth]{figures/fig_nonlinear_interface.pdf}
 \caption{A compatible nonlinear channel adds trainable capacity. (a) The base stays fixed while the side learns, with $AP_\perp g_\psi=0$. (b) Equal-depth paths fuse into a dense width-$64+k$ MLP: the middle matrix is block diagonal and the final side block is projected. The base is embedded once, all dense zero blocks count toward storage and computation, and the output stays $64$-dimensional. Planes are schematic; parameter ratios and the validation screen are reported separately.}
@@ -1751,15 +1975,15 @@ For base weights $(U_1,U_2,U_3)$ and side weights $(V_1,V_2,V_3)$, the fused mat
 \end{equation}
 Stacking the first two biases and using final bias $b_3+P_\perp c_3$ gives the same function with three affine layers and two ReLUs. The fused model embeds the base once and absorbs the separate projection. Its wider dense matrices still count all zero blocks: for side widths $16/32$, encoder parameter ratios are $1.301/1.623$ on SNR and $1.279/1.569$ on HAR, at native float64. Full-data runtime evaluation was contingent on passing the development screen. The side's final weight and bias start at zero; prefix weights copy the first $k$ healthy units and their $k\times k$ second-layer block.
 
-The new plan was committed before numerical execution, after observing the earlier studies. Development uses seeds $500$--$502$, the original width-$64$ base, Adam $10^{-3}$, batch $256$, and the same stratified $20\%$ training reservation before model/head fitting. SNR uses $20\%$ of fitting primary labels, dose $1$, and $25+25$ healthy/continuation epochs. HAR uses a new $1\%$ fitting-label reconstruction regime, doses $1,10$, and $60+30$ epochs. Both test side widths $16,32$. All feature-encoder arithmetic is float64, with fp32 head parameters and float64 classification logits. These changes prevent pooling with earlier confirmation results.
+The new plan was committed after the earlier studies and before numerical execution. Development uses seeds $500$--$502$, the original width-$64$ base, Adam $10^{-3}$, batch $256$, and the same stratified $20\%$ training reservation before model/head fitting. SNR uses $20\%$ of fitting primary labels, dose $1$, and $25+25$ healthy/continuation epochs. HAR uses a new $1\%$ fitting-label reconstruction regime, doses $1,10$, and $60+30$ epochs. Both test side widths $16,32$. All feature-encoder arithmetic is float64, with fp32 head parameters and float64 classification logits. These changes prevent pooling with earlier confirmation results.
 
 Each candidate compares full-network D/J, unconstrained side UD/UJ, and constrained side TD/TJ, with detached/joint auxiliary gradients. Healthy base/head parameters and their Adam states are retained; new side Adam states start empty. The common parameter ordering, paired side initialization, fitting-label masks and future minibatches are checked. The declared score is the minimum of three mean validation gains (J--D, TJ--TD, TJ--D) and the mean TJ--J contrast plus $0.5$ point; ties prefer smaller width, then dose. A task enters ten-new-seed test confirmation only if its best score is strictly positive. No development test outcomes are computed.
 
 \input{nonlinear_development_table.tex}
 
-The highest-scoring SNR candidate uses $k=\NonlinearRmlWidth$, dose $1$. Its validation TJ--TD is $\NonlinearRmlAuxGain$ points, with descriptive paired $95\%$ interval $[\NonlinearRmlAuxGainLow,\NonlinearRmlAuxGainHigh]$, but TJ--D is $\NonlinearRmlTotalGain$, $[\NonlinearRmlTotalGainLow,\NonlinearRmlTotalGainHigh]$, giving a negative score. The highest-scoring HAR candidate uses $k=\NonlinearHarWidth$, dose $1$: TJ--TD is $\NonlinearHarAuxGain$, $[\NonlinearHarAuxGainLow,\NonlinearHarAuxGainHigh]$, but J--D is exactly tied in aggregate correct counts, giving score zero. Neither qualifies for confirmation. The artifact retains all six candidates. These selected three-seed validation estimates describe the development screen.
+The highest-scoring SNR candidate uses $k=\NonlinearRmlWidth$, dose $1$. Its validation TJ--TD is $\NonlinearRmlAuxGain$ points, with descriptive paired $95\%$ interval $[\NonlinearRmlAuxGainLow,\NonlinearRmlAuxGainHigh]$, but TJ--D is $\NonlinearRmlTotalGain$, $[\NonlinearRmlTotalGainLow,\NonlinearRmlTotalGainHigh]$, giving a negative score. The highest-scoring HAR candidate uses $k=\NonlinearHarWidth$, dose $1$: TJ--TD is $\NonlinearHarAuxGain$, $[\NonlinearHarAuxGainLow,\NonlinearHarAuxGainHigh]$, but J--D is exactly tied in aggregate correct counts, giving score zero. Neither qualifies for confirmation, and the artifact retains all six candidates.
 
-The strict-positive gate is evaluated from integer correct counts and exact rational means. Before confirmation, an arithmetic check corrected a floating mean near $3.7\times10^{-17}$ for the tied HAR contrast to zero. Both serializations and the correction audit are retained; the grid and decision rule stay fixed. Since the screen fails, the planned independent-test, auxiliary-MSE, and CPU-budget conjunction is not evaluated, and the $200$-consumer confirmation family is not instantiated.
+Integer correct counts and exact rational means determine the strict-positive gate. Before confirmation, an arithmetic check corrected a floating mean near $3.7\times10^{-17}$ for the tied HAR contrast to zero. Both serializations and the correction audit are retained; the grid and decision rule stay fixed. Because the screen fails, the planned test, auxiliary-MSE, and CPU-budget conjunction is not evaluated.
 
 \begin{figure}[t]
 \centering
@@ -1770,19 +1994,268 @@ The strict-positive gate is evaluated from integer correct counts and exact rati
 
 All $165$ saved state files are locally checked: six healthy states, $87$ endpoint model--Adam states and $72$ deployed side models. A separate tensor-only process reconstructs all $87$ validation consumers; accuracy, NLL and ECE replay exactly, with auxiliary errors also checked. All $36$ constrained-side consumers retain their old validation predictions/NLL/ECE; maximum logit error is $\NonlinearLogitError$. Fused/unfused feature error is at most $\NonlinearFusionError$. The nonlinear prefix changes in every constrained branch, and frozen base weights and Adam states remain unchanged. Structural tests include arbitrary nonlinear changes, native-precision fusion, full-rank/no-nullspace and unconstrained/base-drift negative controls.
 
-The construction supports nonlinear updates with retained affine-consumer outputs, but the tested candidates do not close the utility and cost target. A matched side with its prefix frozen would be needed to isolate the prefix's contribution to performance. Broader architectures, nonlinear downstream consumers, new populations, and adaptive warning policies remain open extensions.
+The construction retains affine-consumer outputs during nonlinear updates, but every candidate misses the joint utility/cost target. Isolating the prefix's contribution would need a matched side with its prefix frozen. A fixed-protocol vision screen did not reproduce the accuracy failure at the tested doses, although the frozen readout changed $42$--$56\%$ of its decisions (Appendix~\ref{app:vision_boundary}). Stronger vision auxiliaries and non-affine consumers are untested.
+
+\input{chart_study.tex}
+
+\subsection{A Decision-Preserving Training Constraint}\label{app:decision_preserving}
+
+\input{decision_preserving_table.tex}
+
+Each arm above fails one axis. A training-time constraint asks whether all
+three are reachable together. Continuation minimises
+$L_{\rm primary}+\alpha L_{\rm aux}+\gamma R$ with
+\begin{equation}
+ R=\frac1n\sum_i\max\Bigl(0,\ \max_{j\ne p_{0i}}z_i[j]-z_i[p_{0i}]\Bigr),
+ \label{eq:decision_penalty}
+\end{equation}
+where $z_i$ is the frozen consumer's logit vector on the current features and
+$p_{0i}$ its prediction on the healthy features. $R$ vanishes at
+initialisation, so it penalises decisions that would flip, not drift. The
+healthy encoder and readout enter fitting only; inference is the single shared
+encoder.
+
+The protocol is the ten-seed benefit confirmation unchanged: RadioML, $20\%$
+primary labels, width $64$, Adam $10^{-3}$, batch $256$, dose $1$, $25$ warm-up
+and $25$ continuation epochs, the same splits, minibatch order, healthy readout
+and monitor partition. On development seeds $800$--$802$ the penalty trades
+disagreement for gain smoothly: at $\gamma=0.1,0.3,1.0,3.0$ the primary gain is
+$1.35,1.26,1.11,0.08$ points and the validation disagreement is
+$38.4,33.4,24.3,14.0\%$, against $1.06$ points and $53.3\%$ for joint training.
+The fixed rule selected the smallest $\gamma$ whose development disagreement is
+at most $5\%$; none reaches it, so it selected $\gamma=3$.
+
+Ten confirmation seeds give $0.72$ points $[0.31,1.12]$ at $\gamma=1$ with
+$29.2\%$ disagreement and $-0.04$ $[-0.46,0.38]$ at $\gamma=3$ with $17.8\%$;
+both use one encoder at inference. Neither is certified: no seed meets the
+five-point budget and the largest exact upper bound is $0.26$ at $\gamma=3$. The
+frozen consumer's accuracy is $0.262$ at $\gamma=3$, above the healthy $0.258$,
+while $17.8\%$ of its decisions differ. The $\gamma=1$ row is a post-hoc knee
+confirmation run after the fixed rule selected $\gamma=3$ and the primary arm
+failed; it is reported separately and does not change the primary decision.
+
+With the same inference graph, the constraint trades $0.25$ of the $0.97$-point gain for
+roughly half the decision changes, and still misses the budget. A second corpus
+tests whether the frontier belongs to the method or to the shift. An addendum,
+fixed before any HAR outcome, reruns the same
+grid, rule and seeds on HAR with its reconstruction auxiliary at dose $10$, the
+highest-scoring HAR candidate in the earlier benefit development, where the
+auxiliary's primary gain is near zero. Every development value already meets the
+budget: disagreement is $1.6,1.2,1.1,2.5\%$ at $\gamma=0.1,0.3,1.0,3.0$, against
+$2.6\%$ for joint training, so the rule selected the smallest, $\gamma=0.1$. Ten
+confirmation seeds at that value give $+0.22$ points $[-0.15,0.60]$ over the
+detached control and $+0.31$ $[-0.68,1.29]$ over joint training, with
+reconstruction error at $0.78$ of the control against $0.81$ for joint training;
+the gain axis is flat in both comparisons. Mean disagreement is $2.3\%$, between
+$1.5$ and $3.1\%$ per seed, and eight of ten seeds certify. The two remaining
+seeds have $2.7$ and $3.0\%$ point disagreement with exact upper bounds of $5.4$
+and $5.6\%$, so they abstain rather than contradict the budget. Unconstrained
+joint training on the same seeds changes $5.3\%$ of legacy decisions, misses the
+budget on three seeds, certifies one, and loses $1.1$ points of frozen accuracy,
+including a $5.6$-point loss on one seed that the constrained arm avoids
+(Table~\ref{tab:decision_har}). The budget is reachable where the shift is small
+and out of reach where it is large. Exact compatibility costs a second encoder at
+inference, approximate compatibility costs gain, and the five-point budget sits
+beyond the strength at which the gain vanishes.
+
+\input{decision_preserving_har_table.tex}
+
+A second constraint tests whether the frontier belongs to the hinge. The anchor
+replaces $R$ by $\frac1n\sum_i\lVert z_i-z_{0i}\rVert^2$, the squared distance
+between the frozen consumer's logits on the current features and on the healthy
+features of the same example, so it penalises every logit change rather than
+only changes that would flip a decision. A separate recorded plan fixed the
+grid $\gamma\in\{0.1,1,10,100\}$ and reused the rule, splits, order and seeds.
+Development gives $+1.18,-0.16,-0.83,-1.10$ points with disagreement
+$29.4,11.8,4.6,2.8\%$; the rule selects $\gamma=10$. Ten confirmation seeds give
+$-1.59$ points $[-2.18,-0.99]$ against the detached control with no seed
+positive, and $-2.56$ against joint training. Mean disagreement is $5.0\%$, at
+most $6.4\%$ per seed, and no seed certifies because the exact upper bounds reach
+$0.10$ at that rate. Reconstruction error is $0.94$ of the control against $0.77$
+for joint training, so the anchor also gives up most of the auxiliary benefit.
+In these runs, stronger logit constraints reduce primary and auxiliary progress
+together.
+
+Exact preservation with fixed weights requires
+$A(h_\theta(x)-h_0(x))=0$ pointwise. This constrains feature functions;
+its runtime and utility depend on the implementation. The tested penalties
+lose SNR utility, while the reference-anchored construction retains it with a
+second encoder at $\BenefitLatencyRatio\times$ cost. These outcomes describe
+the tested controls rather than a necessary cost law. Decision compatibility
+has a different tolerance: nonzero logit changes can leave every prediction
+unchanged. A five-point disagreement budget caps the fraction of examples
+that can newly become wrong relative to the old consumer. The reported curves
+allow another tolerance, and the learned-head studies below test a different
+parameterization of the legacy interface.
+
+\subsection{Learning a Legacy Readout}\label{app:protected_head}
+
+The constraints above keep the old weights on the new feature. A weaker
+requirement asks whether only the old \emph{function} must survive. Let $p$ be
+a linear head with $n_c$ outputs, initialised to the healthy consumer map
+$(A,B)$ and trained with the encoder on
+\begin{equation}
+ \frac1n\sum_i\bigl\lVert p(h_\theta(x_i))-z_0(x_i)\bigr\rVert^2,
+ \label{eq:protected_head}
+\end{equation}
+where $z_0(x)=Ah_0(x)+B$ is the frozen consumer's logit vector, precomputed for
+the fitting set before continuation. Deployment applies $p$ to $h_\theta(x)$:
+one encoder, one forward pass, $n_cm+n_c$ extra parameters ($390$ on HAR,
+$715$ on SNR), and no reference
+forward. This replaces the legacy weights and aims to retain their predictions;
+it does not give an exact logit identity. Logit distillation~\citep{hinton2015distilling}
+and Learning without Forgetting~\citep{li2016lwf} provide the methodological
+precedents. The loss updates both the head and encoder, so this arm tests their
+joint ability to retain legacy predictions. Protocol, splits, minibatch order and
+monitor are those of the benefit confirmation; $\lambda\in\{0.1,1,10\}$ was
+selected on seeds $800$--$802$ by the same rule that ignores accuracy and gain,
+and confirmation uses seeds $300$--$309$.
+
+\input{protected_head_table.tex}
+
+On SNR the selected $\lambda=10$ gives $-1.29$ points $[-1.78,-0.80]$ against
+detachment, $5.0\%$ disagreement and no certificate, with SNR-regression MSE
+at $0.891$ of the control against $0.763$ for joint training. The learned head
+halves the change of the fixed weights on the same features, from $11.8\%$ to
+$5.0\%$, under the selected setting.
+
+HAR reconstruction is more favorable under the selected $\lambda=0.1$. The arm gives
+$+0.44$ points $[-0.03,0.91]$ on the primary task, reconstruction error $0.767$
+of detachment, close to joint training, and $1.8\%$ disagreement, at most
+$2.2\%$ per seed (Table~\ref{tab:protected_head}). Nine of ten seeds meet the
+specified certificate criterion; the remaining seed has an observed
+disagreement of $1.8\%$ and an exact bound of $5.1\%$, and abstains. Applying
+the original
+weights to the same features changes $3.3\%$ of decisions, so the head absorbs
+roughly half the prediction changes on these same features. The primary-gain interval includes zero, and maximum healthy-logit error is $4.05$, so neither a resolved primary gain nor exact function retention follows. Absolute accuracies
+differ from the full-label reconstruction study of Section~\ref{sec:stf}
+because this run keeps the $10\%$ label protocol; all comparisons are within
+run.
+
+The full specified conjunction requires every seed to certify. HAR therefore
+misses it by one conservative abstention, despite all measured full-corpus
+disagreements being below budget; SNR also fails the utility criteria. The
+cross-corpus difference does not identify information loss: teacher regularization,
+linear approximation and fitting can each affect the result. Appendix~\ref{app:protected_audit}
+separates readout fitting on frozen features from jointly constrained learning.
+
+\input{protected_audit.tex}
+
+\input{alignment_confirmation_study.tex}
+
+\input{completion_study.tex}
+
+\subsection{A Vision Boundary Screen}\label{app:vision_boundary}
+
+We next test whether the scale-sensitive accuracy failure appears on a pretrained
+vision backbone. We ran two fixed-protocol development screens and did not open the official test
+split. The model is an
+ImageNet-pretrained ResNet-18~\citep{he2016resnet} on CIFAR-100~\citep{krizhevsky2009cifar} at $64\times64$ input, continued for
+three epochs with SGD at $10^{-3}$ for the encoder and $10^{-2}$ for the heads,
+momentum $0.9$, weight decay $5\times10^{-4}$, batch $128$, and frozen
+batch-normalization running statistics. A linear readout fitted on the healthy
+features reaches $0.521$ validation accuracy across the three replication seeds
+($0.513$--$0.528$). Each branch clones the pretrained model and shares minibatch
+order, and $2{,}048$ paired anchors are isolated from fitting.
+
+The first screen used bf16 continuation at seed $900$, with a natural rotation
+auxiliary at doses $1$ and $10$. Against healthy accuracy $0.513$, the frozen
+readout reached $0.598$ in the primary-only branch and $0.588$ at dose $1$;
+the corresponding current heads reached $0.616$ and $0.615$. The paired
+primary difference was $-0.06$ points, so this screen did not establish an auxiliary benefit. The
+dose-$10$ branch produced a non-finite loss in its first epoch and was not
+retuned or rerun. The specified failure criterion was a loss of at least five
+points. The screen therefore cannot test repair: the fixed
+diagonal-statistics family stayed near $0.61$--$0.62$, and the paired-ridge
+family was unstable across anchor budgets ($0.17$--$0.58$).
+
+The second screen crossed the affine boundary deliberately. The dose was fixed
+before outcomes from the feature trace alone: of two one-epoch scale
+instruments, $\lambda=0.2$ gave a trace ratio of $0.180$ and $\lambda=0.5$ gave
+$0.116$, so the rule selected $0.5$ for a three-epoch branch; readout accuracy
+was not used. Its endpoint trace ratio is $0.099\pm0.003$, a scale of
+$0.315\pm0.005$, below the median top-two crossing scale $0.411$ of the healthy
+readout. The predeclared crossing criterion still fails. Frozen accuracy is
+$0.557$, $3.6$ points above healthy, and the standardized refit reaches $0.637$.
+A rotation auxiliary at dose $3$ reaches scale $0.367$ and frozen $0.484$
+($-2.9$ points), refit $0.594$. At dose $5$ the scale is $0.067$; the frozen
+readout collapses to the constant predictor ($0.013$, equal to the largest
+healthy class frequency) and the current head collapses with it ($0.023$). No
+branch combines a crossed scale with a silent readout loss.
+
+\input{vision_boundary_table.tex}
+
+What the scale does change is the decisions. A post-hoc replay contracts the
+standardized features $z=(h-\mu_0)/s_0$ and evaluates logits $cWz+b$ over a
+fixed grid. This is contraction around the healthy feature mean; the raw-feature
+top-two crossing scale above describes a different path. Accuracy falls by
+only $3.5$ points at the grid value $c=0.432$, where
+$21.1\%$ of predictions change, and by
+$7.0$ points at $c=0.318$, where $33.9\%$ change. Only at $c=0.15$, where
+accuracy falls to $0.169$, do $77.7\%$ of decisions change. At $c=0.432$,
+$6.2\%$ of the corpus moves from correct to wrong and $2.7\%$ the other
+way, while $57.6\%$ of all changes stay between two wrong classes. At $c=0.318$,
+correct-to-wrong and wrong-to-correct changes account for $10.7\%$ and $3.7\%$
+of the corpus, while $57.4\%$ of changed predictions stay between wrong classes,
+giving a net $7.0$-point loss. An
+incompatible interface hides behind stable accuracy because most of its traffic
+never touches the label.
+
+The trained branches show the same separation. The primary-only branch raises
+frozen accuracy by $8.5$ points, changes $42.1\%$ of predictions, and turns
+$7.2\%$ of the corpus from correct to wrong; dose $1$
+raises it by $7.4$ points and changes $44.8\%$, reproduced within one point in
+an independent bf16 run ($42.5\%$ at $8.5$ points); the selected scale branch
+gains $3.6$ points and changes $47.0\%$; dose $3$ loses $2.9$ points, with
+$15.8\%$ of the corpus moving from correct to wrong, $12.8\%$ the other way, and
+$27.2\%$ of the corpus changing between wrong classes (Table~\ref{tab:vision_boundary}). The standardized refit ranks the two
+auxiliary branches above the primary-only branch, while the frozen readout ranks
+them below it; the largest accuracy gain of the four still arrives with a
+$42.1\%$ change of legacy decisions.
+
+The fixed unlabeled readout-input baselines also leave substantial disagreement. Recomputing per-feature input
+statistics at the readout input raises the old readout from $0.606$ to $0.622$
+on the primary-only branch and from $0.557$ to $0.630$ on the selected scale
+branch, yet $40.4\%$ and $41.7\%$ of its decisions still differ. The paired
+new-to-old ridge map reaches $0.585$ and
+$0.580$ with $42.2\%$ and $44.0\%$ changed. Alignment recovers accuracy; it does
+not recover the interface.
+
+Neither screen reproduces the HAR accuracy failure. Pure contraction has an
+exact affine law, whereas trained features also change direction; their trace
+ratio alone does not predict legacy accuracy. The HAR variance auxiliary reaches
+a scale of $0.015$ against a median top-two crossing scale of $0.054$ while
+remaining decodable. The strongly contracting vision branch instead loses both
+frozen and refitted accuracy. Decision compatibility fails across the tested
+vision continuations, including those that improve aggregate accuracy.
+
+\input{vision_consumer_study.tex}
 
 \subsection{A Fixed-Corpus Unlabeled Consumer Check}\label{app:consumer_audit}
 
-For a present checkpoint, we complement the variance audit with unlabeled disagreement against the healthy consumer. This uses the standard relative-loss inequality and exact finite-population sampling. It sits alongside unlabeled performance estimation~\citep{garg2022unlabeled} and update certificates~\citep{usama2026envelopes}, with reference predictions and an explicit abstention option.
+For a present checkpoint, we complement the variance audit with unlabeled disagreement against the healthy consumer. The check combines the relative-loss inequality with exact finite-population sampling, extending unlabeled performance estimation~\citep{garg2022unlabeled} and update certificates~\citep{usama2026envelopes} with reference predictions and an option to abstain.
 
-For a fixed corpus of $N$ inputs, let $f_0$ be the healthy consumer, $f$ a fixed candidate, and $R_T$ the mean $0$--$1$ error on subset $T$. For every assignment of labels,
-\begin{equation}
- R_T(f)-R_T(f_0)\le D_T(f,f_0),\qquad
- D_T=|T|^{-1}\sum_{i\in T}\mathbf1\{f(x_i)\ne f_0(x_i)\}.
- \label{eq:consumer_disagreement}
-\end{equation}
-The inequality follows pointwise: error can increase only where predictions change. It is sharp when the labels equal the healthy predictions. Conversely, changing predictions can improve accuracy, so large disagreement does not establish harm.
+\begin{algorithm}[t]
+\caption{Auditing representation survival and probe validity}\label{alg:survival_audit}
+\begin{algorithmic}[1]
+\REQUIRE Diagnostic batch, healthy reference, checkpoint $\theta$, operating losses and dose $\alpha$, recorded calibration value $q$.
+\STATE Report task metrics, covariance trace $2V$, effective rank, standardized linear probe, and the declared operational scatter criterion.
+\STATE Audit healthy-readout accuracy/NLL/ECE, mean/global/per-feature repairs, and any paired alignment; compare with a refitted probe.
+\STATE With unlabeled monitor inputs and healthy reference predictions, bound consumer disagreement; select a certified candidate or abstain.
+\STATE Report gradient-flow fluxes $(r,c)$ from \eqref{eq:signed_variance}. For Adam, audit $v^\top s_\theta$ and the actual post-step $V$ change; specify any auxiliary counterfactual.
+\STATE Record $1-\alpha q$, the signed balance $\psi=d-\alpha a$, and the corresponding residuals. Form $q^\star=a/d$ only when $d\ne0$.
+\IF{$|1-\alpha q|>\Delta$}
+\STATE Mark the gradient-flow sign locally certified for this batch.
+\ELSE
+\STATE Use the signed audit; report restoration misalignment, geometry, and probe mismatch separately.
+\ENDIF
+\STATE Compare joint training, detachment, and any selective intervention using both survival and task utility at matched doses and seeds.
+\end{algorithmic}
+\end{algorithm}
+
+Equation~\eqref{eq:consumer_disagreement} bounds error increase by
+disagreement for every label assignment. Using its fixed-corpus notation,
+we obtain a sampling bound for the unmonitored inputs.
 
 Uniformly sample $n$ monitor inputs without replacement, independently of the fixed candidate family. If $c$ predictions disagree on this monitor and the unknown full-corpus disagreement count is $K$, then $c$ has the hypergeometric distribution with parameters $(N,K,n)$. With family size $M$ and total tail probability $\delta$, define
 \begin{equation}
@@ -1790,7 +2263,7 @@ Uniformly sample $n$ monitor inputs without replacement, independently of the fi
  U=\frac{K^+(c)-c}{N-n}.
  \label{eq:consumer_finite}
 \end{equation}
-Here $F$ is the exact hypergeometric CDF. Inverting its lower tail bounds the full-corpus disagreement count, hence $D_T\le U$ on the unmonitored remainder. For each candidate the failure probability is at most $\delta/M$; a union bound gives simultaneous coverage for all $M$ candidates, allowing selection from that fixed family. This random-partition statement does not require independent adjacent HAR windows. It covers the fixed corpus, rather than a new population or future optimizer trajectory. The bound concerns classification error; it does not certify NLL, ECE, or conformal coverage. Monitor-adaptive encoder training or unconstrained construction of new repair candidates would require a different analysis.
+Here $F$ is the exact hypergeometric CDF. Inverting its lower tail bounds the full-corpus disagreement count, hence $D_T\le U$ on the unmonitored remainder. For each candidate the failure probability is at most $\delta/M$; a union bound gives simultaneous coverage for all $M$ candidates, allowing selection from that fixed family. The statement needs no independence between adjacent windows, and it covers the fixed corpus with classification error, not a new population, future updates, NLL, ECE, or conformal coverage. Monitor-adaptive training and unconstrained construction of new candidates would need a different analysis.
 
 We predeclare $n=1{,}024$, $\delta=0.05$, and budgets $0.05$ and $0.10$ for relative loss increase. The bank contains all 300 endpoints from the 30 earlier paired runs plus 35 CNN endpoints, each evaluated with the same nine fixed repair arms: $M=\ConsumerFamily$. All maps use the full fitting feature set; a restricted anchor budget would need its own evaluation. A seeded uniform monitor partition is shared across candidates in a run, and old/new reference predictions on those monitor inputs are required. Healthy reference predictions can be cached for a fixed corpus or obtained from the retained healthy encoder; this access is additional to paired training anchors for richer repairs. The first repair in the predeclared hierarchy satisfying $U\le\varepsilon$ is selected, or the audit abstains. Monitor labels never enter this choice. Candidate remainder accuracy and loss increase are scored only after choices are fixed; archived healthy/frozen metrics are also checked independently for reproducibility.
 
@@ -1809,7 +2282,7 @@ At the $10$-point budget, HAR supplies $\ConsumerHarSelectedTen$ selections; Rad
 
 \subsection{Dissociation Between Contraction and Utility}\label{app:dissociation}
 
-The audits above separate three quantities that are often conflated: variance contraction, scale-invariant information, and readout utility. Table~\ref{tab:dissociation} collects the six cases that separate them. These are case studies; the battery, SNR, I/Q, and subject-ID rows use the protocols cited in their sections.
+Three quantities are often conflated: variance contraction, scale-invariant information, and readout utility. Table~\ref{tab:dissociation} separates them in six cases, each using the protocol cited in its section.
 
 \begin{table}[h]
 \centering
@@ -1830,7 +2303,7 @@ HAR reconstruction & $1.00$ & n/a & $0.942$ & benign head \\
 \end{tabular}
 \end{table}
 
-The six cases show why no single scalar orders representation quality. In HAR, scatter contracts by a factor of $60$ while task information remains linearly available and input recalibration repairs the readout. MATR has negative transfer without contraction. SNR combines relative collapse and readout failure, but mostly negative sampled flow flux leaves its Adam attribution unresolved. I/Q retains scatter $1.05$ and refitted accuracy $0.351$ versus $0.312$ detached, while the frozen readout falls to $0.195$. Subject-ID similarly gives joint accuracy $0.887$ at scatter $0.93$, yet frozen accuracy $0.384$ versus $0.901$ refitted. The last row is benign at its tested dose. Each case requires its own measurements of variation, decodability, and compatibility.
+The six cases show why no single scalar orders representation quality. In HAR, scatter contracts by a factor of $60$ while task information remains linearly available and input recalibration repairs the readout. MATR has negative transfer without contraction. SNR combines relative collapse and readout failure, but mostly negative sampled flow flux leaves its Adam attribution unresolved. I/Q retains scatter $1.05$ and refitted accuracy $0.351$ versus $0.312$ detached, while the frozen readout falls to $0.195$. Subject-ID similarly gives joint accuracy $0.887$ at scatter $0.93$, yet frozen accuracy $0.384$ versus $0.901$ refitted. The last row is benign at its tested dose.
 
 \subsection{RadioML Dose--Response and Natural Scale}\label{app:rml_dose}
 
@@ -1859,7 +2332,7 @@ $10000$ & $0.204$ & $3/3$ & $0.140$ & $4138$ & $0.320$ & $0/3$ & $0.641$ \\
 
 SNR collapse begins between $\alpha=3$ and $10$, with all seeds below the criterion by $30$; the historical $3000$ comparison is deep within this observed regime. I/Q reconstruction stays near or above reference scatter through $1000$ and reaches $0.641$ at $10000$, above $0.3$. Thus nominal dose alone does not order the two heads. Their measured radial loadings differ sharply: at $30$, SNR has $\alpha\rho=22.6$, while I/Q loading is near zero. The signed-flux audit below checks what those unsigned measurements can explain.
 
-Table~\ref{tab:rml_stf} adds STF-cal at the three doses around and above the SNR onset. At $\alpha=30$, calibrated filtering reaches $0.303$ against joint $0.248$ and detached $0.306$, with no collapse; at $\alpha=100$ and $300$ the recovery shrinks to $0.278$ and $0.236$ even though the gate opens in every seed. The reconstruction gate stays shut (gate rate $0.00$) at all three doses and STF-cal stays at $0.308$. This is the dose-dependent selective-intervention behavior claimed in the main text: filtering helps near the onset but not at every dose.
+Table~\ref{tab:rml_stf} adds STF-cal at the three doses around and above the SNR onset. At $\alpha=30$, calibrated filtering reaches $0.303$ against joint $0.248$ and detached $0.306$, with no collapse; at $\alpha=100$ and $300$ the recovery shrinks to $0.278$ and $0.236$ even though the gate opens in every seed. The reconstruction gate stays shut (gate rate $0.00$) at all three doses and STF-cal stays at $0.308$. Filtering helps near the onset, not at every dose.
 
 \begin{table}[h]
 \centering
@@ -1900,13 +2373,13 @@ $3000$ & $0.137$ & $0.315$ & $0.099$ & $0.094$ & $0.229$ & $0.315$ & $0.205$ \\
 \end{tabular}
 \end{table}
 
-The signed flux audit uses the same driver with \texttt{--flux-trace}. On a fixed diagnostic batch of $384$ test examples we compute $V=\|C_BH\|_F^2/(2B)$, $v=\nabla_\theta V$, $r=-v^\top G_p$, and $c=v^\top G_a$, and record them at every epoch end; inside the first two epochs we also sample every $10$ minibatches. At $\alpha=3000$ the seed-median $c_t$ is $-3.97$ at epoch $1$, $-49.3$ at epoch $5$, $-66.1$ at epoch $10$, and $-107.5$ at epoch $25$; the aggregate signed cosine is below $-0.90$ at the endpoint. Of $75$ epoch-end checkpoints, $74$ have negative $c_t$; the exception is $+0.76$. Its possible early effect cannot be dismissed by comparing it with larger endpoint magnitudes or by sparse epoch-end sampling. I/Q reconstruction gives $|c_t|<10^{-5}$ at every epoch end, consistent with no variance flux. The SNR head thus shows relative collapse without consistently positive sampled gradient-flow flux. These observations alone do not identify its Adam-step contributions; Appendix~\ref{app:cpu_paired} audits actual updates separately. Records: \texttt{results/READOUT/rml\_snr\_flux*.json} and \texttt{results/READOUT/rml\_iq\_flux.json}.
+The signed flux audit uses the same driver with \texttt{--flux-trace}. On a fixed diagnostic batch of $384$ test examples we compute $V=\|C_BH\|_F^2/(2B)$, $v=\nabla_\theta V$, $r=-v^\top G_p$, and $c=v^\top G_a$, and record them at every epoch end; inside the first two epochs we also sample every $10$ minibatches. At $\alpha=3000$ the seed-median $c_t$ is $-3.97$ at epoch $1$, $-49.3$ at epoch $5$, $-66.1$ at epoch $10$, and $-107.5$ at epoch $25$; the aggregate signed cosine is below $-0.90$ at the endpoint. Of $75$ epoch-end checkpoints, $74$ have negative $c_t$; the exception is $+0.76$. Epoch-end sampling alone cannot rule out an early effect from that checkpoint. I/Q reconstruction gives $|c_t|<10^{-5}$ at every epoch end, consistent with no variance flux. The SNR head thus shows relative collapse without consistently positive sampled gradient-flow flux. These observations alone do not identify its Adam-step contributions; Appendix~\ref{app:cpu_paired} audits actual updates separately. Records: \texttt{results/READOUT/rml\_snr\_flux*.json} and \texttt{results/READOUT/rml\_iq\_flux.json}.
 
 At $\alpha=3000$, every calibrated SNR gate opens and the selected deletion reaches its cap of $3$ (calibrated $\rho=0.44$--$0.49$, margins $1.3$--$1.5\times10^3$). Relative scatter remains $0.25$--$0.36$; frozen accuracy rises only from $0.094$ (joint seed median) to $0.136$, with recalibration $0.124$ and refitting $0.212$. The selected rank and reliably open gate therefore fail to restore compatibility at this dose. Records: \texttt{results/READOUT/rml\_snr\_readout\_stfcal.json}.
 
 \section{Anti-Collapse Regularizers at Matched Doses}\label{app:reg}
 
-Table~\ref{tab:reg} evaluates two regularizer families at the doses and seeds of Table~\ref{tab:conflict}: VICReg's variance hinge plus off-diagonal covariance penalty, and Barlow Twins' redundancy-reduction penalty. Each is applied to the shared representation with weight $\lambda$. VICReg's invariance term is omitted because this experiment has no augmented-view pair. All rows use the same joint-training baseline; these are adaptations of the regularizers to this setting, not evaluations of their complete original learning pipelines.
+Table~\ref{tab:reg} evaluates two regularizer families at the doses and seeds of Table~\ref{tab:conflict}: VICReg's variance hinge plus off-diagonal covariance penalty, and Barlow Twins' redundancy-reduction penalty. Each is applied to the shared representation with weight $\lambda$. VICReg's invariance term is omitted because this experiment has no augmented-view pair. All rows use the same joint-training baseline; these are adaptations of the regularizers to this setting, not evaluations of the complete original pipelines.
 
 Regularization can clear the operational collapse threshold without restoring the single-task reference or improving the task. In the coarse grid, VICReg first avoids collapse in all seeds at $\lambda=10$ for HAR, $300$ for battery, and $10000$ for RadioML. Barlow Twins does not do so at any tested weight.
 
@@ -1915,5 +2388,26 @@ On HAR, VICReg scatter stays near $0.36$ from $\lambda=10$ to $10^4$, while accu
 The Barlow Twins adaptation yields absolute scatter as low as $0.011$, $0.012$, and $0.013$ for HAR, battery, and RadioML, respectively, or factors of $172$, $6$, and $24$ below their references. It fails to clear the collapse threshold throughout the tested grid, with HAR accuracy reaching approximately $0.34$--$0.44$ and RadioML approximately $0.11$ in the low-accuracy configurations.
 
 Additional ten-seed sweeps use $\lambda\in\{2,5,20,50,200,500\}$ on HAR and $\lambda\in\{200,500,700,1500,2000,5000\}$ on battery. The recorded battery transition is bracketed by $150$ and $200$, and the lowest measured battery RMSE remains $0.339$ at $\lambda=300$, above detachment. HAR scatter remains near $0.36$ above its crossing. RadioML was not refined: the sampled collapse rate is $1.0$ at $1000$, $0.10$ at $3000$, and $0.0$ at $10000$. The experiments therefore locate an operational transition over a finite grid rather than a precise critical weight.
+
+\input{shared_replay_details.tex}
+
+\input{consumer_cell_theory.tex}
+\input{consumer_cell_study.tex}
+
+\input{frontier_extension_details.tex}
+
+\input{followup_studies.tex}
+
+\input{contrastive_visual_study.tex}
+
+\input{query_risk_study.tex}
+
+\input{early_update_study.tex}
+
+\input{legacy_precision_study.tex}
+\input{subject_transfer_study.tex}
+\input{rml_one_pass_study.tex}
+
+\input{vit_deployment_study.tex}
 
 \end{document}

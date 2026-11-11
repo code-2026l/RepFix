@@ -1,7 +1,8 @@
 # Reproducing the supplementary artifact
 
 Run commands from the extracted `repfix_supplementary` directory. The supplied
-PDF is the polished manuscript: nine main pages and 62 pages in total.
+PDF has eight main pages. The exact full-page count is recorded in
+`ARTIFACT_MANIFEST.json` and the extracted-archive build report.
 
 ## File and record checks
 
@@ -11,7 +12,11 @@ python repro/scripts/verify_supplement.py
 
 Python 3.10 or newer is sufficient for this check. It verifies the manifest,
 required manuscript inputs, source and protocol hashes stored in the CPU records,
-and the frozen nonlinear decision. It reads records rather than loading model
+the frozen nonlinear/chart decisions, and the protected-head original and
+retrospective verdicts. Exact historical driver bytes are retained under
+`repro/source_versions/`. Some early vision replay records hash `repr(bytes)`
+instead of the raw bytes; the verifier checks and counts that convention
+explicitly. It reads records rather than loading model
 states or recomputing predictions.
 
 ## Review environment
@@ -19,6 +24,16 @@ states or recomputing predictions.
 ```text
 python -m pip install -r requirements-review.txt
 ```
+
+`requirements-review-locked.txt` records the versions used for the local review.
+For CPU-only PyTorch wheels, install the matching official builds first, then
+the locked review environment:
+
+```text
+python -m pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cpu
+python -m pip install -r requirements-review-locked.txt
+```
+
 
 `requirements-review.txt` lists dependencies for dataset-free review, including
 pytest and PyMuPDF. `requirements.txt` describes the broader training environment.
@@ -33,9 +48,11 @@ thread. The hardware timings reported in the paper retain their original setup.
 python repro/scripts/verify_supplement.py --tests
 ```
 
-The 47 tests cover finite-corpus disagreement bounds, repair availability, affine
+The 134 tests cover finite-corpus disagreement bounds, repair availability, affine
 scale boundaries, normalized-head nullspaces, constrained affine folding,
-nonlinear fusion, and exact-count selection at a zero-benefit tie. They use
+nonlinear fusion, exact-count selection at a zero-benefit tie, invertible chart folding,
+vision access/split controls, and teacher-head fitting on affine and nonlinear
+examples. They use
 synthetic numerical inputs. Their success validates the stated algebra and
 implementation controls; the experimental results are in the recorded studies.
 
@@ -46,11 +63,13 @@ python repro/scripts/verify_supplement.py --figures
 ```
 
 The helper runs `repro/scripts/render_paper_figures.py` in a temporary copy. The
-ten coordinated generators reconstruct all 17 included figures from shipped
+coordinated generators reconstruct all 28 included figures from shipped
 records. It compares plotted numerical artists and dimensions with the release
 manifest. Files are exported as PDF, PNG, and SVG at a 5.5-inch width.
 
-Figures use Times New Roman when available, with STIX/DejaVu fallback fonts.
+Figures use Arial when available, with Helvetica/DejaVu Sans fallback fonts
+and STIX mathematical notation. Mechanism drawings use layered vector slabs;
+quantitative panels retain flat axes, seed values and their recorded uncertainty.
 Font availability can change rendering on another system while the numerical
 artist checks remain meaningful. The included vector PDFs reproduce the delivered
 manuscript's appearance.
@@ -115,3 +134,284 @@ The default verification checks available file and record hashes. It does not
 substitute that check for a fresh replay of omitted tensor states. The evidence
 index distinguishes paired seeds, separate protocols, development estimates,
 confirmation results, and historical aggregates.
+
+## Protected-head audit inputs
+
+`protected_head_cpu.py` is the original frozen experiment. Its old timing
+fields are retained but do not measure the cost of returning both outputs.
+`audit_protected_head_cpu.py` replays all 20 confirmation records and computes
+the fixed retrospective OLS/ridge readers on saved encoders.
+`verify_frozen_legacy_readers_cpu.py` reloads the saved heads, checks metrics,
+certificates and convex stationarity without refitting.
+`benchmark_protected_outputs_cpu.py` measures current plus legacy outputs from
+one encoder call, including the float64 OLS implementation.
+
+`summarize_protected_audit.py` derives the release table and verdicts from the
+shipped records. The archive records all 60 original and 140 control consumer
+replays; the default verifier checks those records and hashes rather than
+loading the model tensors. Original checkpoint files and fitted-head tensors
+are retained locally outside the compact release. See
+`docs/PROTECTED_HEAD_AUDIT_20261109.md` for access assumptions, the distinction
+between original and retrospective evidence, and the timing correction.
+
+## Joint alignment and fresh confirmation
+
+The fixed development grid is in `alignment_development/`; its immutable
+choice is `alignment_development_choice.json`. `joint_alignment_cpu.py` reuses
+the original healthy checkpoints and paired future minibatches.
+`confirm_joint_alignment_cpu.py` trains the new HAR seeds 1300--1309 only after
+that gate. `verify_joint_alignment_cpu.py` independently reloads their saved
+states; `benchmark_joint_alignment_cpu.py` measures the inherited diagnostic
+path, and `benchmark_native_alignment_cpu.py` adds native float32 serving.
+
+`summarize_joint_alignment.py`, `alignment_development_table.py` and
+`plot_alignment_confirmation.py` derive the new statistics, tables and figure
+from released records. The default archive verifier checks record/source/plan
+links and preserved decisions; it does not replay tensors excluded from the
+compact archive. `alignment_execution_audit.json` records the completed CPU
+queues, verified transferred state hashes and uploaded numerical source hashes.
+See `docs/FRESH_CONFIRMATION_20261110.md` for all criteria and adverse outcomes.
+
+
+## Final completion and stopped vision screen
+
+`complete_har_controls_cpu.py` consumes the saved fresh-confirmation record and
+its original donor states. The lambda-1 feature control is chosen from prior
+development outcomes under the utility-aware rule in the final completion plan.
+`consumer_contracts.py` records disjoint correct/wrong flows and two fixed
+confidence-threshold consumers. `summarize_completion.py` rebuilds the matched
+table and paired intervals; `plot_consumer_contracts.py` rebuilds the vector figure.
+`verify_completion_cpu.py` replays all 100 recorded endpoints; there are 90
+distinct reader/model pairs because the inherited OLS fit is reproduced exactly.
+`benchmark_completion_cpu.py` measures native current-plus-legacy serving.
+
+`vision_consumer_cpu.py` decodes only the official CIFAR-100 training pickle
+for the fixed development screen. Its prepare stage caches healthy features and
+two heads; branch stages use the same seed-1800 checkpoint and minibatches.
+The released selection script reads the stopped queue: three endpoints complete,
+two coefficients become nonfinite, one branch is interrupted and two remain
+unlaunched. No further development or official test evaluation follows.
+`verify_vision_consumer_cpu.py` independently checks saved encoder/features,
+readers, metrics, selective decisions and OLS stationarity.
+
+`completion_execution_audit.json` records completed and deliberately stopped
+queues, all transferred file hashes and historical source versions. Original
+raw logs and 55 model-state files remain local outside the compact archive.
+Scrubbed review logs are in `logs/final_completion/`. The default verifier checks
+these recorded checks and preserved negative decisions; it does not load the
+excluded tensors or rerun training. See `docs/FINAL_REVIEW_20261110.md` for scope.
+
+## Shared-reference replay and consumer-cell studies
+
+The immutable 2026-11-10 plans specify the fixed cell grids, class-only ablation,
+shared-replay architecture, development choices, failed cost verdict and later
+capacity check. `cell_development_stop.json` preserves the formal class-only
+HAR eligibility and the separate futility stop; it does not report test outcomes.
+
+`shared_replay_cpu.py` produces the six development records. The frozen choice
+is `shared_replay_development_choice.json`. `shared_replay_confirm_cpu.py` trains
+the 20 new confirmation seeds and full-update controls. `summarize_shared_replay.py`
+computes paired intervals. `audit_shared_replay_cpu.py` reconstructs the two
+functions from raw states; `benchmark_shared_replay_cpu.py` and the separate
+Inductor pilot retain absolute times, ratios, setup and strong reuse controls.
+The numerical runtime is CPU PyTorch 2.7.1; dataset-free review uses the local
+environment listed above. Timing results are not hardware-independent.
+
+`vision_shared_replay_cpu.py` and `vision_replay_capacity_cpu.py` produce the two
+fixed ResNet grids; `audit_vision_replay_cpu.py` independently reloads all ten
+completed endpoint states. Both grids stop before official test scoring. The
+study is last-block primary-task adaptation, not full-backbone or auxiliary
+transfer. `shared_reference_replay.py` and `shared_reference_vision.py` implement
+the real-arithmetic identities and separately measured serving arithmetic.
+
+The dense low-rank companion is registered in
+`docs/plans/2026-11-10-dense-lowrank-replay.md`.
+`dense_replay_confirm_cpu.py` produces six development records on seeds
+800--802 and ten confirmation records on seeds 2520--2529; on HAR the
+development gate stops the family, and on SNR the selected (16, 12)
+configuration matches unrestricted joint training. `dense_replay.py`
+implements the dense identity and the packed serving path;
+`benchmark_dense_replay_cpu.py` measures the traced cost of the same
+endpoints; `summarize_replay_rank.py` computes the SVD rank projections on the
+saved full-joint endpoints. The projections are members of the truncated
+families, not lower bounds, and the cost failure is retained.
+
+`recovery_replay_execution_audit.json` records every new queue and file digest,
+all 630 transferred `.pt` files, approximately 1.20 GB remote bytes, and the
+retained technical failures. Source bytes that differ from current helpers
+are preserved by digest under `repro/source_versions/`. Scrubbed technical
+tracebacks are in `logs/shared_replay/`. These omitted tensor files are needed
+for a fresh prediction replay; the compact verifier checks the shipped records
+and hashes rather than claiming to load them.
+
+
+## Nonlinear scope, actual serving and precision
+
+`nonlinear_suffix_cpu.py` and `token_suffix.py` define the complete residual-block
+and final attention-block studies. `nonlinear_suffix_choice.json` and
+`two_block_choice.json` freeze the development selections before their original
+test loading. The earlier final-map, residual-capacity, final-MLP, one-attention-
+block and ResNet-50 failures remain in distinct folders. Test intervals describe
+ten continuation seeds sharing one pretrained reference, split and label mask.
+
+`benchmark_suffix_cpu.py` reconstructs saved endpoints, measures isolated
+current/protected latency, and separately audits the actual full-prefix serving
+outputs at batches 1/128. `reference_precision_choice.json` freezes the selected
+implementation and its full-precision control after actual native validation.
+Protected-only BF16 and suffix autocast leave current/prefix FP32; standard
+whole-encoder AMP has its own matched baseline and retained development verdict.
+These are standard numerical implementations, with empirical old-decision
+contracts distinct from an exact real-arithmetic identity. All timings and
+negative outcomes, including export/bookkeeping stops and reissued jobs, remain.
+
+The numerical host is a Xeon Platinum 8570 with PyTorch 2.7.1/torchvision 0.22.1;
+all tensors are CPU and CUDA visibility is empty. The AVX-512/BF16/AMX capabilities
+are recorded in `frontier_hardware.json`; no individual kernel-dispatch claim is
+made. Vision timing uses 12 threads, 12 warmups and 31 alternating repetitions,
+with no owned training/replay job running concurrently. Model setup, compilation
+and preprocessing are outside forward latency. Small native MLP timings retain
+their separately documented single-thread/four-thread settings.
+
+`readout_alignment.py` supplies all nine fixed unlabeled affine controls in
+`suffix_repair_development/`. `vision_protected_head_cpu.py` supplies the later
+standard one-forward distillation control; its plan explicitly records that
+unconstrained test outcomes were already open when this follow-up was registered.
+Neither baseline is renamed as a new learning algorithm.
+
+The local analysis entry points are `analyze_frontier_extension.py` and
+`analyze_served_frontier.py`. `frontier_execution_audit.json` inventories the
+recovered numerical files and their hashes, including an immutable stopped
+screen's cache moved off the CPU host after verified local recovery.
+`check_frontier_states.py` checks their floating tensors; `replay_frontier_outputs.py`
+recalculates actual serving metrics and certificates from recovered output
+arrays. This output check is not a second execution of the pretrained backbone.
+Raw model states, representation caches and official weight files remain outside
+the compact submission archives; file checks in the default verifier inspect the
+recorded evidence rather than silently rerunning those numerical experiments.
+
+
+The full-corpus verifier initially hit an author-set 8 GiB/job ceiling on two
+ViT jobs, interrupting a third. This was a guard stop, not host exhaustion.
+After the user's resource clarification, the unchanged missing endpoints run
+without fixed per-job/aggregate RSS caps, with a 256 GiB host-available reserve
+and at most four 12-thread workers. Completed original records remain; the
+location index maps each published serving record to its original or resumed
+queue. Both sets use the same numerical program hashes and frozen choices.
+The isolated latency measurements were already complete and are not repeated
+under this concurrent replay load. See `frontier_memory_policy.json` and the
+resource plan for the exact operational change.
+
+
+## Reference and auxiliary follow-up
+
+`docs/plans/2026-11-10-independent-vision-auxiliary.md` fixes the data, gate,
+seed hierarchy and conditional confirmation before outcomes. The corrected
+`vision_auxiliary_cpu.py` isolates decoder optimizer moments. The first ResNet
+attempt is technically invalid and excluded; source snapshots and its exclusion
+are retained. The two valid pilots fail the real-auxiliary gate. Only ViT's
+predeclared CE-only fallback advances to four new fitted references.
+
+`analyze_reference_replication.py` computes intervals over reference means;
+`audit_followup_evidence.py` checks returned arrays locally. Full suffix and
+healthy-consumer forwards are separately executed by
+`vision_auxiliary_replay_cpu.py` on CPU. This avoids treating the training
+record's cached-reference-versus-itself comparison as an independent replay.
+`followup_execution_audit.json` records all nine stopped numerical queues,
+including failures, file fingerprints, recovered outputs and unbundled caches.
+The review verifier checks these records without fetching excluded weights.
+
+
+## Small-budget risk estimation
+
+The frozen point-estimation study and its full controls are in
+`docs/SMALL_BUDGET_RISK_RESULT_20261110.md`. Plans, CPU exports, reference-level
+analysis and independent consumer-rate replay are under the matching risk files.
+The compact paper archive includes code and numerical records. Twelve raw output
+arrays (without images/backbone weights) are provided in the separate local
+`01_研究增量_小预算风险诊断_20261110` evidence package. Its extracted replay reproduces
+both full primary and rate-level JSON results. Initial1024 map-fitting reference
+outputs are separate from the32--256 additional query budgets. These are MAE
+estimates and do not replace the finite-corpus certificate.
+
+## Visual checkpoint replication and matched latency
+
+For the AugReg run, install `safetensors` alongside CPU PyTorch and
+TorchVision. Download the [AugReg checkpoint](https://huggingface.co/timm/vit_base_patch32_224.augreg_in21k_ft_in1k/resolve/56508f8/model.safetensors)
+and retain its digest-pinned file as `model.safetensors`. Set
+`REPFIX_DATA_X` as above. Run the following command with reference seeds
+6201 through 6204 and the SHA-256 of `docs/plans/2026-11-11-augreg-replication.md`.
+
+```text
+python repro/scripts/augreg_replication_cpu.py --checkpoint model.safetensors --reference-seed 6201 --plan-sha256 PLAN_SHA256 --out a000.json
+```
+
+The driver fits both continuation arms, evaluates the old reader on the
+unsplit checkpoint and the protected program, and records logits for
+independent replay. The fixed [latency protocol](plans/2026-11-11-matched-batch-latency.md)
+uses the original TorchVision population and confirmation records
+`c000.json`, `c003.json`, `c006.json`, and `c009.json` and their adjacent
+endpoint states. Run each separately with `matched_batch_cpu.py` on the
+same CPU and thread count. Use `summarize_checkpoint_replication.py` to
+recompute paired intervals and the decision audits from the numerical
+archive. Its README lists the commands and expected JSON files.
+
+## Training-work controls
+
+The full control grid uses references 6201–6204 and continuation seeds
+6310–6312. Both arms start from each reference's healthy suffix. The
+protocol is `docs/plans/2026-11-11-compute-control-confirmation.md`.
+Run both commands for each pair, with unique output paths and the
+protocol's SHA-256.
+
+```text
+python repro/scripts/contrastive_benefit_cpu.py --population population.pt --alpha 0 --reference-seed 6201 --seed 6310 --epochs 10 --primary-two-view --phase compute_control --plan-sha256 PLAN_SHA256 --out k000.json
+python repro/scripts/contrastive_benefit_cpu.py --population population.pt --alpha 0 --reference-seed 6201 --seed 6310 --epochs 20 --phase compute_control --plan-sha256 PLAN_SHA256 --out k001.json
+```
+
+Each endpoint saves validation logits and labels in its `replay.pt`.
+`analyze_compute_confirmation.py` checks their hashes, pairs them with
+the earlier native joint outputs, and recomputes all 24 accuracy
+comparisons. Intervals average three continuation differences within
+each reference and use the four reference means. The separate numerical
+archive includes the compact outputs and the exact analysis command.
+
+## Early decisions on CIFAR-10
+
+Download the [binary CIFAR-10 archive](https://www.cs.toronto.edu/~kriz/cifar.html).
+The driver checks its published MD5 and the TensorFlow Datasets SHA-256
+before decoding the training batches. Use the SHA-256 of
+`docs/plans/2026-11-11-early-update-diagnosis.md` for preparation and the
+development and confirmation runs.
+
+```text
+python repro/scripts/prospective_vision_cpu.py --stage prepare --archive cifar-10-binary.tar.gz --plan-sha256 PLAN_SHA256 --out v000.json
+python repro/scripts/prospective_vision_cpu.py --stage development --population v000_states/population.pt --reference-seed 7410 --rate mild --plan-sha256 PLAN_SHA256 --out d000.json
+```
+
+Run the three rates for each development reference. Derive the fixed
+choice with `analyze_early_update.py` and provide it with `--choice`
+for the six confirmation references. The nominal supervised control uses
+`--alpha 0`. Stability runs use `--stage stability --rate stable` and
+the separate stability protocol's digest. Each run writes a
+`forecast.json` at epoch two and a `replay.pt` after evaluation. The
+numerical archive supplies the full analysis commands, sealed receipts,
+terminal outputs and epoch logs. The archives exclude the image data and
+the prepared feature population.
+
+## Legacy precision on the official CIFAR-10 test partition
+
+Use `stable_prefix_cpu.py --stage fit` at widths 64, 128 and 256 for
+the development screen, with the prepared population and width protocol
+digest. The screen closes before official test access. Use
+`legacy_precision_cpu.py --stage fit` with the same population and the
+legacy precision protocol digest to calibrate the three precision
+candidates. The fixed order selects a zero-exact-call candidate from
+development monitor outputs.
+
+For each confirmation reference (7420–7425), the precision driver
+reconstructs the strong continuation and records both serving actions
+before loading its test partition. The timing stage uses that run's
+saved serving state, the same old-block weights, and the original
+population. The numerical archive provides the exact commands to
+replay selection, decisions and timing summaries. The timing runs use
+the x86 quantized CPU backend.

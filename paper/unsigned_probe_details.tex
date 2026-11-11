@@ -1,0 +1,21 @@
+\subsection{Unsigned feature-space probes}\label{app:unsigned_probe}
+
+Let $h$ and $u$ stack the rows of $H$ and $C_BH$, respectively, and let $g_p=\nabla_h L_p$, $g_a=\nabla_h L_a$. A cheap feature-space probe uses the centered radial direction:
+\begin{definition}[Unsigned radial toxicity proxy]\label{def:toxicity}
+For $u\ne0$ and $\|g_p\|>0$, define
+\begin{equation}
+ \rho_b=\frac{\|\Pi_u g_a\|}{\|g_p\|},\qquad
+ \Pi_u g=\frac{u^\top g}{\|u\|^2}u.
+ \label{eq:order}
+\end{equation}
+The experimental estimator $\hat\rho$ instead averages regularized per-example ratios. The frozen decision uses a recorded value $q=\hat\rho_{t_0}$ and the nominal dose $\alpha_{\rm probe}=1/q$.
+\end{definition}
+
+The proxy drops the sign of the auxiliary direction and takes the whole primary-gradient norm as its reference. Expansion and contraction can then give the same $\rho_b$, and a large primary gradient need not restore centered variation. The two drivers also measure different objects: the controlled one probes the isotropic surrogate $\|C_BH\|_F^2/(Bm)$ while training with fixed projected-variance auxiliaries, and the real-head one probes the actual auxiliary.
+
+The exact encoder metric and calibration drift further limit a frozen radial
+probe. Appendix~\ref{app:boundary_proof} gives a local sign certificate and
+separates restoration alignment, geometry, discarded sign and drift. On $405$
+HAR checkpoints its canonical frozen certificate fires on only $2$, both
+correct. The exact signed flux remains available where the proxy is unresolved.
+

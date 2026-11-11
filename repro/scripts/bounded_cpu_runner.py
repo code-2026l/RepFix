@@ -58,9 +58,14 @@ def main():
     jobs = manifest['jobs']
     if len({j['id'] for j in jobs}) != len(jobs):
         raise ValueError('Unique job ids are required')
+    reserve=manifest.get('min_host_available_bytes',8*2**30)
+    job_memory_cap=manifest.get('per_job_rss_bytes')
+    aggregate_memory_cap=manifest.get('aggregate_rss_bytes')
     state = dict(pid=os.getpid(), started=time.time(), pending=[j['id'] for j in jobs],
                  running={}, completed=[], failed=[], finished=False,
-                 peak_aggregate_rss_bytes=0, max_workers=manifest['max_workers'])
+                 peak_aggregate_rss_bytes=0, max_workers=manifest['max_workers'],
+                 memory_policy=dict(per_job_rss_bytes=job_memory_cap,aggregate_rss_bytes=aggregate_memory_cap,
+                                    minimum_host_available_bytes=reserve),minimum_host_available_bytes=mem_available())
     running = {}
     pending = list(jobs)
     env = os.environ.copy()
@@ -78,7 +83,7 @@ def main():
                 item['peak_rss'] = max(memory, item['peak_rss'])
                 elapsed = time.time() - item['start']
                 reason = None
-                if memory > manifest['per_job_rss_bytes']:
+                if job_memory_cap and memory > job_memory_cap:
                     reason = 'per_job_memory_limit'
                 elif elapsed > manifest['per_job_wall_s']:
                     reason = 'per_job_wall_limit'
@@ -99,12 +104,14 @@ def main():
                     del running[key]
             total_rss = sum(rss(v['process'].pid) for v in running.values())
             state['peak_aggregate_rss_bytes'] = max(total_rss, state['peak_aggregate_rss_bytes'])
-            if total_rss > manifest['aggregate_rss_bytes'] or mem_available() < 8 * 2**30:
+            free_memory=mem_available()
+            state['minimum_host_available_bytes']=min(state['minimum_host_available_bytes'],free_memory)
+            if (aggregate_memory_cap and total_rss > aggregate_memory_cap) or free_memory < reserve:
                 raise RuntimeError('Aggregate or host memory stop condition reached')
             if len(state['failed']) >= 2:
                 raise RuntimeError('Two failed jobs: stop launching and inspect locally')
             enough_space = shutil.disk_usage(root).free > 5 * 2**30
-            enough_memory = mem_available() > 24 * 2**30
+            enough_memory = free_memory > max(24*2**30,reserve+manifest.get('launch_headroom_bytes',0))
             while pending and len(running) < manifest['max_workers'] and enough_memory and enough_space:
                 job = pending.pop(0)
                 identifier = job['id']

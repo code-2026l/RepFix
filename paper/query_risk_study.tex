@@ -1,0 +1,105 @@
+\subsection{Small-Budget Estimation of Consumer Disagreement}\label{app:query_risk}
+
+The finite-corpus check answers whether a candidate meets a disagreement
+budget. A small sample can also estimate the amount of disagreement, although
+direct binary counts have substantial sampling variation. We test whether
+statistical propagation through the cheap reader improves this estimate.
+Conditional-expectation variance reduction and model-assisted estimation are
+established tools; prediction-powered inference~\citep{angelopoulos2023ppi}
+provides related context for combining inexpensive predictions with exact samples.
+Here we evaluate point-estimation error, separately from the earlier certificate.
+
+Let $Z$ be repaired current logits and $E$ the healthy-minus-current logit
+residual. A known conditional law gives
+$m_j(Z)=\Pr\{C_j(Z+E)\ne C_j(Z)\mid Z\}$ for consumer $j$.
+Then $\mathbb E m_j(Z)=\Pr\{C_j(Z+E)\ne C_j(Z)\}$ and the conditional-variance
+identity gives $\operatorname{Var}(m_j(Z))\le\operatorname{Var}(\mathbf1\{C_j(Z+E)\ne C_j(Z)\})$.
+We approximate the residual law by a shared Gaussian mean/covariance estimated
+from a small monitor, with $10\%$ shrinkage toward an isotropic covariance.
+An isotropic comparator retains the same mean and covariance trace.
+
+An exploratory screen on all six earlier visual development endpoints fixes the
+recipe before confirmation. Each repair uses $1{,}024$ isolated anchors to fit
+a standardized centered-logit ridge reader with coefficient $10^{-3}$.
+A separate $1{,}024$-anchor pool supplies monitor subsets of size $32/64/128/256$.
+Both estimators use the same subsets. Propagation averages $64$ fixed Gaussian
+draws over $512$ inexpensive current outputs; direct counting uses the observed
+old/current consumer differences. No consumer labels enter either estimator.
+The additional monitor-query budget is separate from the initial $1{,}024$
+paired map-fitting outputs, which can be cached across updates.
+
+Confirmation uses the twelve saved CE-only ViT endpoints from four independently
+fitted references and partitions, with three continuation seeds per reference.
+Their training accuracies were previously observed, but the new repair and risk
+outcomes were computed after freezing this analysis. The primary target is the
+maximum class/selective disagreement over $5{,}000$ clean validation inputs.
+Twenty monitor subsets measure each endpoint's sampling variation. Intervals
+use four reference means, each averaging three continuations and their subsets
+($t$, three degrees of freedom). The official test split remains closed.
+
+At $32$ additional queries, covariance propagation reduces MAE from $4.773$ to
+$0.509$ points; the paired reduction is $4.264$ points, $95\%$ interval
+$[3.148,5.380]$. At $64$ queries, MAE falls from $2.964$ to $0.502$, a reduction
+of $2.462$ points $[1.573,3.352]$. Both pass the fixed $20\%$ improvement and
+positive-lower-interval criteria. With augmented validation inputs and clean
+monitor anchors, the corresponding MAEs are $0.690/0.683$ against
+$4.228/2.434$, with positive improvement intervals at both primary budgets.
+The augmented-view intervals cross zero at $128/256$ queries.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/fig_risk_queries.pdf}
+\caption{Reference-query budget and disagreement-estimation error.
+Solid markers average four fitted references; pale points show every reference
+mean, each averaging three continuations and twenty monitor subsets. Budgets
+count additional reference calls after the common $1{,}024$ map-fitting anchors.
+The two propagation models additionally use $512$ cheap current outputs.
+(a) Clean validation. (b) Fixed augmented views with clean monitor anchors.
+The isotropic control ties full covariance within uncertainty.}
+\label{fig:query_risk}
+\end{figure}
+
+At $32/64$ queries the isotropic model obtains $0.508/0.499$ points, close
+to full covariance. Averaging errors across consumers gives clean MAEs of
+$0.772/0.779$ versus $3.488/2.514$ for direct counting. Independent
+rate-level replay reproduces the forecasts.
+
+The estimate depends on the joint law. For equally likely binary logits
+$Z=\pm a$, the residuals $E=2Z$ and $E=-2Z$ share a marginal law and yield
+zero and complete sign disagreement, respectively. The observed
+confirmation disagreements are $6.20$--$7.96\%$, above the $1\%$ repair
+limit. The supplementary archive supplies the arrays and replay.
+
+\subsection{Reusing the Fitting Anchors}\label{app:cached_anchor_risk}
+
+The ridge reader already uses $1{,}024$ paired anchors. Its mean leverage
+is $0.741$ on the supervised continuation endpoints, making fitted
+residuals substantially smaller than leave-one-out residuals. With the
+feature normalizer and ridge penalty held fixed, the standard
+leave-one-out identity rescales residual $e_i$ to $e_i/(1-h_i)$, where
+$h_i$ is the diagonal of the ridge hat matrix including the intercept.
+The identity agrees with independent row-deleted refits.
+
+On these endpoints, clean-corpus MAE falls from $4.85$ points for
+in-sample decision counts to $1.09$ for leave-one-out counts and $0.49$
+for isotropic propagation of the leave-one-out residuals. The latter uses
+the original fitting outputs and no additional reference queries. The
+original $32$-query isotropic estimate has MAE $0.51$ points. The
+leave-one-out result on these endpoints is a retrospective control.
+
+We fix the leave-one-out estimator before examining repair risk on the
+twelve cross-view continuations. The clean-corpus MAE is $0.47$ points
+with zero additional reference queries and $0.49$ with $32$ queries.
+The paired difference is $-0.02$ points with $95\%$ interval
+$[-0.27,0.22]$, within the fixed $0.25$-point noninferiority margin.
+On augmented inputs the MAEs are $1.48$ and $1.28$ points, with a paired
+difference of $0.20$ points $[0.10,0.31]$. These fits reuse the same
+reference models and the same initial $1{,}024$ paired accesses. The
+clean-corpus disagreement of the repaired outputs ranges from
+$7.92\%$ to $9.30\%$.
+
+On the clean saved-model corpus, exact stratified audits take $129.60$
+queries to reject a $1\%$ budget, compared with $78.67$ under uniform
+sampling. Holding the residual marginal fixed and reassigning residuals
+to current logits yields constructed disagreement ranges spanning
+$39.49$ points on average.

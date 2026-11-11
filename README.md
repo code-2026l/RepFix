@@ -1,77 +1,108 @@
 # RepFix
 
-**Silent Scale Shift: When Shared Updates Break Existing Readouts**
+Silent Scale Shift: Variance Contraction Breaks Calibrated Readouts
 
-This artifact accompanies the 62-page manuscript in
-[`paper/RepFix_ICLR2027.pdf`](paper/RepFix_ICLR2027.pdf), with nine main-text pages.
-It contains the source, complete recorded outcomes, analysis and figure scripts,
-fixed study protocols, and structural checks.
+This repository contains the manuscript, editable figures, numerical records,
+fixed study plans and verification scripts.
 
-The paper separates task decodability from compatibility with an existing readout.
-Matched continuation and input repair isolate a scale-sensitive failure. Signed
-update audits examine the diagnostic, while the SNR confirmation and single-encoder
-controls measure the benefit and cost of preserving compatibility. The artifact
-retains the CNN, frozen-trunk, nonlinear-side, and calibration boundary results.
+An update can improve a task while breaking an existing readout. Matched
+continuation and unlabeled repair isolate one scale mechanism. The serving
+studies measure which class and threshold decisions survive and how much
+computation the protected program uses.
 
-## Paper and downloads
+On all 10,000 official CIFAR-100 test images, a fixed routed student
+preserves the old fine/coarse class and confidence rules and gains
+0.86 points [0.68, 1.05] over the paired two-view student and
+0.60 [0.41, 0.79] over its doubled-epoch counterpart. It uses the
+updated two-block tail on 32.2% of inputs. Complete FP32 CPU forwards
+cost 1.046× [1.019, 1.074] at batch 1 and 1.032× [1.005, 1.058]
+at batch 128 relative to the unrestricted current teacher.
+[Visual deployment](docs/VIT_DEPLOYMENT_RESULT_20261111.md)
 
-- [Read the final paper](paper/RepFix_ICLR2027.pdf) — 9 main pages, 62 pages total.
-- [Download supplementary material](artifacts/2026-11-09/RepFix_Supplementary_20261109.zip)
-- [Download manuscript source and evidence](artifacts/2026-11-09/RepFix_ICLR_Polished_20261109_source.zip)
-- [Reproduction guide](docs/REPRODUCIBILITY.md) · [Evidence index](docs/EVIDENCE_INDEX.md)
+In the earlier training-only validation study, cross-view auxiliary training on CIFAR-100 improves ViT-B/32 accuracy by
+0.84 percentage points [0.66, 1.03] over matched supervised continuation
+and lowers held-out contrastive loss by 19.5%. Twelve continuations span
+four fitted references with shared ImageNet pretraining. The FP32 reference
+preserves every audited old decision. The selected lower-precision reference
+changes at most 0.18% of decisions. [Visual auxiliary results](docs/CONTRASTIVE_RESULT_20261111.md)
 
-![Readout compatibility overview](paper/figures/fig_readout_overview.png)
+The full 24-endpoint control matrix compares the same twelve joint runs
+against two-view and doubled-epoch supervised continuation. At the same
+suffix-forward budget, the gains are 0.725 points [0.286, 1.164] and
+0.527 points [0.195, 0.858]. [Training-work controls](docs/COMPUTE_CONTROL_RESULT_20261111.md)
 
-## Start here
+The fixed recipe also improves accuracy with AugReg ViT-B/32 weights
+by 0.60 points [0.15, 1.05] and lowers contrastive loss by 8.46%.
+The retained FP32 reference preserves every audited AugReg decision.
+On the TorchVision endpoints, a BF16 reference with the same FP32 current
+graph costs 1.078脳 [1.069, 1.088] at batch 128.
+[Checkpoint replication](docs/CHECKPOINT_REPLICATION_20261111.md)
 
-From this directory, verify the extracted files and archived source/protocol links:
+On CIFAR-10 with ResNet-18, an epoch-two monitor flags 15 of 17 later
+budget exceedances and clears all seven safe updates. A fixed
+limited-reference replay stays within 5% disagreement on all 24 cases
+and sends a median 25% of examples to the old suffix on unsafe updates.
+[Early-update study](docs/EARLY_UPDATE_RESULT_20261111.md)
+
+For the six strongest ResNet-18 updates, an INT8 old block uses zero
+exact FP32 old-block calls on 9,000 official CIFAR-10 test images.
+Maximum disagreement is 1.73%. Batch-128 latency is 1.043脳 current-only
+and 0.878脳 the prior referral program.
+[Legacy precision study](docs/LEGACY_PRECISION_RESULT_20261111.md)
+
+The earlier supervised-transfer studies and the failed visual reconstruction
+and routing screens document how the result depends on the task and access
+conditions. [Earlier experiments](docs/FOLLOWUP_REPORT_20261110.md)
+
+![Shared computation and fresh transfer](paper/figures/fig_suffix_frontier.png)
+
+Cached fitting anchors also support disagreement forecasts through ridge
+leave-one-out residuals. Exact certification uses an independently sampled
+monitor. [Risk estimation and audit results](docs/CACHED_RISK_RESULT_20261111.md)
+
+## Paper and files
+
+- [Paper](paper/RepFix_ICLR2027.pdf)
+- [Supplementary archive](artifacts/2026-11-11/RepFix_Rebuttal19147_20261111_supplement.zip)
+- [Editable source](artifacts/2026-11-11/RepFix_Rebuttal19147_20261111_source.zip)
+- [Reading guide](docs/REVIEWER_GUIDE.md) 路 [Evidence index](docs/EVIDENCE_INDEX.md)
+- [Final argument and English](docs/STORY_FINAL_20261110.md) 路 [Scientific integrity](docs/STORY_INTEGRITY_20261110.json)
+- [Editorial and figure refinement](docs/EDITORIAL_FINISH_20261110.md) 路 [Integrity checks](docs/EDITORIAL_VISUAL_VERIFICATION_20261110.json)
+
+## Verify the artifact
 
 ```text
 python repro/scripts/verify_supplement.py
 ```
 
-This first check uses the Python standard library and reads the shipped manifest.
-It does not download data or train a model.
-
-For the structural tests, figure reconstruction, and manuscript build:
+The default check uses the standard library to verify files, numerical records,
+source/plan hashes, frozen choices and recorded outcomes. For the optional CPU
+checks, install the review environment and run:
 
 ```text
 python -m pip install -r requirements-review.txt
 python repro/scripts/verify_supplement.py --tests --figures --paper
 ```
 
-The optional checks run in a temporary copy, leaving the extracted release intact.
-The paper build also requires `pdflatex`, `bibtex`, and `pdftotext` on `PATH`.
-See [the reproduction guide](docs/REPRODUCIBILITY.md) for each check and its inputs.
+This runs in a temporary copy and preserves the extracted source. It checks 145
+focused structural tests, reconstructs 35 manuscript figures from recorded data,
+and compares the rebuilt paper's page text and pixels. LaTeX requires `pdflatex`,
+`bibtex` and `pdftotext`. See the [reproduction guide](docs/REPRODUCIBILITY.md).
 
-## Find the evidence
+## Evidence and training
 
-- [Evidence index](docs/EVIDENCE_INDEX.md): manuscript figures and claims mapped to
-  recorded results, analysis scripts, and fixed protocols.
-- [`repro/results/CPUCONT/`](repro/results/CPUCONT/): paired continuation, repair,
-  real reconstruction, CNN, head-state, protected-benefit, compiled, and nonlinear
-  studies. Frozen development choices and the exact-count correction are included.
-- [`results/README.md`](results/README.md): detailed directory map for historical
-  benchmarks; [`repro/README.md`](repro/README.md): current script entry points.
-- [`docs/plans/`](docs/plans/): study protocols. Plans referenced by recorded hashes
-  are retained byte for byte.
-- [`paper/figures/`](paper/figures/): vector figures and editable SVG counterparts.
+- [`repro/results/CPUCONT/`](repro/results/CPUCONT/): complete continuation,
+  repair, distillation, nonlinear-scope and actual-serving records.
+- [`docs/plans/`](docs/plans/): fixed protocols and byte-preserved historical versions.
+- [`repro/scripts/`](repro/scripts/): numerical drivers, local analysis, plots and verification.
+- [`paper/figures/`](paper/figures/): publication-width vector PDF/SVG and PNG previews.
+- [`repro/source_versions/`](repro/source_versions/): exact executed source snapshots.
+- [Historical result map](results/README.md) 路 [Current script entry points](repro/README.md)
 
-## What can be reproduced
+Raw datasets, official weight files, trained tensors and large representation
+caches are outside the compact archives. Recovered tensor and output checks are
+recorded explicitly; the default verifier does not silently rerun a pretrained
+backbone or claim to load those excluded inputs. The numerical CPU environment
+and hardware are separate from the lightweight local review environment.
 
-The archive supports dataset-free file/provenance checks, 47 focused structural
-tests, reconstruction of all 17 included figures from recorded results, and a local
-LaTeX build. The validation choice and failed nonlinear development gate can be
-inspected without rerunning training.
-
-Raw datasets and trained tensor checkpoints are not included. Training and an
-independent replay of saved model states require those additional inputs; shipped
-replay records document the earlier completed checks. Dataset setup is described
-in [the reproduction guide](docs/REPRODUCIBILITY.md#data-and-training).
-Historical aggregate-only results are identified in `results/README.md`.
-
-`ARTIFACT_MANIFEST.json` records the manuscript hash and a SHA-256 digest for every
-payload file. `REVIEW_CHECKS.json` records the checks performed on this release.
-The MIT license and third-party terms are in [`LICENSE`](LICENSE) and
-[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md). Citation metadata is in
-[`CITATION.cff`](CITATION.cff).
+[Equal-call routing control](docs/ROUTING_SPECIFICITY_20261111.md): fixed routing gains 0.63 points [0.51, 0.75] over the exact random expectation and captures 99.33% of student/teacher decision differences. This is a retrospective fixed-prediction analysis.

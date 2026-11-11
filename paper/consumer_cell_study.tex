@@ -1,0 +1,38 @@
+\subsection{Consumer-Cell Development Study}\label{app:consumer_cell_study}
+
+The preceding geometry motivated a separately planned loss comparison
+before shared replay. Its purpose was to preserve specified decisions
+without forcing every logit to equal its healthy value. All choices use
+healthy predictions and fitting inputs; selection never uses new labels
+for the old consumer. The class and two fixed confidence-threshold outputs
+define the primary contract. A separately declared class-only ablation
+removes confidence constraints from training but still scores all consumers.
+Standard distillation and full-feature alignment are retained comparators.
+
+Stage A freezes saved development encoders for seeds $800$--$802$ on both
+tasks. It fits affine, diagonal-quadratic and width-$32$ residual readers
+with temperature-$1/2/4$ KL, centered logit MSE, consumer-cell KL and
+consumer-cell log-odds objectives, plus OLS: $114$ endpoints. Adam uses
+learning rate $10^{-3}$, weight decay $10^{-4}$, batch $1024$, $60$ epochs
+and a common gradient-norm cap of $5$. Neither task finds a candidate
+meeting the $2.5\%$ development disagreement limit for all three consumers.
+
+Stage B jointly continues the original healthy encoder and Adam state.
+Each of the six records includes detached/joint controls, conditioned raw
+logit distillation, full-feature alignment, and four objectives at four
+fixed coefficients with affine/residual readers: $216$ endpoints. Primary
+label fractions, auxiliary doses, $30/25$ epochs and batch $256$ remain
+fixed. All arms use the same gradient cap and future orders. The separate
+class-only study adds $96$ endpoints. Complete grids and immutable plans
+are included in the artifact; no test scoring enters development.
+
+Neither task passes the primary three-consumer gate. The class-only HAR
+cell log-odds candidate is formally eligible, but is development-dominated
+by a standard temperature-$1$, coefficient-$1$ KL control: reconstruction
+ratios are $0.633$ versus $0.626$, primary differences $-0.272$ versus
+$-0.136$ points, and worst class disagreements $2.109\%$ versus $2.041\%$.
+We retain that eligibility and apply an additional, explicitly retrospective
+futility stop before any new test confirmation. SNR has no eligible cell
+candidate. The proposed cell losses therefore add no confirmed training advantage
+over the standard controls. Independent SLSQP, envelope-gradient and serving
+checks verify their numerical implementation.

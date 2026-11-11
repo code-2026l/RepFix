@@ -1,0 +1,25 @@
+\subsection{Filtering the Auxiliary Update}
+
+Detachment blocks auxiliary gradients to the encoder and provides the reference when the auxiliary brings no primary-task value. The spectral toxicity filter (\STF{}) instead removes a chosen component of the auxiliary channel. Its idealized backward form is
+\begin{equation}
+ F_w[g_a]=g_a-w\Pi_u g_a,\qquad w\in[0,1],
+ \label{eq:stf}
+\end{equation}
+The implemented selective arms transform the auxiliary input, $\widetilde H=H-wC_BHP$, using a frozen projector $P$ or a centered radial direction. The transformation changes the forward input as well as its gradient, while the auxiliary head continues training (Appendix~\ref{app:general}).
+
+The calibrated arm freezes the warm-up probe and opens the gate when $\alpha\hat\rho\ge1$. The rank variant then selects
+\begin{equation}
+ \mathrm{rank}_{\rm sel}=\min\{\mathrm{rank}\le \mathrm{rank}_{\max}:\alpha\hat\rho_{\rm res}[\mathrm{rank}]<1\},
+ \label{eq:calrule}
+\end{equation}
+from nested candidate subspaces. If none passes, it uses the cap and records the unresolved residual. The radial arm is a separate intervention. Theorem~\ref{thm:minimalrank} gives the minimum deletion rank for a specified PSD operator; using an empirical PCA basis adds a basis-identification question. Gate calibration and subspace choice therefore need separate evaluation.
+
+\label{sec:conflict_ablations}
+The low-label SNR dose scan shows both the value and limits of filtering (Figure~\ref{fig:intervention}a,b). With $20\%$ primary labels, joint training is healthy at low dose but collapses in every seed from $\alpha=30$. Calibrated STF avoids collapse at every sampled dose and exceeds detachment by $0.5$--$1.0$ percentage points over $\alpha\in[15,100]$; the advantage disappears at extreme doses. This five-seed scan uses a different label budget from the fully labeled study in Appendix~\ref{app:rml_dose}.
+
+The fully labeled SNR comparison shows why clearing the scatter threshold is insufficient (Figure~\ref{fig:intervention}c). Detachment reaches $0.307$ accuracy with $0/10$ collapses. The radial arm reaches $0.199$ with $1/10$, and the rank-3 arm $0.211$ with $0/10$. Basis choice also changes how much auxiliary learning is removed: in HAR reconstruction, an auxiliary-gradient basis uses $30.75$ directions versus PCA's $62.0$ among the same four gate-open seeds, at similar accuracy (Table~\ref{tab:realbasis}).
+
+\label{sec:bmtl}\label{sec:bmtl_ablation}\label{sec:finance}
+At the controlled high doses, calibrated filtering reduces collapse from $10/10$ to $0/10$ on HAR, battery, and RadioML, and from $5/5$ to $0/5$ on CelebA Smiling~\citep{liu2015celeba}. With a Transformer at RadioML dose $3000$, joint training collapses in $10/10$ seeds at accuracy $0.156$; filtering gives $0/10$ collapses and relative scatter $0.970$. Reliable gate activation at these extreme doses coexists with the calibration errors in Figure~\ref{fig:probe_prediction}.
+
+

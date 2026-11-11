@@ -9,6 +9,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def main():
+    authored_tex = {path: path.read_text(encoding='utf-8')
+                    for path in (ROOT / 'paper').glob('*.tex')}
     for script in ['paper/revision/build_figures.py',
                    'repro/scripts/plot_final_figures.py',
                    'repro/scripts/plot_probe_arms.py',
@@ -18,15 +20,40 @@ def main():
                    'repro/scripts/plot_compiled_frontier.py',
                    'repro/scripts/plot_nonlinear_study.py',
                    'repro/scripts/plot_benefit_confirmation.py',
-                   'repro/scripts/plot_readout_story.py']:
+                   'repro/scripts/plot_readout_story.py',
+                   'repro/scripts/plot_chart_confirmation.py',
+                   'repro/scripts/plot_protected_audit.py',
+                   'repro/scripts/plot_alignment_confirmation.py',
+                   'repro/scripts/plot_consumer_contracts.py',
+                   'repro/scripts/plot_shared_replay.py',
+                   'repro/scripts/plot_replay_vision.py',
+                   'repro/scripts/plot_suffix_frontier.py',
+                   'repro/scripts/plot_suffix_repairs.py',
+                   'repro/scripts/plot_serving_frontier.py',
+                   'repro/scripts/plot_reference_replication.py',
+                   'repro/scripts/plot_risk_query_result.py',
+                   'repro/scripts/plot_contrastive_benefit.py',
+                   'repro/scripts/plot_early_update.py',
+                   'repro/scripts/plot_legacy_precision.py',
+                   'repro/scripts/plot_subject_transfer.py',
+                   'repro/scripts/plot_rml_one_pass.py',
+                   'repro/scripts/plot_vit_deployment.py',
+                   'repro/scripts/plot_vit_shared_path.py']:
         runpy.run_path(str(ROOT / script), run_name='__main__')
-    assert len(EXPORTS) == 17
+    # Keep editorial float placement when a numerical table writer changes
+    # only [htbp] back to its historical [H] template.
+    for path, before in authored_tex.items():
+        after = path.read_text(encoding='utf-8')
+        if before != after and before.replace('[htbp]', '[H]') == after:
+            path.write_text(before, encoding='utf-8', newline='\n')
+    assert len(EXPORTS) == 35
     assert all(abs(v['width_inches'] - 5.5) < 1e-10 for v in EXPORTS.values())
     report = dict(figures=EXPORTS, figures_rebuilt=len(EXPORTS),
                   all_vector_type42=True, all_text_within_canvas=True,
                   legacy_visual_changes_preserve_numerical_artists=True)
-    (ROOT / 'paper/figures/publication_figure_manifest.json').write_text(json.dumps(report, indent=2) + '\n')
-    print('Rebuilt all seventeen included figures at final 5.5-inch width.')
+    (ROOT / 'paper/figures/publication_figure_manifest.json').write_text(
+        json.dumps(report, indent=2) + '\n',encoding='utf-8',newline='\n')
+    print('Rebuilt all thirty-five included figures at final 5.5-inch width.')
 
 
 if __name__ == '__main__':

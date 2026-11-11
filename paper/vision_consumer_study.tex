@@ -1,0 +1,55 @@
+\subsection{A Distinct Vision Consumer Under Primary-Task Updates}\label{app:vision_consumer}
+
+The final fixed screen separates the current task from the legacy task.
+An ImageNet-V1 ResNet-18 emits $512$ features for CIFAR-100 at $64\times64$.
+The current head predicts $100$ fine classes and the legacy head predicts
+$20$ coarse classes~\citep{krizhevsky2009cifar}. Both healthy heads fit the same
+$20\%$ labeled subset. Coarse labels are excluded from continuation and OLS
+fitting; they remain available to an explicitly supervised refit. The coarse label is derivable from the fine label.
+
+Seed $1800$ partitions the official training split into $42{,}952$ fitting,
+$2{,}048$ isolated anchor and $5{,}000$ validation inputs. Healthy features are
+cached once; running BN statistics remain frozen. The published one-epoch
+screen uses float32, batch $128$, SGD momentum $0.9$, weight decay
+$5\cdot10^{-4}$, encoder learning rate $10^{-3}$ and head/map rate $10^{-2}$.
+All arms clone the same healthy encoder and affine heads and share future
+minibatches. F freezes the encoder; U updates it without protection. P learns
+a coarse head by healthy-logit MSE at coefficients $0.1,1,10$; B learns a full
+feature map at the same coefficients. OLS uses all paired fitting features
+and healthy logits. The supervised refit uses the original coarse labeled
+subset. No auxiliary loss or augmentation is added: the question is transfer
+of the interface contract under a primary-task update.
+
+\begin{table}[htbp]
+\centering
+\caption{Completed validation endpoints in the distinct-consumer vision
+screen. Fine accuracy evaluates the current task; coarse accuracy, disagreement
+and negative flip rate (NFR) evaluate the legacy task. Healthy fine/coarse
+accuracies are $0.443/0.542$. All repair fits use the fitting pool.}
+\label{tab:vision_consumer}
+\footnotesize
+\begin{tabular}{llrrrr}
+\toprule
+Update & legacy reader & fine acc. & coarse acc. & changed & NFR \\
+\midrule
+F & fixed & $0.397$ & $0.542$ & $0.0\%$ & $0.0\%$ \\
+U & fixed & $0.359$ & $0.428$ & $58.9\%$ & $22.0\%$ \\
+U & OLS & $0.359$ & $0.575$ & $45.7\%$ & $12.1\%$ \\
+U & supervised refit & $0.359$ & $0.565$ & $50.5\%$ & $14.0\%$ \\
+P ($0.1$) & fixed & $0.429$ & $0.555$ & $45.2\%$ & $12.3\%$ \\
+P ($0.1$) & learned & $0.429$ & $0.568$ & $44.6\%$ & $12.0\%$ \\
+P ($0.1$) & OLS & $0.429$ & $0.605$ & $41.2\%$ & $9.2\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+U fails the required two-point current-task gain over F: its difference is
+$-3.78$ points. P ($0.1$) improves over both continuation baselines but changes
+$44.56\%$ of coarse decisions, above the $5\%$ budget. OLS improves coarse
+accuracy while leaving $41.20\%$ of decisions changed. The stronger P
+coefficients $1$ and $10$ produce nonfinite losses. The bounded queue stops
+after these two failures: B ($0.1$) is interrupted, and B ($1,10$) are never
+launched. The B branches remain unmeasured. The failed utility gate ends the screen
+before official test evaluation. The saved complete
+endpoints undergo independent checkpoint/reader replay; failure logs and queue
+states are retained separately. This initial full-backbone recipe yields no positive utility/compatibility result.

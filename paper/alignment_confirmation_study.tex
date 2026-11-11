@@ -1,0 +1,88 @@
+\subsection{Joint Alignment Baselines and Fresh Confirmation}\label{app:alignment_confirmation}
+
+We compare BC-Aligner-style feature alignment~\citep{hu2022backward} with
+logit alignment and direct-head distillation, then confirm the selected
+HAR candidates on fresh seeds.
+
+Development reuses the healthy checkpoints, Adam moments, splits and future
+minibatches of seeds $800$--$802$. Both new families learn a bias-free
+$64\times64$ map $M$, initialized to identity. Feature alignment minimizes
+$\|Mh-h_0\|^2/64$ per example; logit alignment minimizes
+$\|AMh+B-z_0\|^2/n_c$. The former is the single-update linear objective of
+BC-Aligner with an explicit width normalization, so its coefficient in the
+per-example squared-norm convention is $\lambda/64$. There is no historical
+composition in this experiment. The two maps share $4{,}096$ trainable
+parameters; serving composes $AM$ into one legacy head. The direct head is the
+original logit-distillation arm, with $390$ parameters on HAR.
+
+Feature coefficients are $\{0.01,0.1,1,10,100\}$ and logit coefficients are
+$\{0.1,1,10\}$. Each family selects the smallest coefficient whose mean
+validation disagreement is at most $5\%$, or the largest if none qualifies.
+Utility is checked only after this choice. A third candidate applies the fixed
+training-only OLS fit to the original protected features and casts the reader
+to float32. Table~\ref{tab:alignment_development} includes every candidate.
+
+\input{alignment_development_table.tex}
+
+On HAR, feature alignment selects $0.01$ and loses $0.63$ primary points,
+missing the half-point utility gate. Stronger feature penalties have viable
+validation tradeoffs: at $\lambda=1$, primary changes by $-0.09$ points, MSE
+is $0.715$ of detachment, and disagreement is $1.29\%$. Thus the compatibility-only selection policy misses a viable
+feature-alignment tradeoff. Logit-map $0.1$ and the direct-head OLS fit pass and open HAR
+confirmation. On SNR, feature-map $100$ still changes $16.5\%$ of decisions;
+logit-map $10$ and direct-head OLS lose $0.62$ and $0.65$ primary points.
+None opens confirmation, and no coefficient is retuned.
+
+We train ten new HAR seeds, $1300$--$1309$, on the same official train/test
+benchmark, with new healthy checkpoints and the fixed low-label reconstruction
+recipe. Detached, joint and direct-head branches are paired with the selected
+logit map; OLS changes only the final reader on the direct-head features.
+The bank allocates $\delta=0.05/160$ per consumer, covering up to two corpora,
+ten seeds, four protected readers and two monitor sizes. Unused allocations
+are retained. The primary monitor has $1{,}024$ uniform inputs. A nested
+$2{,}048$-input monitor reports additional observation cost and cannot replace
+a failed primary decision.
+
+\input{alignment_confirmation_table.tex}
+
+The direct head meets the complete confirmation criterion. Reconstruction MSE
+is $\FreshMse$ of detachment, with paired $95\%$ interval
+$[\FreshMseLow,\FreshMseHigh]$, and primary accuracy differs by
+$+\FreshGain$ points $[\FreshGainLow,\FreshGainHigh]$. This interval clears
+the $-0.5$-point noninferiority margin. Mean legacy disagreement is
+$\FreshDirectChanged\%$, and all ten primary-monitor bounds meet the
+five-point budget. OLS reduces disagreement to $\FreshOlsChanged\%$ with
+the same primary and reconstruction outcomes and ten certificates. The
+logit map has $1.64\%$ mean disagreement but certifies nine seeds. Its ten
+secondary-monitor certificates leave that primary failure unchanged.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/fig_alignment_confirmation.pdf}
+\caption{Fresh HAR confirmation separates aggregate utility from individual
+consumer acceptance. (a) All ten paired primary differences, their means and
+$95\%$ intervals; the dashed line is the $-0.5$-point margin. (b) Each seed's
+observed legacy disagreement (dot) and finite-population upper bound (tick),
+with certificate counts at the fixed $5\%$ budget. Direct and OLS-fp32 share
+the same encoder, current head and auxiliary head. These are new training
+seeds; the earlier $9/10$ HAR study and retrospective audit remain separate.}
+\label{fig:alignment_confirmation}
+\end{figure}
+
+An isolated serving audit evaluates both heads in float32, using four CPU
+threads, five warm-ups and $51$ alternating repetitions. At batch $1{,}024$,
+direct and OLS ratios are $\FreshDirectLatency\times$ and
+$\FreshOlsLatency\times$ current-only inference; at batch one they are
+$\FreshDirectSingleLatency\times$ and $\FreshOlsSingleLatency\times$.
+Both outputs use one encoder call. The additional reader occupies $390$
+float32 parameters ($1{,}560$ bytes). Both arms also meet the original
+diagnostic timing limits, whose current head computes logits in float64.
+Native primary predictions match that diagnostic across all $50$ saved
+branch endpoints.
+
+Tensor replay reproduces all $50$ metric sets and bounds. Casting OLS to
+float32 changes $11$ of $29{,}470$ seed--example predictions, with maximum
+logit difference $0.182$; certificates use the actual float32 reader.
+
+The fresh HAR confirmation therefore retains a bounded fraction of legacy
+decisions under the actual float32 implementation.
