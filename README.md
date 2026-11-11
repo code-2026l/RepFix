@@ -2,45 +2,36 @@
 
 Silent Scale Shift: When Shared Updates Break Existing Readouts
 
-This repository accompanies the manuscript and its full supplementary material. It contains editable LaTeX, vector figures, numerical records, analysis,
-fixed study plans and review checks. Previous positive and negative studies remain.
+This repository contains the manuscript, editable figures, numerical records,
+fixed study plans and verification scripts.
 
-An accurate current head does not show whether an existing readout still works.
-Matched continuation and unlabeled repair isolate the scale component. Signed
-update audits, specified class/threshold consumers, and actual serving programs
-then separate task learning, interface fidelity and computation cost.
+An update can improve a task while breaking an existing readout. Matched
+continuation and unlabeled repair isolate one scale mechanism. The serving
+studies measure which class and threshold decisions survive and how much
+computation the protected program uses.
 
-The fresh evidence includes useful HAR reconstruction, dense SNR auxiliary
-learning at unrestricted-joint accuracy, and complete nonlinear-suffix transfer
-on ResNet-18 and ViT-B/32. For vision, ten fresh continuation seeds per backbone
-share one pretrained reference, split and label mask. Gains over the stronger
-frozen-feature probe are 0.49 [0.37, 0.60] and
-1.59 [1.49, 1.68] percentage points, respectively.
-These are supervised-transfer results, separately from the auxiliary studies.
-Full-precision and approximate reference implementations have distinct actual
-consumer/cost records. The [scientific assessment](docs/FINAL_REVIEW_20261110.md)
-reports every failed budget, negative control and remaining scope condition.
+Cross-view auxiliary training on CIFAR-100 improves ViT-B/32 accuracy by
+0.84 percentage points [0.66, 1.03] over matched supervised continuation
+and lowers held-out contrastive loss by 19.5%. Twelve continuations span
+four fitted references with shared ImageNet pretraining. The FP32 reference
+preserves every audited old decision. The selected lower-precision reference
+changes at most 0.18% of decisions. [Visual auxiliary results](docs/CONTRASTIVE_RESULT_20261111.md)
 
-A separate confirmation varies four fitted ViT references, label masks and
-train/validation partitions, with three continuation seeds per reference.
-The gain over richer frozen features is 1.39 [0.80, 1.97] points, using four
-reference means for the interval. Both real visual reconstruction pilots fail
-their fixed auxiliary-benefit gate; conditional-reference routing also stops
-at development. See the [follow-up report](docs/FOLLOWUP_REPORT_20261110.md).
+The earlier supervised-transfer studies and the failed visual reconstruction
+and routing screens document how the result depends on the task and access
+conditions. [Earlier experiments](docs/FOLLOWUP_REPORT_20261110.md)
 
 ![Shared computation and fresh transfer](paper/figures/fig_suffix_frontier.png)
 
-A frozen saved-model risk study additionally confirms a small-query diagnostic
-benefit across four fitted ViT references. At32 extra reference queries after
-1024 common map-fitting anchors, prediction MAE falls from4.77 to0.51 points.
-The isotropic baseline ties full covariance; this is a point estimate, separate
-from deployment certification. See [the complete risk study](docs/SMALL_BUDGET_RISK_RESULT_20261110.md).
+Cached fitting anchors also support disagreement forecasts through ridge
+leave-one-out residuals. Exact certification uses an independently sampled
+monitor. [Risk estimation and audit results](docs/CACHED_RISK_RESULT_20261111.md)
 
 ## Paper and files
 
-- [Final paper](paper/RepFix_ICLR2027.pdf): 8 main pages, 95 total.
-- [Supplementary archive](artifacts/2026-11-10/RepFix_RiskDiagnosis_20261110_supplement.zip)
-- [Editable source and evidence](artifacts/2026-11-10/RepFix_RiskDiagnosis_20261110_source.zip)
+- [Paper](paper/RepFix_ICLR2027.pdf)
+- [Supplementary archive](artifacts/2026-11-11/RepFix_VisualBenefit_20261111_supplement.zip)
+- [Editable source](artifacts/2026-11-11/RepFix_VisualBenefit_20261111_source.zip)
 - [Reading guide](docs/REVIEWER_GUIDE.md) · [Evidence index](docs/EVIDENCE_INDEX.md)
 - [Final argument and English](docs/STORY_FINAL_20261110.md) · [Scientific integrity](docs/STORY_INTEGRITY_20261110.json)
 - [Editorial and figure refinement](docs/EDITORIAL_FINISH_20261110.md) · [Integrity checks](docs/EDITORIAL_VISUAL_VERIFICATION_20261110.json)

@@ -59,19 +59,47 @@ The isotropic control ties full covariance within uncertainty.}
 \label{fig:query_risk}
 \end{figure}
 
-The isotropic model obtains $0.508/0.499$ points at $32/64$ queries; its difference
-from full covariance is unresolved. Thus covariance directions add no established
-benefit here. Independent rate-level replay reproduces all forecasts. Averaging
-absolute errors across the three consumers instead of taking their maximum
-retains the gain: clean $32/64$ MAEs are $0.772/0.779$ versus $3.488/2.514$ for
-direct counting. The result is not solely a maximum-of-counts effect.
+At $32/64$ queries the isotropic model obtains $0.508/0.499$ points, close
+to full covariance. Averaging errors across consumers gives clean MAEs of
+$0.772/0.779$ versus $3.488/2.514$ for direct counting. Independent
+rate-level replay reproduces the forecasts.
 
-The Gaussian law is an approximation. Marginal residual moments alone cannot
-identify disagreement: binary logits $Z=\pm a$ with equal probability and
-$E=2Z$ or $E=-2Z$ have identical marginal laws for $Z,E$, yet zero or complete
-sign disagreement. Their dependence differs. The estimator therefore supplies
-no distribution-free safety certificate. Actual confirmation disagreements are
-$6.20$--$7.96\%$, above the $1\%$ repair limit: accurately estimating failure does
-not repair it. Query reductions also do not establish end-to-end runtime savings.
-The raw output arrays, fixed plans and independent replay are included separately
-from raw images and pretrained weights.
+The estimate depends on the joint law. For equally likely binary logits
+$Z=\pm a$, the residuals $E=2Z$ and $E=-2Z$ share a marginal law and yield
+zero and complete sign disagreement, respectively. The observed
+confirmation disagreements are $6.20$--$7.96\%$, above the $1\%$ repair
+limit. The supplementary archive supplies the arrays and replay.
+
+\subsection{Reusing the Fitting Anchors}\label{app:cached_anchor_risk}
+
+The ridge reader already uses $1{,}024$ paired anchors. Its mean leverage
+is $0.741$ on the supervised continuation endpoints, making fitted
+residuals substantially smaller than leave-one-out residuals. With the
+feature normalizer and ridge penalty held fixed, the standard
+leave-one-out identity rescales residual $e_i$ to $e_i/(1-h_i)$, where
+$h_i$ is the diagonal of the ridge hat matrix including the intercept.
+The identity agrees with independent row-deleted refits.
+
+On these endpoints, clean-corpus MAE falls from $4.85$ points for
+in-sample decision counts to $1.09$ for leave-one-out counts and $0.49$
+for isotropic propagation of the leave-one-out residuals. The latter uses
+the original fitting outputs and no additional reference queries. The
+original $32$-query isotropic estimate has MAE $0.51$ points. The
+leave-one-out result on these endpoints is a retrospective control.
+
+We fix the leave-one-out estimator before examining repair risk on the
+twelve cross-view continuations. The clean-corpus MAE is $0.47$ points
+with zero additional reference queries and $0.49$ with $32$ queries.
+The paired difference is $-0.02$ points with $95\%$ interval
+$[-0.27,0.22]$, within the fixed $0.25$-point noninferiority margin.
+On augmented inputs the MAEs are $1.48$ and $1.28$ points, with a paired
+difference of $0.20$ points $[0.10,0.31]$. These fits reuse the same
+reference models and the same initial $1{,}024$ paired accesses. The
+clean-corpus disagreement of the repaired outputs ranges from
+$7.92\%$ to $9.30\%$.
+
+On the clean saved-model corpus, exact stratified audits take $129.60$
+queries to reject a $1\%$ budget, compared with $78.67$ under uniform
+sampling. Holding the residual marginal fixed and reassigning residuals
+to current logits yields constructed disagreement ranges spanning
+$39.49$ points on average.

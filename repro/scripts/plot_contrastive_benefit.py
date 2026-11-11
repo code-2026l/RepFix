@@ -40,6 +40,9 @@ def main():
             ax.errorbar(x,mean,yerr=[[mean-lo],[hi-mean]],color=color,fmt=marker,ms=3.7,lw=1,capsize=2,zorder=3,label=label if i==0 else None)
     for x,budget in [(0,1.2),(1,1.1)]:ax.plot([x-.32,x+.32],[budget,budget],color=C['reference'],ls='--',lw=.8)
     ax.axhline(1,color=C['grid'],lw=.65);ax.set_xticks([0,1],['1','128']);ax.set_xlim(-.5,1.5)
+    upper = max(native['cost'][batch][role]['ratio']['ci95'][1]
+                for batch in ['1','128'] for role in ['chosen','full_precision'])
+    ax.set_ylim(.98, upper + .15)
     ax.set_xlabel('Serving batch size');ax.set_ylabel('Latency / FP32 current only');ax.grid(axis='y');ax.legend(fontsize=6.8,loc='upper right',handlelength=.8)
     panel(ax,'d','Fixed programs, four references')
     save(fig,R/'paper/figures/fig_contrastive_benefit');plt.close(fig)

@@ -1,9 +1,11 @@
 \begin{table}[t]
 \centering
 \caption{Useful learning, legacy decisions and measured CPU cost. Each row
-uses ten fresh continuation seeds from its stated study. HAR reports auxiliary
+uses ten fresh continuation seeds, except the cross-view row, which uses
+four fitted references with three continuations each. HAR reports auxiliary
 MSE relative to detachment; SNR reports primary gain over detachment; vision
-reports primary gain over the richer frozen-feature probe H. Intervals are
+reports primary gain over H for supervised transfer and over D for cross-view
+training. Intervals are
 paired $95\%$. Old change is the largest class/selective disagreement under
 actual selected serving. Vision keeps current outputs at FP32 and permits
 the registered reference approximation. Batches are $1/1024$ for MLPs and
@@ -17,7 +19,8 @@ Study & Learning outcome [95\% interval] & Old change & CPU ratios \\
 HAR & MSE $\ReplayHarMse$ [$\ReplayHarMseLow$, $\ReplayHarMseHigh$] & $0\%$ & $\SmallHarCostOne/\SmallHarCostBatch$ \\
 SNR & $+\DenseSnrGain$ pp [$\DenseSnrGainLow$, $\DenseSnrGainHigh$] & $0\%$ & $\SmallSnrCostOne/\SmallSnrCostBatch$ \\
 ResNet-18 & $+\ServedRNGainRichHead$ pp [$\ServedRNGainRichHeadLow$, $\ServedRNGainRichHeadHigh$] & $\ServedRNDisagreement\%$ & $\ServedRNCostOne/\ServedRNCostBatch$ \\
-ViT-B/32 & $+\ServedViTGainRichHead$ pp [$\ServedViTGainRichHeadLow$, $\ServedViTGainRichHeadHigh$] & $\ServedViTDisagreement\%$ & $\ServedViTCostOne/\ServedViTCostBatch$ \\
+ViT-B/32 transfer & $+\ServedViTGainRichHead$ pp [$\ServedViTGainRichHeadLow$, $\ServedViTGainRichHeadHigh$] & $\ServedViTDisagreement\%$ & $\ServedViTCostOne/\ServedViTCostBatch$ \\
+ViT-B/32 cross-view & $+0.84$ pp [$0.66$, $1.03$] & $0.18\%$ & $1.139/1.098$ \\
 \bottomrule
 \end{tabular}
 \end{table}
