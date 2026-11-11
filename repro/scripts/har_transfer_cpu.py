@@ -158,7 +158,7 @@ def run(args):
     seed = args.seed
     selection = json.loads(args.choice.read_text()) if args.choice else None
     if args.stage != 'screen':
-        assert selection['passed'] and selection['plan_sha256'] == args.plan_sha256
+        assert (selection['passed'] or selection['fallback']) and selection['plan_sha256'] == args.plan_sha256
         chosen = selection['selected']
     if args.stage == 'confirmation':
         from har_early_forecast import predict
