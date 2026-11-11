@@ -13,11 +13,18 @@ from har_early_forecast import BASELINES, SCALES, examples, fit, predict, scores
 PLAN = ROOT / 'docs/plans/2026-11-11-rml-trajectory.md'
 FORECASTER = RESULTS / 'rml_trajectory_forecaster_20261111.json'
 CONFIRMATION = RESULTS / 'rml_trajectory_confirmation_20261111.json'
+REPAIR_PLAN = ROOT / 'docs/plans/2026-11-11-rml-early-repair.md'
+REPAIR_FORECASTER = RESULTS / 'rml_repair_forecaster_20261111.json'
+REPAIR_CONFIRMATION = RESULTS / 'rml_repair_confirmation_20261111.json'
 
 
-def load(stage, records, arrays):
+def load(stage, records, arrays, repair=False):
     confirm = stage == 'confirmation'
     prefix, start, count = ('c', 8600, 16) if confirm else ('d', 8500, 12)
+    plan = REPAIR_PLAN if repair else PLAN
+    forecaster = REPAIR_FORECASTER if repair else FORECASTER
+    if repair:
+        start += 200
     for offset in range(count):
         key = f'{prefix}{offset:03d}'
         row = json.loads((records / f'{key}.json').read_text())
@@ -25,10 +32,10 @@ def load(stage, records, arrays):
         receipt = json.loads(receipt_path.read_text())
         assert row['complete'] and row['device'] == 'cpu' and row['stage'] == stage
         assert row['seed'] == receipt['seed'] == start + offset
-        assert row['plan_sha256'] == receipt['plan_sha256'] == digest(PLAN)
+        assert row['plan_sha256'] == receipt['plan_sha256'] == digest(plan)
         assert row['test_loaded'] == confirm and not receipt['test_loaded'] and receipt['early_epoch'] == 6
         assert digest(receipt_path) == row['forecast_sha256']
-        assert receipt['forecaster_sha256'] == (digest(FORECASTER) if confirm else None)
+        assert receipt['forecaster_sha256'] == (digest(forecaster) if confirm else None)
         path = arrays / f'{key}_states/replay.pt'
         assert digest(path) == row['replay_sha256']
         replay = torch.load(path, map_location='cpu', weights_only=True)
@@ -36,10 +43,11 @@ def load(stage, records, arrays):
         assert receipt['early_sha256'] == state_hash(tuple(outputs[k] for k in ('old_early', 'early', 'thresholds')))
         assert torch.equal(outputs['old']['modulation'], outputs['retained']['modulation'])
         assert len(replay['labels']) == (4400 if confirm else 1600)
+        assert row.get('repair', False) == repair
         yield row, outputs, receipt, replay['labels']
 
 
-def calibrate(rows):
+def calibrate(rows, plan=PLAN):
     examples_by_seed = [row[:3] for row in rows]
     fitted = fit(examples_by_seed[:8])
     errors = {scale: [] for scale in SCALES}
@@ -50,7 +58,7 @@ def calibrate(rows):
             for scale in SCALES:
                 errors[scale].append(float(abs((prior + scale * delta).clamp(0, 1).max() - target)))
     means = {str(scale): float(np.mean(errors[scale])) for scale in SCALES}
-    return dict(plan_sha256=digest(PLAN), scale=min(SCALES, key=lambda s: means[str(s)]),
+    return dict(plan_sha256=digest(plan), scale=min(SCALES, key=lambda s: means[str(s)]),
                 tuning_mae=means, model=fit(examples_by_seed))
 
 
@@ -107,17 +115,65 @@ def confirm(rows):
                 joint_gain_pp=primary, references=references)
 
 
+
+def confirm_repair(rows):
+    from rml_trajectory_cpu import POLICIES, REPAIR_RATES, release_choices
+
+    config = json.loads(REPAIR_FORECASTER.read_text())
+    references = []
+    for row, outputs, receipt, labels in rows:
+        thresholds = outputs['thresholds']['modulation']
+        old = decisions(outputs['old']['modulation'], thresholds)
+        forecasts, actual = {}, {}
+        for key, (first, sixth) in outputs['early'].items():
+            estimate = predict(config, key, outputs['old_early'], first, sixth, outputs['thresholds'])
+            for method, values in estimate.items():
+                np.testing.assert_allclose(values['modulation'], receipt['forecasts'][key][method]['modulation'],
+                                           atol=1e-9, rtol=0)
+            forecasts[key] = estimate
+            output = decisions(outputs['terminal'][key]['modulation'], thresholds)
+            actual[key] = float((output != old).double().mean(0).max())
+        policy = release_choices(forecasts, outputs['primary'])
+        assert policy == receipt['policy']
+        actual['reference'] = 0.
+        scores_pp = {key: 100 * (z.argmax(1) == labels).double().mean().item()
+                     for key, z in outputs['primary'].items()}
+        references.append(dict(seed=row['seed'], actual=actual, policy=policy, scores_pp=scores_pp))
+    methods = {}
+    for method in POLICIES:
+        risks = [ref['actual'][choice] for ref in references for choice in ref['policy'][method].values()]
+        choices = [choice for ref in references for choice in ref['policy'][method].values()]
+        methods[method] = dict(episodes=len(choices), reference=choices.count('reference'),
+                               aligned=sum(key.endswith('/aligned') for key in choices),
+                               direct=sum(key != 'reference' and not key.endswith('/aligned') for key in choices),
+                               violations=sum(risk > .05 for risk in risks), maximum_disagreement=max(risks))
+    differences = {}
+    for rate in REPAIR_RATES:
+        differences[str(rate)] = interval([ref['scores_pp'][f'joint/{rate}'] -
+                                          ref['scores_pp'][f'detach/{rate}'] for ref in references])
+    return dict(plan_sha256=digest(REPAIR_PLAN), forecaster_sha256=digest(REPAIR_FORECASTER),
+                scale=config['scale'], policy=methods, joint_gain_pp=differences,
+                practical_passed=methods['forecast']['violations'] == 0 and
+                methods['forecast']['reference'] < methods['schedule_only']['reference'],
+                references=references)
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('stage', choices=('calibration', 'confirmation'))
     parser.add_argument('--records', type=Path)
     parser.add_argument('--arrays', type=Path)
+    parser.add_argument('--repair', action='store_true')
     args = parser.parse_args()
-    arrays = args.arrays or ROOT / f'tmp/conditional_contrastiverml{args.stage}'
+    kind = 'contrastiverml' + ('repair' if args.repair else '') + args.stage
+    arrays = args.arrays or ROOT / 'tmp' / f'conditional_{kind}'
     torch.set_num_threads(4)
-    rows = list(load(args.stage, args.records or arrays, arrays))
-    result, output = ((calibrate(rows), FORECASTER) if args.stage == 'calibration' else
-                      (confirm(rows), CONFIRMATION))
+    rows = list(load(args.stage, args.records or arrays, arrays, args.repair))
+    if args.repair:
+        result, output = ((calibrate(rows, REPAIR_PLAN), REPAIR_FORECASTER) if args.stage == 'calibration' else
+                          (confirm_repair(rows), REPAIR_CONFIRMATION))
+    else:
+        result, output = ((calibrate(rows), FORECASTER) if args.stage == 'calibration' else
+                          (confirm(rows), CONFIRMATION))
     save(output, result)
     print(json.dumps({k: v for k, v in result.items() if k not in ('model', 'references')}, indent=2))
 
