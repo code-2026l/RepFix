@@ -12,6 +12,38 @@ from har_transfer_cpu import base, fresh_state, legacy_logits, paired
 from readout_nullspace import masked_primary_loss
 
 RATES = (.00001, .0001, .001)
+REPAIR_RATES = (.000003, .00001, .0001)
+POLICIES = ('forecast', 'schedule_only', 'persistence', 'forecast_raw', 'schedule_only_raw')
+
+
+def release_choices(forecasts, programs):
+    choices = {method: {} for method in POLICIES}
+    for program in programs:
+        for method in POLICIES:
+            candidates = [program] if method.endswith('_raw') else [program, program + '/aligned']
+            estimator = method.removesuffix('_raw')
+            choices[method][program] = next(
+                (key for key in candidates if max(forecasts[key][estimator]['modulation']) + .005 <= .05),
+                'reference')
+    return choices
+
+
+@torch.no_grad()
+def aligned_logits(model, x, anchors, reference_logits, reader):
+    h = base.embeds(model, anchors)
+    mean = h.mean(0)
+    scale = h.std(0, unbiased=False).clamp_min(.001)
+    a = (h - mean) / scale
+    a = torch.cat((a, a.new_ones(len(a), 1)), dim=1).double()
+    penalty = torch.eye(a.shape[1], dtype=a.dtype) * (.01 * len(a))
+    penalty[-1, -1] = 0.
+    residual = (reference_logits - base.late.linear(h, reader)).double()
+    coeff = torch.linalg.solve(a.T @ a + penalty, a.T @ residual)
+    h = base.embeds(model, x)
+    b = (h - mean) / scale
+    b = torch.cat((b, b.new_ones(len(b), 1)), dim=1)
+    return dict(modulation=base.late.linear(h, reader).double() + b.double() @ coeff)
+
 
 
 def fit_stream(state, data, seed, first, last):
@@ -60,24 +92,35 @@ def run(args):
     reader = base.fit_affine(h, y[known])
     readers = dict(modulation=reader)
     thresholds = dict(modulation=list(confidence_thresholds(base.late.linear(h, reader)).values()))
+    anchors = (raw['X_tr'][order[15200:15712]].float() - mean) / scale if args.repair else None
+    old_anchor = legacy_logits(healthy, anchors, readers)['modulation'] if args.repair else None
+
+    def measure(program, model, population):
+        result = {program: legacy_logits(model, population, readers)}
+        if args.repair:
+            result[program + '/aligned'] = aligned_logits(model, population, anchors, old_anchor, reader)
+        return result
+
     states = {f'{objective}/{rate}': fresh_state(healthy, optimizer.state_dict(), objective, 1., rate, 300)
-              for objective in ('detach', 'joint') for rate in RATES}
+              for objective in ('detach', 'joint') for rate in (REPAIR_RATES if args.repair else RATES)}
     probe = monitor if confirmation else evaluation
     x_probe = (raw['X_tr'][probe].float() - mean) / scale
     old_early = legacy_logits(healthy, x_probe, readers)
     early, forecasts = {}, {}
     for program, state in states.items():
         fit_stream(state, data, args.seed, 0, 2)
-        first = legacy_logits(state['model'], x_probe, readers)
+        first = measure(program, state['model'], x_probe)
         fit_stream(state, data, args.seed, 2, 6)
-        sixth = legacy_logits(state['model'], x_probe, readers)
-        early[program] = first, sixth
-        if confirmation:
-            forecasts[program] = predict(config, program, old_early, first, sixth, thresholds)
+        sixth = measure(program, state['model'], x_probe)
+        for key, first_logits in first.items():
+            early[key] = first_logits, sixth[key]
+            if confirmation:
+                forecasts[key] = predict(config, key, old_early, first_logits, sixth[key], thresholds)
+    policy = release_choices(forecasts, states) if args.repair and confirmation else {}
     receipt = args.out.with_suffix('.forecast.json')
     base.save(receipt, dict(seed=args.seed, plan_sha256=args.plan_sha256, early_epoch=6,
         test_loaded=False, forecaster_sha256=base.digest(args.forecaster) if confirmation else None,
-        early_sha256=paired.state_hash((old_early, early, thresholds)), forecasts=forecasts))
+        early_sha256=paired.state_hash((old_early, early, thresholds)), forecasts=forecasts, policy=policy))
     seal = base.digest(receipt)
     print(json.dumps(dict(forecast_fixed=True, epoch=6)), flush=True)
     for state in states.values():
@@ -93,7 +136,7 @@ def run(args):
     terminal, primary = {}, {}
     for program, state in states.items():
         model = state['model']
-        terminal[program] = legacy_logits(model, x_end, readers)
+        terminal.update(measure(program, model, x_end))
         with torch.no_grad():
             primary[program] = model.primary(base.embeds(model, x_end))
     folder = args.out.parent / f'{args.out.stem}_states'
@@ -103,7 +146,7 @@ def run(args):
                    retained=retained, terminal=terminal, primary=primary)
     torch.save(dict(outputs=outputs, labels=labels), replay)
     base.save(args.out, dict(complete=True, device='cpu', stage=args.stage, seed=args.seed,
-        plan_sha256=args.plan_sha256, test_loaded=confirmation, branches=[],
+        plan_sha256=args.plan_sha256, test_loaded=confirmation, repair=args.repair, branches=[],
         labeled_examples=int(known.sum()), forecast_sha256=seal, replay_sha256=base.digest(replay),
         source_sha256={Path(__file__).name: base.digest(Path(__file__))}))
 
@@ -114,6 +157,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, required=True)
     parser.add_argument('--plan-sha256', required=True)
     parser.add_argument('--forecaster', type=Path)
+    parser.add_argument('--repair', action='store_true')
     parser.add_argument('--out', type=Path, required=True)
     torch.set_num_threads(1)
     torch.set_num_interop_threads(1)
