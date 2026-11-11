@@ -204,3 +204,16 @@ preserves byte-level result provenance across Git checkout line-ending policies.
 Paths above are relative to `repro/results/CPUCONT/`. Raw datasets, large prefix
 caches and trained weights are not bundled. Executed historical source bytes
 remain under `repro/source_versions/`.
+
+## Subject-disjoint utility and sealed risk forecasts, 2026-11-11
+
+The paired HAR screen, calibration and confirmation are in
+`contrastive_contrastivehar{screen,calibration,confirmation}_export/`.
+The graph teacher is in `contrastive_contrastivehargraph{screen,confirmation}_export/`.
+The RadioML trajectory records are in
+`contrastive_contrastiverml{calibration,confirmation}_export/`.
+The candidate-specific alignment and release experiment is in
+`contrastive_contrastivermlrepair{calibration,confirmation}_export/`.
+Each directory retains run-level results and any sealed receipts.
+See [Subject transfer](SUBJECT_TRANSFER_RESULT_20261111.md) for the
+fixed protocols, comparisons and numerical archive.

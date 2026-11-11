@@ -32,16 +32,17 @@ def main():
                    'repro/scripts/plot_risk_query_result.py',
                    'repro/scripts/plot_contrastive_benefit.py',
                    'repro/scripts/plot_early_update.py',
-                   'repro/scripts/plot_legacy_precision.py']:
+                   'repro/scripts/plot_legacy_precision.py',
+                   'repro/scripts/plot_subject_transfer.py']:
         runpy.run_path(str(ROOT / script), run_name='__main__')
-    assert len(EXPORTS) == 31
+    assert len(EXPORTS) == 32
     assert all(abs(v['width_inches'] - 5.5) < 1e-10 for v in EXPORTS.values())
     report = dict(figures=EXPORTS, figures_rebuilt=len(EXPORTS),
                   all_vector_type42=True, all_text_within_canvas=True,
                   legacy_visual_changes_preserve_numerical_artists=True)
     (ROOT / 'paper/figures/publication_figure_manifest.json').write_text(
         json.dumps(report, indent=2) + '\n',encoding='utf-8',newline='\n')
-    print('Rebuilt all thirty-one included figures at final 5.5-inch width.')
+    print('Rebuilt all thirty-two included figures at final 5.5-inch width.')
 
 
 if __name__ == '__main__':

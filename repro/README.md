@@ -1,6 +1,6 @@
 # Reproduction scripts and archived results
 
-The current manuscript has **31 included figures**, rebuilt by coordinated
+The current manuscript has **32 included figures**, rebuilt by coordinated
 generators through one entry point. Start with the artifact-wide
 [reproduction guide](../docs/REPRODUCIBILITY.md) and
 [evidence index](../docs/EVIDENCE_INDEX.md).
@@ -21,7 +21,7 @@ dependencies, and keep the extracted release intact. They run on CPU.
 | Purpose | Script |
 |---|---|
 | Verify files, recorded protocol/source hashes, and optional review checks | `scripts/verify_supplement.py` |
-| Rebuild all 31 manuscript figures from shipped records | `scripts/render_paper_figures.py` |
+| Rebuild all 32 manuscript figures from shipped records | `scripts/render_paper_figures.py` |
 | Compile the supplied manuscript and check its page boundary | `scripts/build_cpu_paper.py` |
 | Paired checkpoint training | `scripts/paired_readout_continuation.py` |
 | Fixed readout repairs | `scripts/checkpoint_repair_audit.py`, `scripts/readout_alignment.py` |
@@ -53,3 +53,5 @@ exceptions. Complete negative outcomes and fixed development decisions are retai
 Older standalone plotting scripts and research notes remain available, but their
 figure numbering and absolute-threshold scaling descriptions belong to earlier
 versions. Use the coordinated renderer and current evidence index for this paper.
+
+The HAR and RadioML continuation records and instructions are indexed in [Subject transfer](../docs/SUBJECT_TRANSFER_RESULT_20261111.md).

@@ -82,9 +82,11 @@ $0.53$ points ($[0.20,0.86]$) over doubled-epoch continuation, at the same
 suffix-forward budget. With AugReg weights, the fixed recipe gains $0.60$
 points ($[0.15,1.05]$) over matched one-view continuation. The retained
 FP32 reference preserves every audited old class and threshold decision.
-On CIFAR-10 with ResNet-18, a warning at epoch two flags $15$ of $17$
-later budget exceedances. A replay of a fixed limited-reference policy
-keeps all $24$ updates within the old-decision budget.
+Early logits forecast later readout disagreement on RadioML with
+$2.25$ points of error, compared with $2.87$ for a schedule-aware
+baseline and $8.27$ for persistence. On CIFAR-10, a policy set before
+the terminal update keeps all $24$ evaluated continuations within the
+old-decision budget.
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
@@ -474,7 +476,17 @@ $25\%$ of examples to the old suffix, compared with $75\%$ under uniform
 referral. The current path is shared across all interventions
 (Appendix~\ref{app:early_update}).
 
-On the strong updates, an INT8 legacy block reads the frozen prefix
+On RadioML, epoch-six margins forecast epoch-24 disagreement with
+$2.25$ points of error, compared with $2.87$ for schedule and $8.27$
+for persistence. Joint SNR training gains $0.35$ points of modulation
+accuracy ($[0.20,0.50]$) at rate $10^{-4}$ with matched labels and steps
+(Appendix~\ref{app:rml_trajectory}). On subject-disjoint HAR, the
+forecast beats persistence, with an uncertain gain over schedule.
+Reconstruction lowers its own loss and graph-derived targets help on
+development subjects but hurt on the test cohort
+(Appendix~\ref{app:subject_transfer}).
+
+On the strong CIFAR-10 updates, an INT8 legacy block reads the frozen prefix
 and keeps its residual addition and output gate at FP32. On $9{,}000$
 official CIFAR-10 test images, it uses zero exact old-block calls.
 The largest disagreement is $1.73\%$, with the same FP32 current
@@ -509,15 +521,9 @@ and spectral measures~\citep{jing2022understanding,dong2021attention,kim2025taxo
 We measure variation across examples and use input repair to test
 decodability after contraction.
 
-Auxiliary-gradient projection~\citep{dery2021attittud,zhu2025gradops},
-auxiliary selection~\citep{navon2021auxiliary,jiang2023forkmerge,shin2024dgr},
-weight-space nullspace adaptation~\citep{pham2026ness} and mergeable
-frozen-backbone updates~\citep{hu2022lora} frame our intervention controls;
-AlphaEdit constrains weight updates to a nullspace when editing stored
-knowledge~\citep{fang2025alphaedit}. Activity recognition~\citep{ucihar},
-modulation recognition~\citep{radioml} and battery
-health~\citep{nasa_battery,severson2019data,attia2020closed,pradhan2022soh}
-supply the test domains.
+Our intervention controls build on auxiliary-gradient projection~\citep{dery2021attittud,zhu2025gradops}, auxiliary selection~\citep{navon2021auxiliary,jiang2023forkmerge,shin2024dgr}, and nullspace
+constraints~\citep{pham2026ness,fang2025alphaedit}. We test activity and
+modulation recognition~\citep{ucihar,radioml} and battery health~\citep{nasa_battery,severson2019data,attia2020closed,pradhan2022soh}.
 
 DeltaCNN reuses sparse activation differences~\citep{parger2022deltacnn}.
 LoRA and adapter serving share base parameters~\citep{hu2022lora,chen2024punica,sheng2024slora}.
@@ -530,13 +536,9 @@ fine-tuning~\citep{kumar2022finetuning}.
 \section{Conclusion}\label{sec:conclusion}
 
 Task information can survive an update that invalidates an existing readout.
-Scale correction recovers much of the lost accuracy in HAR, while decision
-audits expose changes that accuracy alone misses. Exact replay and shared-prefix
-execution retain the healthy function as nonlinear learning continues.
-The useful capacity of the update and the cost of retaining
-the reference both depend on the architecture. An upgrade should be evaluated
-on what it learns, which existing decisions it preserves, and what its served
-program costs.
+Scale correction can recover the old interface, and exact replay can keep
+it in service while the encoder learns. The decisions an upgrade preserves
+and the cost of serving them deserve the same scrutiny as its task accuracy.
 
 \clearpage
 \section*{AI Use Statement}
@@ -2421,5 +2423,6 @@ Additional ten-seed sweeps use $\lambda\in\{2,5,20,50,200,500\}$ on HAR and $\la
 \input{early_update_study.tex}
 
 \input{legacy_precision_study.tex}
+\input{subject_transfer_study.tex}
 
 \end{document}
